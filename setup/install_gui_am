@@ -1,0 +1,1116 @@
+#!/bin/sh
+# This is the install script used to install the Annex Manager
+
+trap "exit_with_error 'Installation Aborted'" 1 2 3 15
+
+[ "$PWD" ] || PWD=`pwd`
+
+
+chmod_files ()
+    {
+    mode=$1
+    shift
+    for i
+	do
+        chmod $mode $i
+	done
+    }
+
+change_owner_and_group ()
+    {
+    if [ "$PLATFORM" = SCO_UNIX ]
+	then
+	for i
+	    do
+	    if [ -d "$i" ]
+	    	then
+	    	find $i -print | (
+		  while read fn
+		      do
+		      chown $owner $fn
+		      chgrp $group_id $fn
+		      done
+		)
+	    else
+	    	chown  $owner "$i"
+	    	chgrp  $group_id "$i"
+		fi
+	    done
+	else
+	    chown -R $owner "$@"
+	    chgrp -R $group_id "$@"
+	    fi
+    }
+
+#
+exit_with_error ()
+    {
+    if [ -f VERSION.SAF ]
+       then
+       mv VERSION.SAF VERSION
+       fi
+
+    echo "$@" 1>&2
+    exit 1
+    }
+
+find_programs ()
+    {
+    YPMATCH=
+    [ -f /usr/bin/ypmatch ] && YPMATCH=/usr/bin/ypmatch
+    if [ -z "$YPMATCH" ]
+	then
+        [ -f /bin/ypmatch ] && YPMATCH=/usr/bin/ypmatch
+	fi
+
+    NISMATCH=
+    [ -f /usr/bin/nismatch ] && NISMATCH=/usr/bin/nismatch
+    if [ -z "$NISMATCH" ]
+	then
+        [ -f /bin/nismatch ] && NISMATCH=/usr/bin/nismatch
+	fi
+    }
+#
+validate_entry_in_map ()
+    {
+    # first try to get the name from the passwd file
+    if [ "$1" = "0" ]
+	then
+	return 0
+	fi
+
+    grep "^$1:" /etc/$2 2> /dev/null >&2 && return 0
+
+    if [ "$YPMATCH" ]
+	then
+ 	$YPMATCH "$1" $2 2> /dev/null >&2 && return 0
+	fi
+
+    if [ "$NISMATCH" ]
+	then
+ 	$NISMATCH "$1" $2 2> /dev/null >&2 && return 0
+	fi
+    return 1
+    }
+
+#
+determine_platform ()
+    {
+    host=`uname -n`
+    arch=`uname -s`
+    if [ $arch = $host ]
+        then
+        platform=SCO_UNIX
+        PLATFORM=SCO_UNIX
+    else
+        platform=$arch
+	case $platform in
+	SunOS)
+	    case `uname -r` in
+	    5.4*|5.3*|5.2*)
+		 ;;
+	    5.*)
+		platform=SunOS5
+		;;
+	    esac
+	esac
+        fi
+    }
+ 
+#
+setup_echo_statement()
+    {
+    case $platform in 
+    SunOS)
+	case `uname -a` in
+	*5.*)
+	    bsc=1
+	    ;;
+	*4.*) 
+            bsc=0
+	    ;;
+	esac
+	;;
+    AIX|SunOS5)
+        bsc=1
+	;;
+    HP*)
+	bsc=1
+	;;
+    *)
+        bsc=0
+	;;
+    esac
+    }
+
+#
+setup_copy_command()
+    {
+    if [ $platform = SCO_UNIX ]
+        then
+        cpcmd='copy'
+        permopt='-o'
+    else
+        cpcmd='cp'
+        permopt='-p'
+        fi
+    }
+
+#
+echo_no_newline()
+    {
+    echo
+    case $bsc in
+    0)
+	echo -n "$@"
+	;;
+    1)
+	echo "$@" "\c"
+	;;
+    esac
+    }
+
+#
+mrg_ud_grps ()
+    {
+    rm -f tmp_ud_grp
+
+    for base in data/gui_am_data/mib_func.dat \
+     		data/gui_am_data/mib_func_grp.dat \
+      		data/gui_am_data/mib_func_vars.dat
+	do
+	echo "Processing $base"
+	old_datafile=$GUI_AM_DIR/$base	
+	new_datafile=$ver_dir/$base
+
+        if [ ! -f $old_datafile ]
+	    then
+            echo No old datafile, $datafile, to merge
+   	else
+      	    awk '{
+  		 if ($1 >= 128) { print }
+		 } ' $old_datafile > tmp_ud_grp
+
+      	    cat $new_datafile tmp_ud_grp > tmp_grps.dat
+      	    mv tmp_grps.dat $new_datafile
+      	    rm tmp_ud_grp
+	    change_owner_and_group $new_datafile
+	    fi
+	done
+    }
+
+#
+gui_am_dir_not_set ()
+    {
+    if [ -z "$GUI_AM_DIR" ]
+        then
+        if [ -d bin ]
+	    then
+	    cat <<-END!
+		WARNING: The enviroment variable GUI_AM_DIR is not set;
+		however there is a bin directory in the current working
+		directory ('$PWD').  
+
+		This directory may contain the installed Annex
+		Manager.  If you do not wish to merge current data,
+		press 'c' to continue.  Otherwise,
+		  
+		   - abort by pressing 'a'
+		   - set the environment variable GUI_AM_DIR 
+		   - restart the installation process.
+END!
+        else
+	    cat <<-END!
+		WARNING: The enviroment variable GUI_AM_DIR is not set.
+
+		If there is a current installation of Annex Manager
+		and you want to merge the current data, 
+
+		   - abort the installation by pressing 'a' 
+		   - set the environment variable GUI_AM_DIR 
+		   - restart the installation process.  
+
+		If this is a new installation or you do not wish to
+		merge current data, press 'c' to continue.
+END!
+	    fi
+    elif [ ! -d "$GUI_AM_DIR" ]
+        then
+        cat <<-END!
+	WARNING: The enviroment variable GUI_AM_DIR is set to a
+	directory that does not exist ($GUI_AM_DIR).  
+
+	In order to merge data from a currently installed Annex
+	Manager, GUI_AM_DIR needs to point the directory where the
+	Annex Manager is installed.
+
+	If you do not wish to merge current data or this is a new
+	installation, press 'c' to continue.
+	
+	Otherwise, 
+	    - abort by pressing 'a'
+	    - set the environment variable GUI_AM_DIR 
+	    - restart the installation process.
+
+END!
+    else
+        cat <<-END!
+	The enviroment variable GUI_AM_DIR is set to '$GUI_AM_DIR'. 
+	The installation script will merge data from the current
+	installation ($old_version) in '$GUI_AM_DIR' into the installation 
+	directory, '$PWD'.
+	
+	If this is correct, press 'c' to continue. 
+	Otherwise, 
+	  - abort by pressing 'a'
+	  - make the necessary changes for your correct installation
+	  - restart the installation process.
+END!
+
+        echo_no_newline "Continue (c/a) [c] "
+	read cont
+	case $cont in
+	[Aa])
+	    exit_with_error 'Installation aborted by user.' 
+	    ;;
+	esac
+	return 0
+        fi
+
+    while :
+        do
+        echo_no_newline "Continue (c/a) [c] "
+        read cont
+
+        case $cont in
+        [Aa])
+	    exit_with_error 'Installation aborted by user.' 
+	    ;;
+        ""|[cC])
+          echo "WARNING: You will not be able to copy current Annex lists," 
+          echo "         scripts, access list, user-defined parameter groups," 
+          echo "         or saved output text." 
+          echo 
+          while [ "$cont" != 'y' ]
+	      do
+              echo_no_newline "Continue with installation (y/n) [y] "
+              read cont 
+	      case $cont in
+	      ""|[yY])
+		    cont=y
+		    ;;
+	      [nN])
+		    exit_with_error "Installation aborted by user" 
+		    ;;
+	      esac
+	      done
+	      break
+	      ;;
+        esac
+    done
+    return 0
+    }
+
+read_value ()
+    {
+    read tmp_value 
+    case $tmp_value in
+    "")
+	tmp_value=$1
+	;;
+    esac
+    echo "$tmp_value"
+    }
+
+#
+which_owner ()
+    {
+    # change the ownership if necessary
+
+    echo_no_newline  \
+"
+The installation program will change the ownership of Annex Manager
+files to root.
+
+Only owner of certain configuration files may modify those files.
+
+To have the installation script change the ownership to
+another user id, enter the username now or press return to accept root.
+
+
+Enter Username [root] "
+    owner=`read_value root` 
+
+    until validate_entry_in_map $owner passwd
+	do
+	echo_no_newline "
+The name '$owner' was not found in /etc/passwd or NIS or NIS+
+
+Enter a valid user name [root] "
+
+	owner=`read_value root`
+	done
+
+
+    if validate_entry_in_map sys group
+	then
+	group_id=sys
+    elif validate_entry_in_map bin group
+	then
+	group_id=bin
+    else
+        group_id=0
+	fi
+
+    echo_no_newline  "The installation program will change the group id of Annex Manager
+files and directories  to group '$group_id'.  Only members of this group can
+add data files.
+
+To have the installation script change the group id, enter the group id
+now, or press return to accept $group_id.
+
+Enter Group id [$group_id] "
+
+    group_id=`read_value $group_id`
+
+    until validate_entry_in_map $group_id group
+	do
+	echo_no_newline "
+The group '$group_id' was not found in /etc/group or NIS or NIS+
+
+Enter a valid group id [$group_id] "
+	group_id=`read_value bin`
+	done
+    }
+
+#
+check_platform ()
+    {
+    case $platform in
+    SunOS5|SunOS|HP-UX|AIX|SCO_UNIX)
+
+	if [ "$1" -eq 1 ]
+	    then
+            echo "The installation program has detected that you are currently"
+            echo "running the $platform operating system."
+	else
+	    return 0
+	    fi
+
+        while :
+	    do
+	    echo_no_newline "Is this correct (y/n) [y] "
+      	    read correct_os  
+	    first_check=0
+      	    case $correct_os in
+	    ""|[yY])
+		return 0
+		break
+		;;
+	    [nN])
+		break
+		;;
+	    esac
+	    done
+	;;
+    [qQ][uU][iI][tT]|[qQ])
+	exit_with_error "Installation aborted by user"
+	;;
+    *)
+	echo "WARNING: The install process does not recognize the operating"
+	echo "system that you are running." 
+	echo 
+        echo "The installation program has detected that you are currently"
+        echo "running the $platform operating system."
+	;;
+	esac
+    return 1
+    }
+
+#
+do_merge()
+    {
+    echo 
+    echo "All old data will come from GUI_AM_DIR='$GUI_AM_DIR'"
+    echo 
+    
+    echo "
+A copy of the X resource file, Gui_am, and the keysym definitions,
+XKeysymDB_gui_am, will be copied from $GUI_AM_DIR/bin to your new
+installation area and appended with '.old'. 
+
+You must merge any changes you may have made to them into the new
+version files.
+"
+    $cpcmd $GUI_AM_DIR/bin/Gui_am $ver_dir/bin/Gui_am.old 2>/dev/null >&2
+    change_owner_and_group $ver_dir/bin/Gui_am.old
+
+    $cpcmd $GUI_AM_DIR/bin/XKeysymDB_gui_am $ver_dir/bin/XKeysymDB_gui_am.old 2>/dev/null >&2
+    change_owner_and_group $ver_dir/bin/XKeysymDB_gui_am.old 
+    
+    while :
+	do
+        echo_no_newline \
+	   "Do you want a copy of your old user-defined parameter groups (y/n) [y] "
+        read merge_ud_grps 
+	case  $merge_ud_grps in
+	""|[yY])
+            mrg_ud_grps 
+	    break
+	    ;;
+	[Nn])
+	    break
+	    ;;
+	esac
+	done
+    
+    rm -f $ver_dir/data/anx_lists/* > /dev/null 2>&1
+
+
+    while :
+	do
+        echo_no_newline "Do you want a copy of your old Annex lists (y/n) [y] "
+        read copy_anx_lists 
+        case $copy_anx_lists in
+	""|[yY])
+	    for i in $GUI_AM_DIR/data/anx_lists/*
+		do
+	        case $i in
+	        $GUI_AM_DIR/data/anx_lists/'*')
+		    break
+		    ;;
+	        *)
+		    echo "Copying $i"
+		    $cpcmd $permopt $i $ver_dir/data/anx_lists
+		    ;;
+	        esac
+		done
+	    break
+	    ;;
+	[nN])
+	    break
+	    ;;
+        esac
+        done
+    
+    while :
+	do
+        echo_no_newline "Do you want a copy of your old user-defined scripts (y/n) [y] "
+        read copy_anx_scripts 
+	case $copy_anx_scripts in
+        ""|[Yy])
+	    for  i in $GUI_AM_DIR/data/anx_scripts/*
+		do
+		case $i in
+		$GUI_AM_DIR/data/anx_scripts/'*')
+		    break
+		    ;;
+		*/xylo_def_*)
+		    continue
+		    ;;
+		*)
+		    echo "Copying $i"
+		    $cpcmd $permopt $i $ver_dir/data/anx_scripts
+		    ;;
+		esac
+		done
+	    break
+	    ;;
+	[Nn])
+	    break
+	    ;;
+	esac
+	done
+    
+    while :
+	do
+        echo_no_newline \
+	  "Do you want a copy of your old saved output text (y/n) [y] "
+        read get_saved_data 
+        case $get_saved_data in
+	""|[yY])
+	    for i in $GUI_AM_DIR/data/saved_text/*
+		do
+	        case $i in
+	        $GUI_AM_DIR/data/saved_text/'*')
+		    break
+		    ;;
+	        *)
+		    echo "Copying $i"
+		    $cpcmd $permopt $i $ver_dir/data/saved_text
+		    ;;
+	        esac
+		done
+	    break
+	    ;;
+	[nN])
+	    break
+	    ;;
+        esac
+        done
+    
+    while :
+	do
+        echo_no_newline "Do you want a copy of your old user access list (y/n) [y] "
+        read  copy_user_list 
+	case $copy_user_list in
+	""|[yY])
+            $cpcmd $permopt $GUI_AM_DIR/bin/users.list $ver_dir/bin/users.list 2>/dev/null >&2
+	    break
+	    ;;
+        [nN])
+            rm -f $ver_dir/bin/users.list
+            echo >  $ver_dir/bin/users.list
+	    break
+	    ;;
+	esac
+	done
+    }
+
+find_name ()
+    {
+    grep "^$1\$" $ver_dir/bin/users.list > /dev/null 2>&1
+    return $?
+    }	    
+
+put_name_on_list ()
+    {
+    echo $1 >> $ver_dir/bin/users.list
+    }
+#
+add_name ()
+    {
+    if find_name $1
+	then
+	return 1
+    else
+	if validate_entry_in_map $name passwd
+	    then
+	    put_name_on_list $name
+	else
+	    echo_no_newline "
+The name '$name' was not found in /etc/passwd or NIS or NIS+
+
+Do you still want the name ($1) added y/n [n] "
+	    read ok_to_add
+	    case $ok_to_add in
+	    [Yy])
+		put_name_on_list $name
+		;;
+	    esac
+	    fi
+        return 0
+	fi
+    }
+
+#
+add_the_access_list ()
+    {
+    #
+    # Code to read in new users for the access list.  We prompt the user to
+    # to add other users.  If they want to, we provide a loop to enter names.
+    # The installer enters '.' to quit.  The installers name is automatically
+    # added to the list.  If any of the names are already in the list, the name
+    # is not readded.
+    #
+
+    name=$my_id
+    add_name $name 
+
+    echo "
+In order for users to configure the Annex (use Set, Execute Script,
+Copy, Boot, and Reset commands) you must enter their user names in the
+user access list.  root will be added to the user access list
+automatically.
+"
+    
+    echo "This is the current access list"
+    cat $ver_dir/bin/users.list 
+    add_others=
+    until [ "$add_others" ]
+	do
+        echo_no_newline "Do you want to add other names to the user access list (y/n) [y] "
+        read add_user_list
+        case $add_user_list in
+        [Nn])
+            return 
+	    ;;
+	""|[Yy])
+            add_others=1
+	    ;;
+	esac
+        done
+
+	MESG1='Enter user names (one per line) to permit set access.
+Type "<CR>",  "." or ^D on a line by itself to end.
+Enter a ? to print the current access list
+
+User name [<CR> to end]: '
+
+	echo_no_newline "$MESG1"
+	while read name
+	    do
+	    case $name in
+	    ""|'.')
+		break
+		;;
+	    '?')
+		echo "
+CURRENT ACCESS LIST $ver_dir/bin/users.list"
+		cat $ver_dir/bin/users.list 
+		;;
+	    '')
+		echo "Invalid name"
+		;;
+	    *)
+    		add_name $name || echo "$name already in list"
+		;;
+	    esac
+
+	    echo_no_newline "$MESG1"
+	    done
+    }	    
+
+#
+default_chroma ()
+    {
+    rm -f $ver_dir/bin/default.chroma
+    while :
+	do
+        echo_no_newline "What default color scheme do you want (c=color/m=mono) [c] "
+	read dft_chroma  
+	case $dft_chroma in
+	[mM])
+            echo gui_am_mono > $ver_dir/bin/default.chroma
+	    return
+	    ;;
+	""|[cC])
+            echo gui_am_color > $ver_dir/bin/default.chroma
+	    return
+	    ;;
+	esac
+	done
+    }
+
+#
+replace_version ()
+    {
+
+    copy_to_current=1      
+    if [ -d bin ]
+	then
+	while :
+	    do
+            echo_no_newline "Do you want to replace old version ($prefix/$old_version)
+with $PWD/$ver_dir (y/n) [y] "
+            read replace_version_dir
+	    case $replace_version_dir in
+	    ""|[Yy])
+		break;
+		;;
+	    [Nn])
+		break;
+		copy_to_current=0
+		;;
+            esac
+	    done
+        fi
+    echo
+    echo 'Finishing installation...'
+
+    if [ "$copy_to_current" = 1 ]
+        then
+	relink_file bin
+	relink_file data
+        fi
+
+    tar xpf $tar_dev uninstall_gui_am 
+    change_owner_and_group uninstall_gui_am
+
+    # set permissions correctly
+    chmod_files 775 $ver_dir/bin \
+      $ver_dir/data  \
+      data/anx_lists \
+      data/anx_scripts  \
+      data/gui_am_data \
+      data/saved_text 
+
+    chmod_files 444 data/anx_scripts/xylo_def_*.scr
+
+    chmod_files 664 data/gui_am_data/mib_func.dat \
+              data/gui_am_data/mib_func_grp.dat \
+              data/gui_am_data/mib_func_vars.dat \
+              data/gui_am_data/mib_site_def.dat
+
+    chmod_files 644 data/help/* bin/users.list
+
+
+    }
+
+
+#
+file_check ()
+    {
+    if touch $1 2>/dev/null
+	then
+	rm -f $1
+    else
+	exit_with_error \
+"You do not have the correct permissions in the $3
+$2 to perform the installation.
+
+This directory may be on an NFS filesystem which does not allow root
+access. 
+
+"
+
+	fi
+    }
+
+#
+check_for_root ()
+    {
+    case $PWD in
+    /)
+	exit_with_error "ERROR:
+You are installing this product in the root directory.
+Annex Manager cannot be installed in '/'. "
+	;;
+    esac
+
+    if [ "$GUI_AM_DIR" ]
+        then
+	if [ -d "$GUI_AM_DIR" ]
+	    then
+            prefix=$GUI_AM_DIR
+	else
+	    exit_with_error "GUI_AM_DIR ($GUI_AM_DIR) does not exist.
+Installation Aborting"
+        fi
+    else
+        prefix=$PWD
+        fi
+    tmp_id=`id`
+    ODIFS=$IFS
+    IFS='()'
+    set $tmp_id
+    IFS="$OLDIFS"
+    my_id=$2
+
+    case $my_id in
+    root*)
+	file_check $prefix/$$.xx.$$ $prefix "Annex Manager Directory"
+	file_check $PWD/$$.xx.$$ $PWD	"Installation Directory"
+        ;;
+    *)
+       exit_with_error "You must install this product as root"
+       ;;
+    esac
+    }
+
+relink_file()
+    {
+    WARNING="WARNING:
+    You must manually remove $prefix/$1
+    and link $ver_dir/$1 to $prefix/$1"
+
+    if [ \( ! -d $1 \) -a \( ! -f $1 \) ]
+	then
+	if ln -s $ver_dir/$1 $1
+	    then
+	    :
+	else
+	    echo "WARNING: You must manually link $ver_dir/$1 to $prefix/$1"
+	    fi
+    elif rm $1
+	then
+	if ln -s $ver_dir/$1 $1
+	    then
+	    :
+	else
+	    echo "WARNING: You must manually link $ver_dir/$1 to $prefix/$1"
+	    fi
+    else
+	echo "$WARNING"
+	fi
+    }
+
+# begin the program 
+
+[ ! -t 0 ] && exit_with_error "Your standard input must be connected to a terminal"
+
+[ ! -t 1 ] && exit_with_error "Your standard output must be connected to a terminal"
+
+[ $# -ne 1 ] && exit_with_error "Correct usage: $0 tar_device"
+
+
+AMVER=R2.3
+
+echo "Begining Annex Manager $AMVER Installation
+
+"
+
+tar_dev="$1"
+
+check_for_root
+
+[ ! -f $tar_dev ] && exit_with_error "$tar_dev does not exist"
+[ ! -r $tar_dev ] && exit_with_error "No read permission on $tar_dev"
+
+
+if [ -f "$prefix/VERSION" ]
+    then
+    old_version=`cat "$prefix/VERSION"`
+else
+    old_version="unknown"
+    fi
+
+find_programs 
+determine_platform 
+setup_echo_statement
+setup_copy_command
+gui_am_dir_not_set 
+
+
+# get executable that corresponds to the platform which will be installed
+
+if check_platform 1
+    then
+    executable=gui_am.$platform
+    uid=gui_am.uid.$platform
+else
+    while :
+        do
+        echo 
+        echo 'Annex Manager runs on the following operating systems.'
+        echo 'If you are not running one of these, you may install'
+        echo 'Annex Manager for one of the systems listed.'
+        echo
+        echo 'Annex Manager only executes on the following systems:'
+        echo
+        echo '      SunOS (both SunOS 4.x and Solaris 2.3, 2.4)'
+        echo '      SunOS5 (Solaris 2.5, 2.5.1)'
+        echo '      HP-UX'
+        echo '      AIX'
+        echo '      SCO_UNIX'
+        echo '      quit (to abort installation)'
+        echo
+
+        echo_no_newline "Enter the OS that you want to install: "
+	read platform
+	if check_platform 0
+	    then
+	    executable=gui_am.$platform
+	    uid=gui_am.uid.$platform
+	    break
+	    fi
+	done
+fi
+
+echo
+
+which_owner
+
+cp VERSION VERSION.SAF 2>/dev/null >&2
+
+if tar xpf $tar_dev VERSION
+    then
+    change_owner_and_group VERSION
+    chmod 444 VERSION
+else
+    if [ ! -w $PWD ]
+       then
+       exit_with_error "ERROR: no write permission in $PWD"
+    else [ ! -f VERSION ]
+       exit_with_error "ERROR with tar file"
+       fi
+    fi
+
+ver_dir=`cat VERSION`
+
+if [ "$ver_dir" = "$old_version" ]
+    then
+    if [ -d "$PWD/$old_version" ]
+	then
+
+	cat <<-END
+The version ($ver_dir) you are trying to install into the current directory
+($PWD) appears to be installed. 
+
+WARNING: You may lose all the current data if you continue.
+
+If you wish to replace this version and merge the data 
+
+	- press 'a' to abort
+	- refer to the README file for instructions.
+
+Otherwise, press 'c' to continue.
+
+END
+
+        while :
+            do
+            echo_no_newline "Continue (c/a) [a] "
+            read cont
+
+            case $cont in
+            ""|[Aa])
+	        exit_with_error 'Installation aborted by user.' 
+	        ;;
+            [cC])
+	      echo 
+              echo "WARNING: You will destroy all Annex lists," 
+              echo "         scripts, access list, user-defined parameter groups," 
+              echo "         or saved output text which is located in"
+	      echo "         $PWD/$old_version" 
+              echo 
+              while [ "$cont" != 'y' ]
+	          do
+                  echo_no_newline "Continue with installation (y/n) [n] "
+                  read cont 
+	          case $cont in
+	          [yY])
+		        no_copy_old_stuff=1
+		        cont=y
+		        ;;
+	          ""|[nN])
+		        exit_with_error "Installation aborted by user" 
+		        ;;
+	          esac
+	          done
+	          break
+	          ;;
+            esac
+            done
+	fi
+    fi
+
+while :
+    do
+    echo 
+    echo "Annex Manager $AMVER will be installed in $PWD"
+    echo_no_newline "If this is the correct directory press 'c' to
+continue or 'a' to abort the installation.
+Continue or Abort (c/a) [c] "
+
+    read ans
+    case $ans in
+    ""|[cC])
+	break
+	;;
+    [aA])
+	exit_with_error "Installation Aborted by user"
+	;;
+	esac
+    done
+
+echo "Installing Annex Manager $AMVER into '$prefix/$ver_dir'  ..."
+echo
+
+while :
+    do
+    if [ -d $ver_dir ]
+        then
+        echo_no_newline "Annex Manager, $prefix/$ver_dir, already exists.  
+
+To save $prefix/$ver_dir, press 'a' to abort and backup the directory.
+
+To remove $prefix/$ver_dir and continue with the installation, press 'c'.
+
+Continue or abort (c/a) [a] "
+
+        read cont 
+	case $cont in
+	""|[aA])
+          rm VERSION
+          exit_with_error 'Installation aborted by user.'
+	  ;;
+	[cC])
+	    if rm -rf $ver_dir
+		then
+		break
+	    else
+		exit_with_error "ERROR: Problems removing $prefix/$ver_dir" \
+		  "Installation Aborted"
+		fi
+	  ;;
+        esac
+    else
+	break
+	fi
+    done
+
+if mkdir $ver_dir
+    then
+    $cpcmd VERSION $ver_dir || exit_with_error "Could not create $ver_dir/VERSION" \
+	"Installation Failed"
+    chmod 444 VERSION
+else
+    exit_with_error "Could not create $ver_dir" "Installation Failed"
+    fi
+
+# get all files that aren't the executable
+echo "Extracting data files..."
+tar xpf $tar_dev $ver_dir/bin $ver_dir/data $ver_dir/README $ver_dir/Release.txt 2>/dev/null || exit_with_error "Installation Failed" "Could not extract tar file $tar_dev files:$ver_dir/bin $ver_dir/data"
+
+echo Extracting $platform version of executable and uid...
+tar xpf $tar_dev $ver_dir/exe/$executable.Z $ver_dir/exe/$uid.Z || exit_with_error "Installation Failed" "Could not extract tar file $tar_dev files: $ver_dir/exe/$executable.Z $ver_dir/exe/$uid.Z"
+
+uncompress $ver_dir/exe/$executable.Z
+uncompress $ver_dir/exe/$uid.Z
+mv $ver_dir/exe/$executable $ver_dir/bin/gui_am_exe
+mv $ver_dir/exe/$uid $ver_dir/bin/gui_am.uid
+chmod 555 $ver_dir/bin/gui_am_exe $ver_dir/bin/gui_am.uid
+rmdir $ver_dir/exe
+
+change_owner_and_group $ver_dir
+
+#
+# Merge data from current installation area.  If we don't know where
+# the current installation area is because GUI_AM_DIR is not set (could
+# be because it's the first installation), or it's set but the directory
+# it is pointing to doesn't exist, skip it.
+#
+if [ "$GUI_AM_DIR" ]
+    then
+    if [ ! -d "$GUI_AM_DIR" ]
+	then
+	echo "ERROR: Cannot merge old data."
+        echo "       '$GUI_AM_DIR' does not exist."
+    elif [ ! -d "$GUI_AM_DIR/bin" ]
+	then
+	echo "ERROR: Cannot merge old data."
+        echo "       '$GUI_AM_DIR/bin' does not exist."
+    elif [ ! -d "$GUI_AM_DIR/data" ]
+	then
+	echo "ERROR: Cannot merge old data."
+        echo "       '$GUI_AM_DIR/data' does not exist."
+    elif [ -z "$no_copy_old_stuff" ]
+	then
+	do_merge
+    fi
+fi
+
+add_the_access_list
+default_chroma
+replace_version
+
+rm -f VERSION.SAF  2>/dev/null >&2
+
+echo "Installation complete."
+echo 
+echo 
+echo "To run Annex Manager, you need to set your environment as follows:"
+echo 
+echo "   1. If you have changed the recommended installation directory, "
+echo "         Set the GUI_AM_DIR environment variable to $PWD"
+echo "   2. Put the $PWD/bin directory in your path"
+echo "   3. Set the DISPLAY environment to point to the host where you"
+echo "      want Annex Manager to appear."
+echo 
+echo "You can put these commands in your .cshrc, .login,"
+echo ".profile or some other equivalent script."
+echo 
+echo "To run the Annex Manager, type 'gui_am' at the shell prompt.  Consult"
+echo "the README file for release information."
+echo 

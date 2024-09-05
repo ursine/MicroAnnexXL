@@ -1,0 +1,63 @@
+.ig xy
+.TH ACP_DBM 1M ANNEX
+.xy
+.ie '\*(sy'V' .TH ACP_DBM 1M ANNEX
+.el .TH ACP_DBM 8 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+acp_dbm \- Annex database services utility
+.SH SYNOPSIS
+.B acp_dbm
+[
+.BR \-\^s \ \fIuser\fP
+] [
+.BR \-\^c \ \fIuser\fP
+] [
+.BR \-\^d \ \fIuser\fP
+] [ 
+.BR \-\^l
+]
+
+.SH ARGUMENTS
+.TP 12n
+.BI \-s \ user
+This option sends to stdout information about that user stored in the apc_dbm database.			
+.RS 10
+  First it outputs the following line:
+.HP 
+  Number of failed logins since last success: N 
+.RE
+.IP  
+then it outputs a list of the previous login failures, up to 20, the ultimate 
+maximum of login failures that can be stored.  The format of each failure:
+.RS 10
+
+  Login failure on Sun Sep 16 01:03:52 1973.
+.RE
+.TP
+.BI \-c \ user
+This option clears the user from the blacklist and clears the history of login failures as well.  Use this option to remove a user from the blacklist.  Make sure you have investigated this account and are confident it is not under attack.  This option only clears the blaclist login failure logs; it does not clear the password history or any other user information stored in the acp_dbm database.
+.TP
+.BI \-d \ user
+This option deletes the user record from the acp_dbm database.  Use this option when you wish to delete a user entirely.  Note that you will still have to delete references to the user in any ACP files(i.e. acp_passwd, acp_userinfo, etc.); this option will only delete the user from acp_dbm.
+.TP
+.B \-l
+This option lists all usernames stored in the acp_dbm. 
+.TP
+.SH DESCRIPTION 
+.I acp_dbm 
+is the Annex database services daemon.  It supports the use of blacklisting
+features which is, the authorization of users based on their previous login 
+history.  The blacklisting can be achieved in two ways.  One way is to set the maximum number of consecutive failures and the other way is to set the number of total allowable login failures over a certain period of time.
+.RE
+.RS
+
+The utility always displays the current list of blacklisted users apart from the options specified on the command line.
+

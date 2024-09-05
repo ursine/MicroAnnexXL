@@ -1,0 +1,99 @@
+################################################################################
+# annex.dct - Bay Networks Annex Family dictionary
+# 
+# (See README.DCT for more details on the format of this file)
+################################################################################
+
+# This file is intended for use with BSAC V1.3 RADIUS Servers.
+# Since tunnel databases are not supported in that release, we have commented
+#  out the tunneling attributes.
+#
+#
+# Use the Radius specification attributes
+#
+@radius.dct
+
+#
+# BayDVS usage of Tunnel-Server-Endpoint is an ASCII string of the format:
+#    a.b.c.d <hwtype>:<hex_dlci>
+#  where a.b.c.d is the ip address of the server
+#   <hwtype> is none, sl, ppp, fr=Frame Relay
+#   :<hex_dlci> is the DLCI address in decimal
+#
+# Define tunnel-password attribute from the tunnel extensions draft
+#
+#ATTRIBUTE Tunnel-Password                69 [fill1=0 data=string]  t  tunnel-pw-encrypt
+
+ATTRIBUTE Connect-Info                   77 string   Ca
+#
+# Define additional Bay Networks Annex Family Attributes
+# For R14.1 release     as of 9/22/97 DJM
+#
+
+MACRO Bay-VSA(t,s) 26 [vid=1584 type1=%t% len1=+2 data=%s%]
+
+ATTRIBUTE Annex-Filter                      Bay-VSA(28, string)  RO
+ATTRIBUTE Annex-CLI-Command                 Bay-VSA(29, string)  RO
+ATTRIBUTE Annex-CLI-Filter                  Bay-VSA(30, string)  RO
+ATTRIBUTE Annex-Host-Restrict               Bay-VSA(31, string)  RO
+ATTRIBUTE Annex-Host-Allow                  Bay-VSA(32, string)  RO
+ATTRIBUTE Annex-Product-Name                Bay-VSA(33, string)  a
+ATTRIBUTE Annex-SW-Version                  Bay-VSA(34, string)  a
+ATTRIBUTE Annex-Local-IP-Address            Bay-VSA(35, ipaddr)  r
+ATTRIBUTE Annex-Callback-Portlist           Bay-VSA(36, integer) r
+#ATTRIBUTE Annex-Sec-Profile-Index           Bay-VSA(37, integer) t
+
+#ATTRIBUTE Annex-Tunnel-Authen-Type          Bay-VSA(38, integer) t
+#VALUE     Annex-Tunnel-Authen-Type          None            0
+#VALUE     Annex-Tunnel-Authen-Type          kmd5-128        1
+
+#ATTRIBUTE Annex-Tunnel-Authen-Mode          Bay-VSA(39, integer) t
+#VALUE     Annex-Tunnel-Authen-Mode          None            0
+#VALUE     Annex-Tunnel-Authen-Mode          prefix-suffix   1
+
+#ATTRIBUTE Annex-Authen-Servers              Bay-VSA(40, string)  t
+#ATTRIBUTE Annex-Acct-Servers                Bay-VSA(41, string)  t
+
+#ATTRIBUTE Annex-User-Server-Location        Bay-VSA(42, integer) t
+#VALUE     Annex-User-Server-Location        Local           1
+#VALUE     Annex-User-Server-Location        Remote          2
+
+#ATTRIBUTE Annex-Local-Username              Bay-VSA(43, string)  t  return-tunnel-user
+ATTRIBUTE Annex-System-Disc-Reason          Bay-VSA(44, integer) a
+ATTRIBUTE Annex-Modem-Disc-Reason           Bay-VSA(45, integer) a
+ATTRIBUTE Annex-Disconnect-Reason           Bay-VSA(46, integer) a
+#ATTRIBUTE Annex-Addr-Resolution-Protocol    Bay-VSA(47, integer) t
+#VALUE     Annex-Addr-Resolution-Protocol    None            0
+#VALUE     Annex-Addr-Resolution-Protocol    DHCP            1
+
+#ATTRIBUTE Annex-Addr-Resolution-Servers     Bay-VSA(48, string)  t
+#ATTRIBUTE Annex-Domain-Name                 Bay-VSA(49, string)  t  return-tunnel-name
+ATTRIBUTE Annex-Transmit-Speed              Bay-VSA(50, integer) ca
+ATTRIBUTE Annex-Receive-Speed               Bay-VSA(51, integer) ca
+
+
+#
+# Define additional Bay Networks specific values
+#
+
+VALUE   Service-Type        Annex-Authorize-Only       0x06300001
+VALUE   Service-Type        Annex-Framed-Tunnel        0x06300002
+
+VALUE   Acct-Status-Type    Annex-User-Reject          0x06300001   purge-acct-rec
+VALUE   Acct-Status-Type    Annex-Call-Reject          0x06300002
+VALUE   Acct-Status-Type    Annex-IPCP-Start           0x06300003
+VALUE   Acct-Status-Type    Annex-IPXCP-Start          0x06300004
+VALUE   Acct-Status-Type    Annex-ATCP-Start           0x06300005
+VALUE   Acct-Status-Type    Annex-Accounting-Restart   0x06300006
+VALUE   Acct-Status-Type    Annex-Accounting-Shutoff   0x06300007
+VALUE   Acct-Status-Type    Annex-Tunnel-Start         0x06300008   add-acct-rec
+VALUE   Acct-Status-Type    Annex-Tunnel-Stop          0x06300009   purge-acct-rec
+VALUE   Acct-Status-Type    Annex-Tunnel-Reject        0x0630000a   purge-acct-rec
+VALUE   Acct-Status-Type    Annex-Tunnel-Link-Start    0x0630000b
+VALUE   Acct-Status-Type    Annex-Tunnel-Link-Stop     0x0630000c
+VALUE   Acct-Status-Type    Annex-MP-Start             0x0630000d
+VALUE   Acct-Status-Type    Annex-MP-Stop              0x0630000e
+
+################################################################################
+# annex.dct - Bay Networks Annex dictionary
+################################################################################

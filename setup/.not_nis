@@ -1,0 +1,54 @@
+#!/bin/sh
+
+#############################################################################
+#
+# Is the services files under NIS?
+# 
+# If a NIS database does not appear to be used then the script returns
+# 1.  This script returns non-zero (the value varies) if the services
+# database that is normally in /etc/services appears to be in a NIS
+# database instead.  If "ypcat services" appears to work then the value
+# returned is 1.  If it does not appear to work but otherwise services
+# seems to be under an nis database then the script returns 2.
+# 
+# The "sed" statements below work as follows:
+#   Ensure that "services:" begins at the start of a line.
+#   Strip comments off the line.
+#   Make "nis" or "nisplus" easy to find.
+#   Tag lines starting with "services:" and have " nis " somewhere on the line.
+
+
+
+# Initialize variables
+
+list=""
+FILE=/etc/nsswitch.conf
+
+# We are assuming that the call to ypcat will work on systems where it
+# it available because root's PATH has been appended to our path earilier
+# in the installation.
+
+if (ypcat services 1> /dev/null 2>&1 ; exit $?) 1> /dev/null  2>&1
+then
+    exit 1
+else
+    if [ -f $FILE ]
+    then
+#	# See above for explanation of the "sed" statements.
+	list=`cat $FILE | sed \
+	    -e 's/^[ 	]*services:/services:/'		\
+	    -e 's/#.*//'				\
+	    -e 's/nis/ nis /g'				\
+	    -e 's/^services:.* nis .*/ XYZ_FOUNDIT /'	\
+	    | grep XYZ_FOUNDIT`
+	for i in $list
+	do
+	    case $i in
+		XYZ_FOUNDIT) exit 2 ;;
+	    esac
+	done
+    fi
+fi
+
+exit 0
+

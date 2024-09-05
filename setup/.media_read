@@ -1,0 +1,742 @@
+#!/bin/sh
+# This script is called by the main installation script when files have
+# to be extracted from the distribution media or some tarfile.  Some
+# variables have to be exported by the main installation script for this
+# to work.  Other values are passed in as arguments.  The first argument
+# is the type of the medium (e.g., tape, cd-rom, etc).  The second
+# argument is the name of the tarfile or the device to read.  The
+# remaining arguments are the directories that are to be extracted from
+# the distribution (e.g., src, man, bin/SUN, etc).
+
+# Initialize value that may be overwritten by the .vars file
+
+if [ -z "$FAKE_FLOPPY" ]
+then
+    FAKE_FLOPPY=false
+fi
+
+if [ "$FLOPPY_DEBUG" != "" ]
+then
+	set -x
+fi
+	
+REQUIRED_FILES=".mkpath ./.contains ./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+
+
+# Initialize:
+
+FILEDATAFILE=${SCRIPT_DIR}/.filedatafile
+
+bfs_extract=false
+gui_extract=false
+assemble_files=false
+parseprob=true
+noextract=true
+flopnums=""
+
+
+# Name temporary files used only here
+# The tartab file is a script we create.  See notes in the script itself.
+# The tartest files are used to see if "B" is a valid tar option.
+# The tartoc files hold modified tar table of contents to see if files exist.
+
+tartab=/tmp/tartab.$$
+tartest1=/tmp/tartest1.$$
+tartest2=/tmp/tartest2.$$
+tartoc1=/tmp/tartoc1.$$
+tartoc2=/tmp/tartoc2.$$
+tartoc3=/tmp/tartoc3.$$
+ourtempfiles="$tartab $tartest1 $tartest2 $tartoc1 $tartoc2 $tartoc3 floppy_[0-9]*_"
+
+# Add our temporary files to any in the environment
+
+tempfiles="$tempfiles $ourtempfiles"
+
+
+# Use local version of these if not an exported version:
+
+if [ -z "$floppy" ]
+then
+    floppy="diskette"
+    Floppy="Diskette"
+    floppies="diskettes"
+    Floppies="Diskettes"
+fi
+
+
+# Read command line (two required arguments)
+
+case "$#" in
+    0) parseprob=true;  noextract=true;;
+    1) parseprob=true;  noextract=true;;
+    2) parseprob=false; noextract=true;;
+    *) parseprob=false; noextract=false;;
+esac
+
+if $parseprob
+then
+    echo "ERROR: $0: Usage: Requires two arguments, medium and file" 1>&2
+    rm -f $ourtempfiles
+    exit 1
+fi
+
+medium=$1
+tarfile="$2"
+shift
+shift
+
+# The directories to extract are optional and follow the tarfile name
+
+extract_these="$*"
+
+# If the BFS directory has been specified, we need to get the list
+# of bfs files to import.
+#
+# Elsewhere in the install script, it is claimed that grep's exit
+# status does not reflect the results of the search on all systems,
+# so the following slightly more convoluted mechanism is employed.
+#
+# We need to check to see if the media name is "nowhere", which would
+# indicate the files have already been extractd.
+#
+# Question:  Why are we called if the files have already been extracted?
+#
+tmp="`echo $extract_these | grep bfs`"
+
+if [ "$tmp" != "" -a "$medium" != "nowhere" ]
+then
+	# This script will set bfs_extract_basenames
+	. ${SCRIPT_DIR}/.select_image 
+else
+	bfs_extract_basenames=""
+fi
+
+# Possible Enhancement:
+#		: Check for the existance of $tarfile.  The main installation
+#		: script does this before the call to this script but it could
+#		: be a useful check for stand-alone use.
+
+
+
+#############################################################################
+#
+# Now get the desired files out of the tarfile on the distribution medium.
+# We extract differently depending on the distribution medium.
+#
+
+if $noextract
+then
+    $debug && echo "${dbg_hdr}No files to extract from $medium ($tarfile)"
+    rm -f $ourtempfiles
+    exit 0
+else
+    $debug && echo "${dbg_hdr}Extracting from $medium ($tarfile)"
+    $debug && echo "${dbg_hdr}Extracting $extract_these"
+
+#   # Create another script needed
+cat << "LABEL" > $tartab
+#!/bin/sh
+
+# This script can make directories out of tar table information or it
+# can create a script that sets xerr=1 if any file in tar's table
+# of contents is missing. Input is expected to be in "tar tv" format.
+# The awk command would be neater to use than sed but it may not be available.
+# The mkdir commands are executed in a subshell so we can stifle error
+# messages if the directory already exists.
+case "$1" in
+    mkdir)
+	grep ' 0 ' | sed -e 's/^.* \([^ ]*\)$/\1/' -e 's:^:\./\.mkpath :g' |\
+		(sh) 1> /dev/null  2> /dev/null
+	;;
+    mkscript)
+	grep -v ' 0 ' | sed -e 's/^.* \([^ ]*\)$/\1/' \
+		-e   "s/^/test -f /g"   -e   "s/\$/ || xerr=1/g"
+	;;
+esac
+LABEL
+    chmod 766 $tartab
+
+#   # This section of code checks whether "B" is a valid option to tar.  We
+#   # want to use "B" if it is ok.  To check we create a junk file, archive
+#   # it, remove junk file, get it back. If it is back then tar does not choke
+#   # on "B".
+    date > $tartest1
+    tar -cf $tartest2 $tartest1
+    rm -f $tartest1
+    taropts="-xf"
+    if [ ! -f $tartest2 ]
+    then
+	tar -xBf $tartest2 2> /dev/null
+	if [ -f $tartest1 ]
+	then
+	    taropts="-xBf"
+	fi
+    fi
+    rm -f $tartest1 $tartest2
+
+
+    ask_q=false
+    $debug && echo "${dbg_hdr}More files needed from $medium"
+    case $medium in
+	nowhere)
+#	    # Script is being called after all files have already
+#	    # been extracted.
+	    ask_q=false
+	    extract_these=""
+	    ;;
+
+# Possible Enhancement: If tape, we could try to do a rewind first
+	tarfile|tape|cd-rom)
+#	    # Some versions of tar cannot create directories that may be
+#	    # in the tar archive.  Create these directories prior to calling
+#	    # tar.  Use the list of directories in the distribution.
+	    rm -f $tartest1
+	    for dir in $extract_these
+	    do
+		grep "^${dir}[ 	/]" $FILEDATAFILE | sed \
+		    -e "s:[ 	].*$::" -e "s:^:\./\.mkpath :" >> $tartest1
+		if [ "`echo ${dir} | grep bfs`" != "" -a "$bfs_extract_basenames" != "" ]
+		then
+			# We need to replace this one with the real
+			# files needed.
+			for file in $bfs_extract_basenames
+			do
+				extract_list="$extract_list ${dir}/$file"
+			done
+		else
+			extract_list="$extract_list ${dir}"
+		fi
+	    done
+	    sh $tartest1
+	    rm -f $tartest1
+	    ask_q=false
+	    excmd="tar $taropts $tarfile $extract_list"
+	    echo "Calling command: $excmd"
+	    msgid=mr_taketime
+	    . $MSG_FILE
+	    tar $taropts "$tarfile" $extract_list
+	    ;;
+	floppies)
+	    ask_q=true
+	    # Get a numerically (and uniquely) sorted list of floppies
+	    flopnums=`(
+		for dir in $extract_these
+		do
+		    grep "^${dir}[ 	/]" $FILEDATAFILE
+		done
+	    ) | awk '
+	    	    BEGIN { for (i = 0; i < 100; i++) flop[i]=0 }
+	    	    { for (i = 3; i <= NF; i++) flop[$i]=1 }
+	    	    END { for (i = 0; i < 100; i++) if ( flop[i] == 1 ) print i }
+	    	    '`
+#	    # Note that above we are looking at the third to last fields
+#	    # (the floppy numbers, field1=directory field2=size)
+	    flopnums=`echo " " $flopnums`
+	    excmd="tar $taropts $tarfile"
+	    msgid=mr_whichfloppies
+	    . $MSG_FILE
+	    ;;
+	*)
+	    ask_q=false
+	    echo "ERROR: $0: Unexpected medium ($medium)" 1>&2
+	    rm -f $ourtempfiles
+	    exit 1
+	    ;;
+    esac
+
+
+###########################################################################
+#		START OF EXTRACTING FILES FROM FLOPPIES
+###########################################################################
+#
+# This section of code attempts to get all data from floppies by requesting
+# the installer to insert the needed ones one at a time.  If we are not
+# installing from floppies then flopnums="" and we skip this section.
+# 
+# The code checks to see if the floppy is the right one by doing a tar to get
+# the table of contents and seeing if a file exists whose name encodes the
+# floppy number.
+# 
+# We determine what floppies are needed in the following way: In variable
+# extract_these are the names of the directories that we need.  There is a
+# script that given the name of a directory returns the numbers of any floppy
+# that contain any part of that directory (the script is updated by release
+# engineers).  We then "sort unique" the list.  The next part is tricky -
+# going backward so that once we have a floppy in the drive we know what
+# directories we should tar off (we do not just tar everything off).
+# 
+# After extracting from the floppy an eject is tried.  The eject commands are
+# done in a subshell to avoid any problems with the command not being found.
+# Immediately after the eject a tar is done and if the floppy number file is
+# found then we assume the eject did not work.
+# 
+#----------------------------------------------------------------------------
+
+
+#   # For each floppy, try to get all data off
+    floptrynum=0
+    for fn in $flopnums
+    do
+	floptrynum=`expr $floptrynum + 1`
+	msg=" "
+#	# Get all data off one floppy
+	while true
+	do
+#	    # Get the right floppy
+	    while true
+	    do
+#		# Ask for the floppy
+		while true
+		do
+		    echo "$msg "
+		    echo "Please insert $floppy #${fn} into the floppy drive ${tarfile}"
+		    echo " "
+		    msg=" "
+		    dfltans=y
+		    rp="Is diskette #${fn} ready (y/n/q=quit) [$dfltans]:"
+		    . ./.myread
+		    if [ -z "$ans" ]
+		    then
+			ans=$dfltans
+		    fi
+		    case $ans in
+		    Y*|y*)
+			break
+			;;
+		    N*|n*)
+			continue
+			;;
+		    Q*|q*)
+			(eject $tarfile) > /dev/null 2>&1 || (eject) > /dev/null 2>&1
+			msgid=abort_quit
+			. $MSG_FILE
+			break
+			;;
+		    "?")
+			msgid=mr_flopready
+			. $MSG_FILE
+			continue
+			;;
+		    *)
+			msgid=ynq
+			. $MSG_FILE
+			continue
+			;;
+		    esac
+		done
+#		# Asking for the floppy
+
+#		# Name of file on floppy that identifies the floppy number:
+		floppynumfile=floppy_${fn}_
+
+#		# We should have a floppy in the drive; is it the right one?
+#		# Check the table of contents for a floppy identifying file.
+		if $FAKE_FLOPPY
+		then
+		    tar -tvf ${tarfile}${fn} > $tartoc1
+		else
+		    tar -tvf ${tarfile} > $tartoc1
+		fi
+
+		if ./.contains $floppynumfile $tartoc1
+		then
+#		    # Have the right floppy
+
+#		    # In the table of contents strip out leading "./" in names
+		    sed -e "s:[ 	][ 	]*\./: :g" $tartoc1 > $tartoc2
+
+#		    # Fake out the table of contents to contain only lines
+#		    # for the directories we are interested in.  This is
+#		    # because the table of contents gets turned into a script
+#		    # and we want to avoid looking for files we do not want on
+#		    # the host.  For example, the floppy may contain both the
+#		    # bin/PLAT1 and bin/PLAT2 directories and we do not want
+#		    # the failure to find file bin/PLAT1/erpcd to cause us to
+#		    # fail if we are extracting bin/PLAT2 and not bin/PLAT1.
+		    rm -f $tartoc1 $tartoc3
+		    for dir in $extract_these
+		    do
+			grep " $dir" $tartoc2 >> $tartoc1 2> /dev/null
+			if [ "$dir" = "bfs" -a "$bfs_extract_basenames" != "" ]
+			then
+				for file in $bfs_extract_basenames
+				do
+					grep "$dir/$file" $tartoc2 >> $tartoc3 2> /dev/null
+				done
+			else
+				grep " $dir" $tartoc2 >> $tartoc3 2> /dev/null					
+			fi
+		    done
+
+# Possible Enhancement:
+#		: We could get a bug above if we ever passed in a filename
+#		: instead of a directory name.  Especially if the filename
+#		: was one that was actually in pieces (e.g., bfs/oper.42.enet)
+#		: Currently we just pass in directory names though.
+
+#		    # Create needed directories (not all machines have
+#		    # a tar that will do it automatically)
+		    sh $tartab mkdir < $tartoc1
+
+#		    # Create a script that can check if all expected
+#		    # files are present
+		    sh $tartab mkscript < $tartoc3 > $tartoc2
+		    break
+
+		else
+			echo " "
+			msg="Sorry, this is not $floppy #${fn}"
+			(eject $tarfile) > /dev/null 2>&1 || (eject) > /dev/null 2>&1
+		fi
+	    done
+#	    # Getting the right floppy
+
+
+#	    # Find out all file and directory names that we have to extract
+#	    # from this floppy.  xlist will be a subset of extract_these
+#	    #
+#	    # Grep would be nice to use here but not all versions encode
+#	    # whether the search was successful in its exit status and using
+#	    # ./.contains is messy here also because we have to write files.
+
+	    xlist="$floppynumfile"
+	    for dir in $extract_these
+	    do
+		tmp=`echo "$dir" | sed -e "s:/.*::g"`
+		case "$tmp" in
+		    "bfs")    assemble_files=true ; bfs_extract=true ;;
+		    "gui_am") assemble_files=true ; gui_extract=true ;;
+		esac
+#		# Get the list of floppies that hold anything in this directory
+		tmp=`grep "^${dir}[ 	/]" $FILEDATAFILE \
+	        | awk '
+	    	    BEGIN { for (i = 0; i < 100; i++) flop[i]=0 }
+	    	    { for (i = 3; i <= NF; i++) flop[$i]=1 }
+	    	    END { for (i = 0; i < 100; i++) if ( flop[i] == 1 ) print i }
+	    	    '`
+		tmp=`echo " " $tmp " "`
+		tmp2=`echo "$tmp" | sed -e "s/ ${fn} / /"`
+		if [ "$tmp" != "$tmp2" ]
+		then
+#		    # The directory is at least partially on this floppy
+		    if [ "`echo $dir | grep bfs`" != "" -a "$bfs_extract_basenames" != "" ]
+		    then
+			# Get the list of files that we want extracted
+			# from bfs dir
+			if $FAKE_FLOPPY
+			then
+				tar -tf ${tarfile}${fn} > $tartoc3
+			else
+				tar -tf ${tarfile} > $tartoc3
+			fi
+
+			# Choose the ones on the floppy.  We need to do
+			# this convoluted thing because the files might
+			# be split, and we know the name will be the prefix,
+			# but might not be the whole pathname.
+			for file in $bfs_extract_basenames
+			do
+				xlist="$xlist `grep $file $tartoc3`"
+			done
+		    else
+		    	xlist="$xlist $dir"
+		    fi
+		fi
+	    done
+
+#	    # We have the right floppy and we have a list of what to extract.
+#	    # Now get the data off the floppy
+	    $debug && echo "${dbg_hdr}tar $taropts $tarfile $xlist"
+	    if $FAKE_FLOPPY
+	    then
+		echo "Calling command: tar $taropts ${tarfile}${fn} $xlist"
+		msgid=mr_taketime
+		. $MSG_FILE
+		tar $taropts ${tarfile}${fn} $xlist
+	    else
+		echo "Calling command: tar $taropts $tarfile $xlist"
+		msgid=mr_taketime
+		. $MSG_FILE
+		tar $taropts $tarfile $xlist
+	    fi
+
+#	    # Clear flag to indicate we have all files
+	    xerr=0
+
+#	    # Run the script that checks for each file in table of contents
+#	    # of the tarfile (and sets xerr flag if a file was not found)
+	    . $tartoc2
+
+#	    # Do not need these files anymore
+	    rm -f $tartoc1 $tartoc2 $floppynumfile
+
+#	    # Check for an extract error
+	    if [ $xerr -ne 0 ]
+	    then
+		echo " "
+# Possible Enhancement:	: Make the following message better.
+		msg="ERROR: Could not extract file"
+# Possible Enhancement:
+#		: Create a list of the files.
+#		: Could use a modified $tartoc2 file to do this.
+	    else
+#		# Try to eject the floppy
+
+
+#-start-temporary-indent-offset-------------------------------------------
+#
+# Eject the floppy and then try to read it.  If you find the file that
+# identifies the floppy that you just ejected then the eject probably
+# is not working
+
+ejectproblem=false
+(eject $tarfile) > /dev/null 2>&1 || (eject) > /dev/null 2>&1
+sleep 1
+if $FAKE_FLOPPY
+then
+    tmp=`(tar -tf $tarfile${fn}) 2> /dev/null | grep floppy_${fn}_`
+else
+    tmp=`(tar -tf $tarfile) 2> /dev/null | grep floppy_${fn}_`
+fi
+
+if [ -n "$tmp" ]
+then
+    ejectproblem=true
+fi
+
+if $FAKE_FLOPPY
+then
+    if [ "$floptrynum" = "1" ]
+    then
+	echo " "
+	echo "TESTING: FIRST FLOPPY FORCES EJECT PROBLEM, THE REST DO NOT"
+	echo " "
+	ejectproblem=true
+    else
+	ejectproblem=false
+    fi
+fi
+
+while $ejectproblem
+do
+	msgid=mr_ejectproblem
+	. $MSG_FILE
+
+	while true
+	do
+	    dfltans=y
+	    rp="Are you ready to continue (y/q=quit) [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+	    Y*|y*)
+		ejectproblem=false
+		break
+		;;
+	    Q*|q*)
+		ejectproblem=false
+		msgid=abort_quit
+		. $MSG_FILE
+		break
+		;;
+	    "?")
+		msgid=mr_flopcont
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=yqonly
+		. $MSG_FILE
+		continue
+		;;
+		esac
+	done
+done
+#
+#-end-temporary-indent-offset-------------------------------------------
+
+
+		break
+	    fi
+	done
+	$debug && echo "${dbg_hdr}Done: Getting all data off floppy ${fn}"
+    done
+    if [ -n "$flopnums" ]
+    then
+	$debug && echo "${dbg_hdr}Done: For each floppy, got all data off"
+    fi
+
+#
+#############################################################################
+#		END OF EXTRACTING FILES FROM FLOPPIES
+###########################################################################
+
+
+
+#   # See if we got everything (Note though that the following code
+#   # makes a big assumption - it assumes that if we have a directory
+#   # then the directory holds all the files it should).
+
+#   # Checking to see if everything there
+    while true
+    do
+	$debug && echo "${dbg_hdr}Checking for presence of needed files"
+	noerrs=true
+	for f in $extract_these
+	do
+	    if [ -d $f -o -f $f ] 
+	    then
+		$debug && echo "${dbg_hdr}We have extracted $f"
+	    else
+		if $noerrs
+		then
+		    echo " "
+		    echo "Error extracting from distribution ($medium: $tarfile)"
+		    noerrs=false
+		    ask_q=true
+		fi
+		echo "${indent}$f not found"
+	    fi
+	done
+
+#	# Did we get everything we should have?
+	if $noerrs
+	then
+	    ask_q=false
+	else
+#	    # Have errors extracting needed files
+	    echo " "
+	    echo "Please load the needed files onto the host by doing:"
+	    echo "${indent}$excmd"
+	    ask_q=true
+	fi
+
+	if $ask_q
+	then
+	    ask_q=false
+	    msgid=mr_useshell
+	    . $MSG_FILE
+
+	while true
+	do
+	    dfltans=y
+	    rp="Are you ready to continue (y/n/q=quit) [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+	    Y*|y*)
+		break
+		;;
+	    N*|n*)
+		continue
+		;;
+	    Q*|q*)
+		msgid=abort_quit
+		. $MSG_FILE
+		break
+		;;
+	    "?")
+		msgid=mr_tarprobcont
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynq
+		. $MSG_FILE
+		continue
+		;;
+		esac
+	    done
+	fi
+
+#	# If we get here then we should have everything that we need
+#	# that we could have gotten from doing a tar of the whole tarfile.
+	$debug && echo "${dbg_hdr}Should not need any more extraction"
+
+#	# We now have all data from the media.
+#	# Does any of the data have to be massaged?
+#	# Some files may be too large to fit unto one floppy.
+#	# They have to be reassembled.
+
+# Sort of a bug here:
+# If the user tarred the floppies himself and then did an install the
+# oper files would not have been assembled.
+
+# Another possible bug:
+# The following code will be an error if ever calling this script with
+# both gui_am and bfs on the command line.  This will never happen though.
+
+	if $assemble_files
+	then
+	    if $gui_extract
+	    then
+		tmp=gui_am/gui_am.tar
+	    fi
+	    if $bfs_extract
+	    then
+		tmp=`ls bfs/oper.*.enet.1 2> /dev/null | sed -e "s:enet.1:enet:g"`
+		tmp=`echo " " $tmp`
+	    fi
+
+	    $debug && echo "${dbg_hdr}Re-assembling files: $tmp"
+	    for bin in $tmp
+	    do
+		rm -f ${bin}
+		num=0
+		while true
+		do
+		    num=`expr $num + 1`
+		    if [ ! -f ${bin}.${num} ]
+		    then
+			break
+		    else
+			cat ${bin}.${num} >> ${bin}
+			rm -f ${bin}.${num}
+		    fi
+		done
+	    done
+	fi
+
+#	# All files should be either extracted or assembled
+	$debug && echo "${dbg_hdr}Should not need any more files"
+	break
+
+    done
+    $debug && echo "${dbg_hdr}Done: Checking for presence of needed files"
+
+#   # If you get here then all files that we need will be available
+fi
+
+rm -f $ourtempfiles
+exit 0
+
+

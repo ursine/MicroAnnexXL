@@ -1,0 +1,291 @@
+H_ADD
+This command will add a new entry into the TMS database.  The format
+of the command is:
+
+add domain dnis te=te_addr maxu={max_users | unlimited}
+    [srvloc=servers_location] [tutype=tunnel_type]
+    authp=auth_proto pauth=primary_as_addr [sauth=secondary_as_addr]
+    [acctp=acct_proto [pacct=primary_acct_addr [sacct=secondary_acct_addr]]]
+    [addrp=addr_proto [paddr=primary_addr_addr [saddr=secondary_addr_addr]]]
+    [hwtype=hw_type [hwaddr=hw_addr hwalen=hw_addr_len]]
+    [spi=sec_protocol_index] [passwd=password]
+    [tatype=tun_auth_type tamode=tun_auth_mode takey=tun_auth_key]
+
+Parameters in brackets "[ ]" are optional.  No space is allowed around the
+equal signs "=" in the keyword/parameter pairs.  An error is returned if the
+domain/DNIS pair is already in the database.  It is permissable for a single
+domain to have multiple DNISes, and for multiple domains to share the same
+DNIS.
+
+"Domain" is the customer's domain name.  "Dnis" is the dialed phone number.
+If DNIS is not in use, a "0" (character zero) must be entered.  These two
+parameters constitute an entry's key in the database.
+
+"Te_addr" is the IP address of the Tunnel Endpoint.  For L2TP, this is the
+host on which the LNS resides.  For DVS, this is the Gateway on which the
+Home Agent resides.
+
+"Max_users" is the maximum number of concurrent users allowed on the system
+for this domain/DNIS.  A value of 0 (zero) indicates that no users are
+allowed on, effectively creating a disabled domain/DNIS.  If "unlimited" is
+specified, then no user limit is applied to this domain/DNIS.
+
+"Servers_location" is the location of the Authentication, Accounting and
+Dynamic Address Assignment servers.  The available locations are "local"
+(i.e., in the Service Provider's network), and "remote" (i.e., in the
+Customer Network).  The default is "local" when "auth_proto" is "acp", and
+"remote" when "auth_proto" is set to "radius."
+
+"Tunnel_type" is the type of tunnel to establish.  The available types are
+"l2tp" (layer 2), and "dvs" (layer 3).  The default is "dvs."
+
+"Auth_proto" is the authentication protocol used between the Gateway and
+the Authentication Server.  The available protocols are "acp" (local) and
+"radius" (remote).  "Primary_as_addr" is the IP address of the primary
+Authentication Server.  "Secondary_as_addr" is the IP address of the
+secondary Authentication Server.
+
+"Acct_proto" is the accounting protocol used between the Gateway and the
+Accounting Server.  The only available protocol is "radius" (remote).
+"Primary_acct_addr" is the IP address of the primary Accounting Server.
+"Secondary_acct_addr" is the IP address of the secondary Accounting Server.
+
+"Addr_proto" is the dynamic address assignment protocol used between the
+Gateway and the Dynamic Address Assignment Server.  The only available
+protocol is "dhcp."  "Primary_addr_addr" is the IP address of the primary
+Dynamic Address Assignment Server.  "Secondary_addr_addr" is the IP address
+of the secondary Dynamic Address Assignment Server.
+
+"Hw_type" is the type of network connection between the Gateway and the CPE.
+The supported network types are: "sl" (proprietary serial), "ppp" (Point to
+Point Protocol), and "fr" (Frame Relay).  "Hw_addr" is an address associated
+with the network type.  It is required for Frame Relay.  "Hw_addr_len" is
+the length (in octets) of the address; it is required when an address is
+required.
+
+"Sec_protocol_index" is the Security Protocol Index used by the gateway to
+determine the tunnel authentication type, mode and key.  SPI values of 1-255
+(inclusive) are reserved.
+
+"Password" is the L2TP password passed between the LAC and the LNS.  It
+may be a maximum of 16 characters in length.  Setting the password to ""
+(the default) disables password protection.
+
+"Tun_auth_type" is the type of authentication algorithm used to
+cryptographically checksum tunnel registration messages between the Foreign
+Agent and the Home Agent.  The only supported type is "kmd5-128" (128-bit
+keyed MD-5).  "Tun_auth_mode" is the operating mode of the authentication
+algorithm.  The only supported mode is "pref-suff" (prefix/suffix).
+"Tun_auth_key" is the key used by the authentication algorithm.  It may be
+up to 64 hexadecimal characters (0-9, A-F, a-f) in length.  If tunnel
+authentication is to be used, all three parameters are required.
+H_END
+H_MOD
+This command will modify an existing entry into the TMS database.  The
+format of the command is:
+
+modify domain dnis te=te_addr maxu={max_users | unlimited}
+       srvloc=servers_location tutype=tunnel_type
+       authp=auth_proto pauth=primary_as_addr sauth=secondary_as_addr
+       acctp=acct_proto pacct=primary_acct_addr sacct=secondary_acct_addr
+       addrp=addr_proto paddr=primary_addr_addr saddr=secondary_addr_addr
+       hwtype=hw_type hwaddr=hw_addr hwalen=hw_addr_len
+       spi=sec_protocol_index passwd=password
+       tatype=tun_auth_type tamode=tun_auth_mode takey=tun_auth_key
+
+The domain and dnis are required; all other parameters are optional.  No
+space is allowed around the equal signs "=" in the keyword/parameter pairs.
+An error is returned if the domain/DNIS pair is not in the database.
+
+"Domain" is the customer's domain name.  "Dnis" is the dialed phone number.
+If DNIS is not in use, a "0" (character zero) must be entered
+
+"Te_addr" is the IP address of the Tunnel Endpoint.  For L2TP, this is the
+host on which the LNS resides.  For DVS, this is the Gateway on which the
+Home Agent resides.
+
+"Max_users" is the maximum number of concurrent users allowed on the system
+for this domain/DNIS.  A value of 0 (zero) indicates that no users are
+allowed on, effectively disabling domain/DNIS.  Note that if maxu is set
+below the current number of users (including 0), the excess users are not
+disconnected from the system; however, no additional users will be allow on
+until the count drops below the new maxu setting.  If "unlimited" is
+specified, then no user limit is applied to this domain/DNIS.
+
+
+"Servers_location" is the location of the Authentication, Accounting and
+Dynamic Address Assignment servers.  The available locations are "local"
+(i.e., in the Service Provider's network), and "remote" (i.e., in the
+Customer Network).  The default is "local" when "auth_proto" is "acp", and
+"remote" when "auth_proto" is set to "radius."
+
+"Tunnel_type" is the type of tunnel to establish.  The available types are
+"l2tp" (layer 2), and "dvs" (layer 3).
+
+"Auth_proto" is the authentication protocol used between the Gateway and
+the Authentication Server.  The available protocols are "acp" (local) and
+"radius" (remote).  "Primary_as_addr" is the IP address of the primary
+Authentication Server.  "Secondary_as_addr" is the IP address of the
+secondary Authentication Server.  If an authentication protocol is defined,
+a primary server must also be defined.  If a secondary server is defined, a
+primary server must be defined.
+
+"Acct_proto" is the accounting protocol used between the Gateway and the
+Accounting Server.  The only available protocol is "radius" (remote).
+"Primary_acct_addr" is the IP address of the primary Accounting Server.
+"Secondary_acct_addr" is the IP address of the secondary Accounting Server.
+If an accounting protocol is defined, a primary server must also be
+defined.  If a secondary server is defined, a primary server must be defined.
+
+"Addr_proto" is the dynamic address assignment protocol used between the
+Gateway and the Dynamic Address Assignment Server.  The only available
+protocol is "dhcp."  "Primary_addr_addr" is the IP address of the primary
+Dynamic Address Assignment Server.  "Secondary_addr_addr" is the IP address
+of the secondary Dynamic Address Assignment Server.
+
+"Hw_type" is the type of network connection between the Gateway and the CPE.
+The supported network types are: "sl" (proprietary serial), "ppp" (Point to
+Point Protocol), and "fr" (Frame Relay).  "Hw_addr" is an address associated
+with the network type.  It is required for Frame Relay.  "Hw_addr_len" is
+the length (in octets) of the address; it is required when an address is
+required.
+
+"Sec_protocol_index" is the Security Protocol Index used by the gateway to
+determine the tunnel authentication type, mode and key.  SPI values of 1-255
+(inclusive) are reserved.
+
+"Password" is the L2TP password passed between the LAC and the LNS.  It
+may be a maximum of 16 characters in length.  Setting the password to ""
+disables password protection.
+
+"Tun_auth_type" is the type of authentication algorithm used to
+cryptographically checksum tunnel registration messages between the Foreign
+Agent and the Home Agent.  The only supported type is "kmd5-128" (128-bit
+keyed MD-5).  "Tun_auth_mode" is the operating mode of the authentication
+algorithm.  The only supported mode is "pref-suff" (prefix/suffix).
+"Tun_auth_key" is the key used by the authentication algorithm.  It may be
+up to 64 hexadecimal characters (0-9, A-F, a-f) in length.  If tunnel
+authentication is to be used, all three parameters are required.
+H_END
+H_DEL
+This command will delete a database entry.  The format of the command is:
+
+delete domain dnis
+
+"Domain" is the customer's domain name.  "Dnis" is the dialed phone number.
+If DNIS is not in use, a "0" (character zero) must be entered.  Both
+parameters are required.  An error is returned if the domain/DNIS pair is
+not in the database.
+
+Deleting an entry will NOT cause active users to be disconnected.
+H_END
+H_REKEY
+This command will change the domain/DNIS pair (the key) of an entry in the
+database.  The format of the command is:
+
+rekey <domain> <dnis> domain=new_domain dnis=new_dnis
+
+"<domain>" is the customer's domain name.  "<dnis>" is the dialed phone
+number.  If DNIS is not in use, a "0" (character zero) must be entered.
+Both parameters are required.  An error is returned if the domain/DNIS pair
+is not in the database or if the newly created domain/DNIS pair is already
+in the database.
+
+"New_domain" is the new domain name.  "New_dnis" is the new DNIS.  No space
+is allowed around the equal sign "=" in the keyword/parameter pairs.  Either
+or both of these parameters may be specified; at least one is required.
+
+The other parameters (as set with the add of modify commands) are unchanged.
+Rekeying an entry does NOT affect active connections.  However, the current
+user counts will not be properly decremented when users disconnect because
+their Terminate messages will specify the old domain/DNIS pair.  Consider
+clearing the counts after rekeying an entry.
+H_END
+H_LIST
+This command will display all of the domain/DNIS pairs in the database.  The
+format of the command is:
+
+list [ordered]
+
+If ordered is specified, the list will be sorted alphabetically by domain
+then DNIS in ascending order.  Otherwise, the list will be in no particular
+order.
+H_END
+H_SHOW
+This command will display information about a domain/DNIS.  The format of
+the command is:
+
+show domain dnis {config | ordered | rases | stats | all}
+
+"<domain>" is the customer's domain name.  "<dnis>" is the dialed phone
+number.  If DNIS is not in use, a "0" (character zero) must be entered.
+Both parameters are required.  Exactly one display option must be specified.
+An error is returned if the domain/DNIS pair is not in the database.
+
+"Config" displays the configured information (as entered with the add and
+modify commands) for the domain/DNIS.
+
+"Ordered" displays a sorted (lexicographically ascending) list of the RASes
+which have been the POPs for users connecting to the domain/DNIS.  The
+active count associated with each RAS is also displayed.
+
+"Rases" displays an unsorted list of the RASes which have been the POPs for
+users connecting to this domain/DNIS.  The active count associated with each
+RAS is also displayed.
+
+"Stats" displays the statistical information for the domain/DNIS.  This
+information includes the number of grants, the number maximum-users-exceeded
+denies, and the number of active users.
+
+"ALL" displays config, stats, and ordered.
+H_END
+H_CLEAR
+This command will erase information about a domain/DNIS.  The format of
+the command is:
+
+clear domain dnis {rases | stats | all}
+
+"<domain>" is the customer's domain name.  "<dnis>" is the dialed phone
+number.  If DNIS is not in use, a "0" (character zero) must be entered.
+Both parameters are required.  Exactly one clear option must be specified.
+An error is returned if the domain/DNIS pair is not in the database.
+
+"Rases" will zero the active user counts and delete the RAS list for the
+domain/DNIS.  Note that this action does not affect active users.  However,
+as they disconnect, RAS entries (for the RASes to which the users were
+connected) with a count of zero will be added to the database.
+
+"Stats" will zero the grant and maximum-users-exceeded counters.
+
+"All" will clear rases and stats.
+
+Note that configured information cannot be cleared with this command.  Use
+the modify or delete commands.
+H_END
+H_REM
+This command will remove all references to a RAS from the database,
+decrementing user counts where necessary.  The format of the command is:
+
+remove ras
+
+"<ras>" is the IP address of the RAS to be removed from the database.
+Presumably, it is a RAS which has already been removed from service.
+H_END
+H_HELP
+This command will display help information for for all of the tms_dbm
+commands.  The syntax of the command is:
+
+help [command]
+
+"Command" may be any of the following:
+
+    add    - how to add a new entry to the database
+    modify - how to modify an existing database entry
+    delete - how to delete a database entry
+    rekey  - how to change the domain/DNIS pair (key) for a database entry
+    list   - how to display a list of the domain/DNIS pairs in the database
+    show   - how to display information about a databsae entry
+    clear  - how to erase information about a databsae entry
+    remove - how to remove references to a RAS from the database
+    help   - display the information you are now reading
+H_END

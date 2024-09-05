@@ -1,0 +1,319 @@
+Copyright (c) 1992, Xylogics, Inc.  ALL RIGHTS RESERVED.
+
+ALL RIGHTS RESERVED.  Licensed Material - Property of Xylogics, Inc.
+This software is made available solely pursuant to the terms of a
+software license agreement which governs its use.  Unauthorized
+duplication, distribution or sale is strictly prohibited.
+
+
+Internal documentation for rtelnet
+
+Files:
+
+	rtelnet.h -
+		Contains definitions for portions of TELNET protocol
+		understood by Annex terminal servers, as well as common
+		data for the source modules.
+
+	rtelnet.c -
+		Contains command-line argument reading routine, main
+		polling loop, and TELNET protocol encoder/decoder.
+		This file contains routines that are common to all
+		versions of rtelnet -- machine dependent code does not
+		belong here.
+
+	machdep.c -
+		Symbolic link to a machine-dependent pseudo-terminal
+		and network I/O module.
+
+	debugging.c -
+		Symbolic link to a machine-dependent error and
+		information logging module.
+
+Porting hints:
+
+	Starting with an existing machdep.* module will greatly ease the
+	porting process.  To select an appropriate starting point, first
+	determine if the target host has a native BSD socket or System V
+	TLI network interface.  If it has both, it is likely that one or
+	the other interface is actually the "native" operating system
+	interface and the other is a "compatibility library."  In
+	general, you will get better results if you use the "native"
+	interface.
+
+	Next, determine if the system has BSD-style pseudo-terminals
+	(typically named /dev/[pt]ty[p-z][0-9a-f]), System V-style
+	"multiplexed master" pseudo-terminals (typically named
+	/dev/pmtx), or both.
+
+	Now, form the intersection of the subsets specified in these
+	lists:
+
+	Sockets:	hpux sgiv sun umax mips aix ultrix
+	TLI:		ncr sco seqptx sol iunix
+
+	BSD ptys:	hpux sun umax ultrix
+	SysV ptys:	aix mips ncr seqptx sgiv
+	Both:		sco sol iunix
+
+	If this results in more than one module, just do a diff between
+	them and select the most likely looking one.  Be especially
+	careful of -f (on the fly) pty-open detection, alias reopen,
+	and network/pty closing when you're testing.
+
+Global flags:
+
+	int cbreakmode;
+		- Slave PTY should default to CBREAK mode.
+
+	int transparent;
+		- Slave PTY should default to RAW mode.
+
+	int debug;
+		- Debug level.  (0 to 5, currently.)
+
+"machdep" interface:  (Routines supplied by machdep.c to rtelnet.c)
+
+	int flag_check();
+		- Check machine-dependent compatibility of command line
+		  flags.  Print message on standard error if problems
+		  are found, and return a non-zero value.  Return zero
+		  if no incompatibilities found.
+
+	void use_log_file(char *);
+		- Open given file in append mode, if possible.
+
+	void start_using_log(void);
+		- Assign stderr output to file opened above -- all
+		  normal user output is done.  Also starts UID "root"
+		  fork for System V autopush, if needed.
+
+	int name_to_unit(char *);
+		- Convert port name to unit number.  Returns -1 if not
+		  convertable.
+
+	void resolve_annex(char *);
+		- Argument is name of Annex that will be used.  This
+		  should resolve (and check) as necessary, and save
+		  static information for make_connection.
+
+	void set_file_mode(char *);
+		- Argument is file mode to impose on slave pty.  This
+		  is in octal, and should be converted and saved.
+
+	void set_user_name(char *);
+		- Argument is name of user to change into.  This is
+		  passed through getpwnam() (or equivalent) and saved
+		  for the start_using_log routine.
+
+	void startup_cleaning(void);
+		- Examine system ptys and return any renamed masters
+		  back to the system pool.
+
+	void i_perror(char *);
+		- Print a message concerning the current value of errno.
+
+	void become_daemon(void);
+		- Fork off from invocation task and set necessary flags
+		  to become a normal daemon (unless debug is set).
+
+	int make_connection(void);
+		- Use static data saved by resolve_annex to establish
+		  a network connection to the Annex.  Returns the file
+		  descriptor for that connection, or -1 for errors.
+
+	int wait_for_io(int from,int pty,int net,int time);
+		- Wait for some kind of I/O activity, as specified by
+		  the "from" flags, or a timeout of "time" milliseconds.
+		  Returns flags in same format as "from".  Both "pty"
+		  and "net" may be -1, which means that the file
+		  descriptor should be ignored.
+
+	int set_io_block(int fd,int flag);
+		- Set I/O mode for descriptor "fd" to blocking if flag
+		  is non-zero, or non-blocking if it is zero.  Returns
+		  non-zero if some error occurs.
+
+	int openmaster(char *);
+		- Open the master end of the pty and link the user's
+		  name for it to the slave end.
+
+	void machdep_cleanup(void);
+		- Clean any changed structures before exit.
+
+	int reopen_pty(int pty);
+		- Attempt to reopen the same master pty as initially
+		  opened by openmaster.  If unable to guarantee the same
+		  master, this routine returns -1, and openmaster should
+		  be used again.
+
+	void first_pty_data(void);
+		- Called once the first real data from the pty is
+		  received.  Used for holding pty for setting IOCTL
+		  flags on System V machines.
+
+	int fix_cooked_mode_bug(int columns,int pty);
+		- Check if insertion of a newline character is necessary
+		  on writing to master pty.  Returns zero for no
+		  insertion, non-zero for insertion required.
+
+	int get_interrupt_char(int pty);
+		- Get appropriate representation of IAC IP (Interrupt
+		  Process) TELNET sequence for pty.
+
+	int get_erase_char(int pty,int flag);
+		- If flag is zero, get erase-character character, if
+		  non-zero, get erase-line character.  (For IAC EC and
+		  IAC EL, respectively.)
+
+	int mode(int pty,int flag,int option);
+		- Flag is non-zero to set options, zero to clear.
+		  Options are MODEF_RAW and MODEF_ECHO.
+
+	void reset_serial_line(void);
+		- Sends NA reset to serial line on Annex.
+
+	int force_send(int fd,char *buff,int len,int flag);
+		- Sends data directly to the Annex through the network,
+		  bypassing any operating system buffering.  "Flag" is
+		  non-zero if this data should have the TCP urgent flag
+		  set.  Returns a negative number for errors, in the
+		  same manner as network_write.
+
+	int network_read(int fd,char **buffp,int len);
+		- Read a block of data from the network interface.  The
+		  number of bytes read is returned.  If an error occurs,
+		  -1 is returned and errno is set.  If the read would
+		  block, then -2 is returned.  buffp is advanced to the
+		  first byte of data.  If the stream closes, then -4 is
+		  returned.
+
+	int network_write(int fd,char *buff,int len);
+		- Write a block of data to the network interface.  The
+		  number of bytes written is returned.  If an error
+		  occurs, -1 is returned instead and errno is set.
+		  If the write would block, then -2 is returned.  If
+		  network output should be removed from the list of
+		  things to wait for, then -3 is returned.
+
+	void network_close(int fd);
+		- Close the network connection to the Annex.
+
+	int pty_read(int fd,char **buffp,int len);
+		- Read a block of data from the pty interface.  The
+		  number of bytes read is returned.  If an error occurs,
+		  -1 is returned and errno is set.  If the read would
+		  block, then -2 is returned.  buffp is advanced to the
+		  first byte of data.
+
+	int pty_write(int fd,char *buff,int len);
+		- Write a block of data to the pty interface.  The
+		  number of bytes written is returned.  If an error
+		  occurs, -1 is returned instead and errno is set.
+		  If the write would block, then -2 is returned.  If
+		  pty output should be removed from the list of things
+		  to wait for, then -3 is returned.
+
+	void pty_close(int fd);
+		- Close the pty connection.  Also resets autopush
+		  information on System V machines.
+
+	char machrev[],machsrc[];
+		- RCS strings.  Used to create -V output automatically.
+
+"rtelnet" interface:  (Routines supplied by rtelnet.c to machdep.c)
+
+	int main(int argc,char **argv);
+		- Standard C entry point.
+
+	void show_rtelnet_statistics(int);
+		- Show rtelnet I/O system statistics at given debug
+		  level.  Intended to be used by SIGUSR1 handler.
+
+	void cleanup(void);
+		- Shut down rtelnet.  Doesn't return to caller.
+
+	int telnet_ship_lflow(int);
+		- Argument is 0 to disable "local" flow control, 1 to
+		  enable it.  (When "local" flow control is enabled, the
+		  Annex will handle flow control itself.  When it is
+		  disabled, the Annex will pass all input through
+		  unmolested.)  Return value is 1 if the new mode has
+		  been successfully invoked, and 0 if it has been
+		  deferred.  This is intended to be used as an upcall in
+		  TIOCPKT mode so that the user's ioctls will be passed
+		  on to the Annex.
+
+	int telnet_halt_network(int);
+		- Argument is 0 to restart network output, 1 to stop.
+		  This is intended to be used as an upcall in TIOCPKT
+		  mode so that the user's ioctls can be implemented.
+		  Return value is 1 if successful, and 0 if not.
+
+	int cancel_network_input(void);
+		- Discards pending network input data and synchronizes
+		  with Annex by means of a timing mark.  Returns zero on
+		  success, non-zero when action has been deferred.  This
+		  is intended to be used as an upcall in TIOCPKT mode so
+		  that the user's flush ioctl can be implemented.
+
+	int cancel_network_output(void);
+		- Discards pending network output data and synchronizes
+		  with Annex by means of an urgent data mark.  Returns
+		  zero on success, non-zero when action has been
+		  deferred.  This is intended to be used as an upcall in
+		  TIOCPKT mode so that the user's flush ioctl can be
+		  implemented.
+
+"debugging" interface:  (Routines supplied to machdep.c and rtelnet.c)
+
+	void initialize_debugging(void);
+		- Called by rtelnet.c before any DBG output is used.
+		  Currently, this is used to open the syslog(3)
+		  interface in debugging.sys.
+
+	void _DBG(int level,int sever,char *fmt, ...);
+		- Called all over the code to implement debugging
+		  output.  "level" is the minimum debug level at which
+		  the output should occur, and sever is the perceived
+		  severity of the situation (see macros starting with
+		  "D_" in rtelnet.h).  The rest of the arguments are as
+		  in standard printf(3).
+
+	char dbgrev[],dbgsrc[];
+		- RCS strings.  Used to create -V output automatically.
+
+"netadm" interface:  (From ../netadm/netadm.a)
+
+	int reset_line(struct sockaddr_in *s,u_short type,u_short port);
+		- Sends an NA message to Annex at address "s".  "type"
+		  is always SERIAL_DEV, and port is the serial port
+		  number.  This is used by machdep.c to implement the
+		  -h switch (called from reset_serial_line).
+
+Original Author:  James Carlson		Created on:  05AUG92
+
+Revision Control Information:
+$Id: INTERN,v 1.5 1993/06/21 14:55:19 carlson Rel $
+
+This file created by RCS from
+$Source: /annex/common/src/./newrtelnet/RCS/INTERN,v $
+
+Revision History:
+$Log: INTERN,v $
+Revision 1.5  1993/06/21  14:55:19  carlson
+Minor spelling repair.
+
+Revision 1.4  93/06/21  14:51:13  carlson
+Added more porting hints and cross-references between versions.
+
+Revision 1.3  93/02/04  17:20:27  carlson
+Added documentation for -u and -M changes.
+
+Revision 1.2  92/08/13  17:13:27  carlson
+Added documentation of pty I/O routines.
+
+Revision 1.1  92/08/05  15:40:20  carlson
+Initial revision
+
+This file is currently under revision by: $Locker:  $

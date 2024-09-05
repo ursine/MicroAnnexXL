@@ -1,0 +1,717 @@
+# Modem configurations to be used with Bay Networks (Xylogics) Annexes.
+#
+#    Modems should be configured for the following
+#     Serial Port Rate of Modem Locked
+#     If DTR drops, connection hangs up
+#     DCD tracks status of carrier signal
+#     enable RTS/CTS local flow control
+#
+#     Outbound Modem Calls - Result Codes enabled (numeric only)
+#     Inbound Modem Calls  - Result Codes disabled
+#
+# For Annexes with internal modems (T1, PRI products), we supply modem
+# configurations here.  We do not recommend that you change the
+# configurations of Annex internal modems.
+
+# Bay Networks/Xylogics 5391 CT1 internal modem
+type_of_modem       BAYT1_5391_288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68 70 72
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=0S2=43
+dialin_setup_cmd    AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=1S2=0
+setup_cmd           AT&C1&D2\J0\N3\Q3\V0Q2V0W2
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# CSMIMT1 internal modem
+type_of_modem       CSMIMT1_288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68 70 72
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore      2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=0S2=43
+dialin_setup_cmd    AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=1S2=0
+setup_cmd           AT&C1&D2\J0\N3\Q3\V0Q2V0W2
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Cardinal Modem 3480 56K x2
+type_of_modem       cardinal_56K
+ready_status        0
+connect_status      1 5 10 11 13 18 20 21 25 43 85 91 99 103 107 151 155 180 184 188 192 196 200 204 208 212 216 220 224 228 232 236
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2 33 35
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q0V0W2&C1&D2&K3&Q5S0=0
+dialin_setup_cmd    ATE1M0Q0V0W2&C1&D2&K3&Q5S0=1
+setup_cmd           ATE1M0Q0V0W2&C1&D2&K3&Q5
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+# Cardinal MVPV34XF
+type_of_modem       cardinal_v34xf
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 16 17 18 19 40 46 47 48 49 50 51 52 53 54 55 56 57 58 78 79 59 61 62 63 64 91 84 66 67 69 76 77 80
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2 33 35
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q0V0W2&C1&D2&K3&Q5S0=0
+dialin_setup_cmd    ATE1M0Q0V0W2&C1&D2&K3&Q5S0=1
+setup_cmd           ATE1M0Q0V0W2&C1&D2&K3&Q5
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+
+# Hayes Optima 14.4
+type_of_modem       hayes_optima144
+ready_status        0
+connect_status      1 5 10 11 12 13 14 18 28
+connect_abort	    4 6
+connect_retry       3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=0
+dialin_setup_cmd    ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=1
+setup_cmd           ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+# Hayes Optima 96
+type_of_modem       hayes_optima96
+ready_status        0
+connect_status      1 5 10 11 12 14 28
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=0
+dialin_setup_cmd    ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=1
+setup_cmd           ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60
+dial_cmd            ATDT
+timeout             90
+retry               1
+end
+
+# Hayes Smartmodem 28.8
+type_of_modem       hayes_accura288
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 19 24
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q0V0W2&C1&D2&K3&Q5S7=90S0=0
+dialin_setup_cmd    ATE1M0Q1V0W2&C1&D2&K3&Q5S7=90S0=1
+setup_cmd           ATE1M0Q0V0W2&C1&D2&K3&Q5S7=90
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+# Hayes Smartmodem 28.8
+type_of_modem       hayes_optima288
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 19 24
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q2V0W2&C1&D2&K3&Q5S7=90S0=0
+dialin_setup_cmd    ATE1M0Q2V0W2&C1&D2&K3&Q5S7=90S0=1
+setup_cmd           ATE1M0Q2V0W2&C1&D2&K3&Q5S7=90
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+# Hayes Ultra 9600
+type_of_modem       hayes_ultra96
+ready_status        0
+connect_status      1 5 10 11 12 13 14 18 28
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=0
+dialin_setup_cmd    ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60S0=1
+setup_cmd           ATE1M0Q2V0W2&C1&D2&K3&Q5S7=60
+dial_cmd            ATDT
+timeout             120
+retry               2
+end
+
+# Microcom Deskporte V.FC/V.34
+type_of_modem       microcom_mvp288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68
+connect_abort       4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=0
+dialin_setup_cmd    AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=1
+setup_cmd           AT&C1&D2\J0\N3\Q3\V0Q2V0W2
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Microcom Deskporte ES V.FC/V.34
+type_of_modem       microcom_ep_288
+ready_status        0
+connect_status      1 5 9 10 11 12 13 14 15 16 59 61 62 63 64
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZQ0
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2&K3\N3Q0V0S95=3S0=0
+dialin_setup_cmd    AT&C1&D2&K3\N3Q1V0S95=3S0=1
+setup_cmd           AT&C1&D2&K3\N3Q0V0S95=3
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Microcom Deskporte ES V.FC/V.34
+type_of_modem       microcom_es_288
+ready_status        0
+connect_status      1 5 9 10 11 12 13 14 15 16 59 61 62 63 64
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZQ0
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2&K3\N3Q0V0S95=3S0=0
+dialin_setup_cmd    AT&C1&D2&K3\N3Q1V0S95=3S0=1
+setup_cmd           AT&C1&D2&K3\N3Q0V0S95=3
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Motorola Codex 3260
+type_of_modem       codex_3260
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 16 17 18 19 20 22 23 24 26 27 28 29
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATV0M0E1Q2X4&C1&D2&S0*FL3S0=0
+dialin_setup_cmd    ATV0M0E1Q2X4&C1&D2&S0*FL3S0=1
+setup_cmd           ATV0M0E1Q2X4&C1&D2&S0*FL3 
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Motorola LifeStyle 28.8
+type_of_modem	    lifestyle_288
+ready_status        0
+connect_status      1 5 9 10 11 12 13 14 15 17 18 80 81 82 83 84 85
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F1
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\Q3\N7L1Q2VS7=90S0=0
+dialin_setup_cmd    AT&C1&D2\Q3\N7L1Q2VS7=90S0=1
+setup_cmd           AT&C1&D2\Q3\N7L1Q2VS7=90
+dial_cmd            ATDT
+timeout	            120
+retry               3
+end
+
+# Motorola V.3400
+type_of_modem       motorola_V3400
+ready_status        0
+connect_status      1 5 9 10 11 12 13 14 15 17 18 80 81 82 83 84 85
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F1
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\Q3\J0\N7L1Q2V0W0S7=90S0=0
+dialin_setup_cmd    AT&C1&D2\Q3\J0\N7L1Q2V0W0S7=90S0=1
+setup_cmd           AT&C1&D2\Q3\J0\N7L1Q2V0W0S7=90
+dial_cmd            ATDT
+timeout             120
+retry               3
+end
+
+# Motorola Voice/ModemSurfer 56K
+type_of_modem       surfr_56K
+ready_status        0
+connect_status      1 5 9 10 11 12 13 14 15 16 17 18 19 22 23 40 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 61 62 63 64 66 67 69 70 77 78 79 80 81 82 83 84 85 91 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F1
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATM0&C1&D2L1V0S0=0
+dialin_setup_cmd    ATM0&C1&D2L1V0S0=1
+setup_cmd           ATM0&C1&D2L1V0
+dial_cmd            ATDT
+timeout             120
+retry               3
+end
+
+
+# Multitech MT2834BL
+type_of_modem       multitech_bl
+ready_status        0
+connect_status      1 5 9 10 11 12 13 19 21 24 26 28
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay         03+0.2
+dialout_setup_cmd   ATV0M0E1Q2X4&C1&D2&Q1&S0S0=0
+dialin_setup_cmd    ATV0M0E1Q2X4&C1&D2&Q1&S0S0=1
+setup_cmd           ATV0M0E1Q2X4&C1&D2&Q1&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Multitech MT2834ZXD
+type_of_modem       multitech_zdx
+ready_status        0
+connect_status      1 5 9 10 11 12 13 19 21 24 26 28
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay         03+0.2
+dialout_setup_cmd   ATV0M0E1Q2X4&C1&D2&Q1&S0S0=0
+dialin_setup_cmd    ATV0M0E1Q2X4&C1&D2&Q1&S0S0=1
+setup_cmd           ATV0M0E1Q2X4&C1&D2&Q1&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Penril Alliance V.32/14.4
+type_of_modem       penril_14.4
+ready_status        0
+connect_status      1 5 10 12 13 14 15 18
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ0
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&FQ2V0\Q1,1S0=0
+dialin_setup_cmd    AT&FQ2V0\Q1,1S0=1
+setup_cmd           AT&FQ2V0\Q1,1
+dial_cmd            ATDT
+timeout             90
+retry               1
+end
+
+# Penril Alliance V.34
+type_of_modem       penril_33.6
+ready_status        0
+connect_status      1 5 10 12 13 14 15 18 76 80
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ0
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&FM0Q2V0\Q1S0=0
+dialin_setup_cmd    AT&FM0Q2V0\Q1S0=1
+setup_cmd           AT&FM0Q2V0\Q1
+dial_cmd            ATDT
+timeout             90
+retry               1
+end
+
+# Practical Peripheral PM14400FXMT V.32bis
+type_of_modem       pract_pm14400
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 18 24 25 26 28 29 31 34 60
+connect_abort	    4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATL0Q2V0W2&D2&C1&K3&Q5&S0S0=0
+dialin_setup_cmd    ATL0Q2V0W2&D2&C1&K3&Q5&S0S0=1
+setup_cmd           ATL0Q2V0W2&D2&C1&K3&Q5&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Practical Peripheral PM28800FXMT V.FC
+type_of_modem       pract_pm28800
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 18 24 25 26 28 29 31 34 60
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay	    3.0+0.2
+dialout_setup_cmd   ATL0Q2V0W2&D2&C1&K3&Q5&S0S0=0
+dialin_setup_cmd    ATL0Q2V0W2&D2&C1&K3&Q5&S0S0=1
+setup_cmd           ATL0Q2V0W2&D2&C1&K3&Q5&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Practical Peripheral 5638US V.34
+type_of_modem       pract_33.6
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 18 22 23 24 25 26 28 29 31 34 36 37 38 40 44 45 46 47 48 49 50 51 52 53 54 60 66 69 70 80 91
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2 55 67 77
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATL0V0W2&D2&C1&K3&Q5&S0S0=0
+dialin_setup_cmd    ATL0V0W2&D2&C1&K3&Q5&S0S0=1
+setup_cmd           ATL0V0W2&D2&C1&K3&Q5&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Practical Peripheral PM56K MT x2
+type_of_modem       pract_56K
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 18 22 23 24 25 26 28 29 31 34 36 37 38 40 44 45 46 47 48 49 50 51 52 53 54 60 66 69 70 80 91 99 103 107 151 153 155 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2 55 67 77
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATL0V0W2&D2&C1&K3&Q5&S0S0=0
+dialin_setup_cmd    ATL0V0W2&D2&C1&K3&Q5&S0S0=1
+setup_cmd           ATL0V0W2&D2&C1&K3&Q5&S0
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Telebit FastBlazer8840
+type_of_modem      telebit_fastbl
+ready_status       0
+connect_status     1 5 10 30 31 32 33 34 36 37 45 46 47
+connect_abort      4 6
+connect_retry      3 7 8
+connect_ignore     2
+reset_cmd          AT&F
+reset_delay        3.0+0.2
+dialout_setup_cmd  ATE1V0&C1&D2&E1*E1&I1&K2L1&R0&S0S7=90S0=0
+dialin_setup_cmd   ATE1V0&C1&D2&E1*E1&I1&K2L1&R0&S0S7=90S0=1
+setup_cmd          ATE1V0&C1&D2&E1*E1&I1&K2L1&R0&S0S7=90
+dial_cmd           ATDT
+timeout            120
+retry              2
+end
+
+# Telebit T2500
+type_of_modem      telebit_t2500
+ready_status       0
+connect_status     1 5 10 11 12 14 40 46 47 48 50
+connect_abort	   4 6
+connect_retry	   3 7 8
+connect_ignore	   2
+reset_cmd          ATZ
+reset_delay	   3.0+0.2
+dialout_setup_cmd  ATE1V0Q8X1M0S52=2S58=2S66=1S95=2S96=1S131=1S0=0
+dialin_setup_cmd   ATE1V0Q8X1M0S52=2S58=2S66=1S95=2S96=1S131=1S0=1
+setup_cmd          ATE1V0Q8X1M0S52=2S58=2S66=1S95=2S96=1S131=1
+dial_cmd           ATDT
+timeout            90
+retry              2
+end
+
+# Telebit T3000
+type_of_modem       telebit_t3000
+ready_status        0
+connect_status      1 5 10 11 12 13 14 15 16 46 47 48 49
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1V0Q2X1M0S58=2 S0=0
+dialin_setup_cmd    ATE1V0Q2X1M0S58=2 S0=1
+setup_cmd           ATE1V0Q2X1M0S58=2
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Telebit TrailBlazer
+type_of_modem       telebit_trailbl
+ready_status        0
+connect_status      1 5 10 20 22 23 50 61 62 63 70 71 72 73
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1V0Q7X3M0S51=255S52=1S58=2S66=1S95=2S96=1S0=0
+dialin_setup_cmd    ATE1V0Q7X3M0S51=255S52=1S58=2S66=1S95=2S96=1S0=1
+setup_cmd           ATE1V0Q7X3M0S51=255S52=1S58=2S66=1S95=2S96=1
+dial_cmd            ATDT
+timeout             40
+retry               2
+end
+
+# UDS V.3229
+type_of_modem       uds_v.3229
+ready_status        0
+connect_status      1
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay	    3.0+0.2
+dialout_setup_cmd   ATE1V0Q2X0&C1&D2&S0S0=0
+dialin_setup_cmd    ATE1V0Q2X0&C1&D2&S0S0=1
+setup_cmd           ATE1V0Q2X0&C1&D2&S0
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# US Robotics Sportster 56K x2
+type_of_modem       USR_56K
+ready_status        0
+connect_status      1 5 10 13 18 20 21 25 43 47 85 91 99 103 107 151 153 155 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243
+connect_abort       4 6 12
+connect_retry       3 7 8
+connect_ignore      2 11
+reset_cmd           AT&F1
+reset_delay         4.0+2.0
+dialout_setup_cmd   ATE1M0Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=0
+dialin_setup_cmd    ATE1M0Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=1
+setup_cmd           ATE1M0Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2
+dial_cmd            ATDT
+timeout             90
+retry               3
+cmdline_termination cr
+end
+
+# US Robotics Sportster 33.6
+type_of_modem       USR_336
+ready_status        0
+connect_status      1 5 10 13 18 20 21 25 43 47 85 91 99 103 107 151 153 155
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           AT&F1
+reset_delay	    4.0+2.0
+dialout_setup_cmd   ATE1Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=0
+dialin_setup_cmd    ATE1Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=1
+setup_cmd           ATE1Q2V0X0&A0&B1&C1&D2&H1&I0&K1&R2 
+dial_cmd            ATDT
+timeout             90
+retry               3
+cmdline_termination cr
+end
+
+# USR288
+type_of_modem       USR_288
+ready_status        0
+connect_status      1 5 10 13 18 20 21 25 43 47 85 91 99 103 107
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore      2
+reset_cmd           AT&F1
+reset_delay	    4.0+2.0
+dialout_setup_cmd   ATE1Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=0
+dialin_setup_cmd    ATE1Q2V0X4&A0&B1&C1&D2&H1&I0&K1&R2S0=1
+setup_cmd           ATE1Q2V0X0&A0&B1&C1&D2&H1&I0&K1&R2 
+dial_cmd            ATDT
+timeout             90
+retry               3
+cmdline_termination cr
+end
+
+# USR144
+type_of_modem       USR_144
+ready_status        0
+connect_status      1 5 10 13 18 20 21 25 43 47 85 91
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay	    3.0+0.2
+dialout_setup_cmd   ATE1V0Q2X4&A0&B1&C1&D2&H1&I0&K1&R2S0=0
+dialin_setup_cmd    ATE1V0Q2X4&A0&B1&C1&D2&H1&I0&K1&R2S0=1
+setup_cmd           ATE1V0Q2X1&A0&B1&C1&D2&H1&I0&K1&R2
+dial_cmd            ATDT
+timeout             90
+retry               2
+cmdline_termination cr
+end
+
+# USRobotics Courier V.32 bis with ASL
+type_of_modem       USR_96
+ready_status        0
+connect_status      1 5 10 13 14 15 16 17 18 19 20 21 25 43
+connect_abort	    4 6
+connect_retry       3 7 8
+connect_ignore	    2
+reset_cmd           AT&F
+reset_delay	    3.0+0.2
+dialout_setup_cmd   ATE1V0Q0X1&B1&D2&H1&K3S0=0
+dialin_setup_cmd    ATE1V0Q0X1&B1&D2&H1&K3S0=1
+setup_cmd           ATE1V0Q0X1&B1&D2&H1&K3
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# USRobotics Courier V.Everything w/x2
+type_of_modem       usr_vevery
+ready_status        0
+connect_status      1 5 10 13 18 20 21 25 43 47 85 91 99 103 107 151 153 155 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATM0E1V0Q2X1&B1&D2&H1&K3S0=0
+dialin_setup_cmd    ATM0E1V0Q2X1&B1&D2&H1&K3S0=1
+setup_cmd           ATM0E1V0Q2X1&B1&D2&H1&K3
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Bay Networks/Xylogics RA6100 internal modem
+type_of_modem       XYL_RA6100_288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68 70 72
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore      2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=0S2=43
+dialin_setup_cmd    AT&C1&D2\J0\N3\Q3\V0Q2V0W2S0=1S2=0
+setup_cmd           AT&C1&D2\J0\N3\Q3\V0Q2V0W2
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Bay Networks/Xylogics RA6100 internal modem with output levels setup for Hong Kong
+type_of_modem       BAYT1_HK_288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68 70 72
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F
+reset_delay         3.0+0.2
+dialout_setup_cmd   AT&C1&D2\J0\N3\Q3\V0Q2V0W2:t93=10:t94=6S0=0S2=43
+dialin_setup_cmd    AT&C1&D2\J0\N3\Q3\V0Q2V0W2:t93=10:t94=6S0=1S2=0
+setup_cmd           AT&C1&D2\J0\N3\Q3\V0Q2V0W2:t93=10:t94=6
+dial_cmd            ATDT
+timeout             90
+retry               2
+end
+
+# Bay Networks/Xylogics RA6300 internal modem
+type_of_modem       XYL_RA6300_288
+ready_status        0
+connect_status      1 5 9 10 11 30 32 34 36 40 44 60 62 64 66 68 70 72
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           AT&F\V0V0S0=0S2=0
+reset_delay         3.0+0.0
+dialin_setup_cmd    AT
+dialout_setup_cmd   AT
+dial_cmd            ATD
+timeout             60
+retry               2
+answer_cmd          ATA
+end
+
+# Zoom 56K K56flex
+type_of_modem       zoom_56K
+ready_status        0
+connect_status      1 5 9 10 11 12 14 15 16 17 18 19 20 21 22 23 33 35 40 44 45 46 47 48 49 50 51 52 54 55 56 57 58 59 61 62 63 64 66 67 69 70 77 78 79 80 84 91 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1L0M0V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60S0=0
+dialin_setup_cmd    ATE1L0M0V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60S0=1
+setup_cmd           ATE1L0M0V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Zoom 33.6 V.34
+type_of_modem       zoom_28.8
+ready_status        0
+connect_status      1 5 9 10 11 12 14 15 16 59 61 62 63 64 84 91
+connect_abort	    4 6
+connect_retry	    3 7 8
+connect_ignore	    2
+reset_cmd           ATZ
+reset_delay         3.0+0.2
+dialout_setup_cmd   ATE1V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60S0=0
+dialin_setup_cmd    ATE1V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60S0=1
+setup_cmd           ATE1V0&Q5&K3&C1&D2&S0%E1S46=138S95=1S7=60
+dial_cmd            ATDT
+timeout             90
+retry               3
+end
+
+# Zyxel U1496
+type_of_modem       zyxel_u1496
+ready_status        0
+connect_status      1 5 10 11 12 14 15 16 17 18 19 20 21
+connect_abort       4 6
+connect_retry       3 7 8
+connect_ignore      2
+reset_cmd           ATZ4
+reset_delay	    3.0+0.2
+dialout_setup_cmd   ATV0M0S7=60S0=0
+dialin_setup_cmd    ATV0M0S7=60S0=1
+setup_cmd           ATV0M0S7=60
+dial_cmd            ATDT
+timeout             90
+retry               2
+end

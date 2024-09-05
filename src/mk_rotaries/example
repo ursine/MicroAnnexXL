@@ -1,0 +1,10 @@
+# annex rotaries definitions file
+modem_2400:	6,9,14,15,16 @63.37; \
+		1,3,5,6@63.57
+modem_1200:\
+		1,2@63.9; 3,4@zurton
+
+gateway1:	4 , 5, 3 @63.39
+
+gateway2:	12@63.39
+x.25:		4 @anexpilot6

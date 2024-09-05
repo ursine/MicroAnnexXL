@@ -1,0 +1,7 @@
+# erpc remote programs
+#
+# prog no.	verlo	verhi	name
+#
+1		0	0	bfs
+#3		0	99	acp
+

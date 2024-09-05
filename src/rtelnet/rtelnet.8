@@ -1,0 +1,172 @@
+.TH RTELNET 8
+.SH NAME
+rtelnet \- Annex reverse TELNET daemon
+.\"To "rtelnet " "Annex reverse TELNET daemon"
+.SH SYNOPSIS
+.B rtelnet
+[
+.B \-bdfhmrtD
+]
+.I annex
+.I port
+.I device-name
+.SH ARGUMENTS
+.TP 6n
+.B \-b
+requests that
+.I rtelnet
+negotiate
+.SM TELNET
+binary mode
+when communicating with the Annex.
+This is for devices like laser printers which use binary data
+that might be scrambled by
+.SM TELNET's
+CR/LF conventions.  (See also -t option below.)
+.TP
+.B \-d
+turns on socket-level debugging.
+.TP
+.B \-f
+enables the \fIconnect on the fly\fP mode.
+The \fB-m\fP switch should also be used with this mode,
+to ensure that
+.I rtelnet
+will drop the connection when the slave device is not in use.
+.TP
+.B \-h
+tells
+.I rtelnet
+to send a \fBreset port\fP RPC to the Annex port when the slave pseudo device
+is closed. This must be used in conjuction with the \fB-m\fP switch. This uses
+the same
+.SM NETADM
+protocol used by \fBna\fP. This will currently only work on Annexes without
+an \fBannex_password\fP parameter set.
+.TP
+.B \-m
+tells
+.I rtelnet
+to momentarily drop the network connection to the
+Annex port whenever the slave pseudo device is closed.
+This causes the Annex to drop
+.SM DTR,
+which can be used to cause a dial-out modem to
+hang up when a program like tip exits.
+.TP
+.B \-r
+directs
+.I rtelnet
+to remove the device
+.I device-name
+if it already exists.  Without
+.BR \-r ,
+.I rtelnet
+will exit with an error message if
+.I device-name
+already exists.
+.TP
+.B \-t
+causes
+.I rtelnet
+to use a transparent TCP connection to the indicated Annex.
+This will cause the connection to be made through Annex ports
+in the 7000 range, rather than the 5000 range, and no
+.SM TELNET
+option negotiation or CR/LF mapping will be used.  Use this option
+to create a fast, completely transparent data path.
+.TP
+.B \-D
+turns on verbose debugging output.
+.I Rtelnet
+does not fork off a daemon in this case;
+instead, it displays TELNET option negotiation
+and all received data on the terminal where
+.I rtelnet
+was started.
+.TP
+.I annex
+The hostname or Internet address
+(in standard Internet dot separated notation)
+of the Annex.
+.TP
+.I port
+The serial port number on the Annex.
+.TP
+.I device-name
+name of psuedo device to create (usually in the /dev directory).
+.SH DESCRIPTION
+.I Rtelnet
+is a modified version of the 4BSD telnetd program.
+Its purpose is to create a pseudo-tty device
+that is connected to an Annex serial port.
+This allows UNIX programs such as tip and uucp to
+access serial devices attached to Annex ports.
+.I Rtelnet
+works like a telnet daemon program (telnetd)
+except in a reverse fashion.
+Instead of accepting telnet connections from other network machines,
+.I rtelnet
+makes telnet connections to Annex ports.
+.I Rtelnet
+creates a new file-like device (in /dev)
+that programs can open and use like a normal tty.
+.PP
+Normally,
+.I rtelnet
+makes the connection to the Annex immediately.
+This ties the Annex port to exactly one host.
+This is useful for dedicated devices.
+On the otherhand, this will not interact correctly with a port set to the
+.B adaptive
+mode, which would normally be used for a dial-in/dial-out modem.
+Such a configuration should use the \fIconnect on the fly\fP option.
+In that case,
+.I rtelnet
+will not make the connection immediately,
+but will instead wait until another process opens the slave device.
+When that happens,
+.I rtelnet
+will attempt to make the network connection.
+When the connection is up, data will flow as normal.
+If the connection cannot be made,
+.I rtelnet
+will try again using an exponential backoff.
+.PP
+.I Rtelnet
+should run as-is on any 4BSD-based system.
+To run on other systems may require some code modification.
+In particular, some systems name their psuedo-terminals differently.
+The source code has rudimentary support for some such systems.
+.PP
+Example usage:
+.RS +5
+A dial-out modem is attached to
+port 15 of an Annex named "modem-annex".
+To enable its use via \fItip\fP on a 4BSD host:
+.IP 1.
+Configure port 15 using \fIna\fP to:
+.sp
+		"control_lines: modem_control"
+		"         mode: slave"
+.IP 2.
+Start up \fIrtelnet\fP to create the pseudo-device:
+.sp
+		rtelnet -rbm modem-annex 15 /dev/modem1
+.sp
+Normally, this would be added to the system startup file
+(/etc/rc).
+.IP 3.
+Create new system definition in /etc/remote specifying /dev/modem1
+as the device.
+.sp
+.SH FILES
+.nf
+.ta \w'/dev/pty[p-s][0-9a-f]   'u
+/dev/pty[p-s][0-9a-f]	default list of master pseudo-terminals
+/dev/tty[p-s][0-9a-f]	default list of slave pseudo-terminals
+.fi
+.SH SEE ALSO
+Annex Network Administrator's Guide
+.SH DIAGNOSTICS
+Messages should be self-explanatory.

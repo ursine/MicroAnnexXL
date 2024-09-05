@@ -1,0 +1,57 @@
+'''
+'''	$Header: /annex/common/src/./na/RCS/na.8,v 1.6 1993/10/07 10:04:42 emond Rel $
+'''
+.ig xy
+.TH NA 1M ANNEX
+.xy
+.ie '\*(sy'V' .TH NA 1M ANNEX
+.el .TH NA 8 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+na \- Annex network administrator's utility
+.\"To "na " "Annex network administrator's utility
+.SH SYNOPSIS
+.B na
+.SH DESCRIPTION
+The Annex network administrator program,
+.IR na ,
+is a utility that can restart an Annex terminal server, reset its ports,
+and display or change most of its operating characteristics.  One
+.I na
+command can examine or change the parameters for one or more of the
+serial ports or the printer port on a single Annex or several Annexes.
+.PP
+Only the super-user can change configuration, reset ports, or
+restart an Annex terminal server.
+.PP
+.if '\*(sy'V' \{
+.PP
+Some of
+.IR na 's
+more typical actions can be performed with the
+.I modtty
+subcommand of the
+.IR sysadm (1)
+command.
+\}
+.PP
+The 
+.I na
+utility, including all commands and their arguments, is
+described in detail in the 
+.IR "Annex Network Administrator's Guide" .
+.SH SEE ALSO
+.ie '\*(sy'V' \{
+sysadm(1), erpcd(1M).
+\}
+.el erpcd(8).
+.br
+.IR "Annex Network Administrator's Guide" .
+

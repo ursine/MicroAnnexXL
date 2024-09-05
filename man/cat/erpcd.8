@@ -1,0 +1,263 @@
+
+
+
+     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))                     AAAANNNNNNNNEEEEXXXX                     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          erpcd - Annex network services daemon
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          eeeerrrrppppccccdddd [ ----bbbb_m_a_x_c_o_n ] [ ----dddd[ _u_d_p_p_o_r_t] ] [ ----DDDD[_l_e_v_e_l] ] [ ----pppp ]
+               [ ----ffff_b_f_s-_d_i_r_e_c_t_o_r_y ] [ ----gggg_p_e_r_i_o_d ] [ ----ssss_a_c_p-_d_i_r_e_c_t_o_r_y ]
+               [ ----uuuu [ _f_i_l_e_n_a_m_e ] ] [ ----xxxx_m_a_x__t_o_t_a_l ]
+
+
+     AAAARRRRGGGGUUUUMMMMEEEENNNNTTTTSSSS
+          ----bbbb _m_a_x__c_o_n   This option enables blacklisting based on
+                      consecutive login failures and sets the maximum
+                      allowed consecutive login failures to _m_a_x__c_o_n,
+                      which can be any non-negative number.  A value
+                      of 0 enables blacklisting on any login failure
+                      (not recommended).
+
+          ----dddd _u_d_p_p_o_r_t   Change the udp port number used from the
+                      default of 121.  The ----dddd option used without the
+                      port number argument turns on socket level
+                      debugging. Note that there is a space between
+                      the ----dddd and the number.
+
+          ----DDDD_l_e_v_e_l      Put _e_r_p_c_d into debug mode.  _e_r_p_c_d will not
+                      detach from the tty and instead prints out
+                      extensive debugging information. The amount of
+                      debugging information can be increased by giving
+                      a debugging level with the ----DDDD option. Note that
+                      there is no space between ----DDDD and the number.
+
+          ----pppp           This flag will cause the PID number of the
+                      erpcd process started to be displayed on
+                      standard output.  This is useful in start-
+                      up/shut-down scripts which need to save the
+                      process ID of the main erpcd daemon.
+
+          ----ffff_p_a_t_h       This option sets the location of the BFS boot
+                      files.  The default is /_u_s_r/_s_p_o_o_l/_e_r_p_c_d/_b_f_s.
+                      This is useful when using pre-compiled host
+                      tools.  The space between the ----ffff and the path is
+                      optional.
+
+          ----gggg _p_e_r_i_o_d    This option sets the period of time, in weeks,
+                      over which to apply the non-consecutive login
+                      failure allowance to _p_e_r_i_o_d, which can be any
+                      non-negative integer.
+
+          ----ssss_p_a_t_h       This option sets the location of the ACP
+                      security files.  The default is /_u_s_r/_a_n_n_e_x. This
+                      is useful when using pre-compiled host tools.
+                      The space between the ----ssss and the path is
+                      optional.
+
+
+
+     Page 1                                         (printed 10/13/98)
+
+
+
+
+
+
+     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))                     AAAANNNNNNNNEEEEXXXX                     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))
+
+
+
+          ----uuuu _f_i_l_e_n_a_m_e  The ----uuuu option invokes the aaaaccccpppp____uuuusssseeeerrrriiiinnnnffffoooo syntax
+                      checker on the file _f_i_l_e_n_a_m_e. This option does
+                      not start an eeeerrrrppppccccdddd daemon, it does syntax
+                      checking only. If _f_i_l_e_n_a_m_e is omitted, stdin is
+                      used.
+
+          ----xxxx _m_a_x__t_o_t_a_l
+                      Enables blacklisting based on non-consecutive
+                      login failures and sets the maximum number of
+                      allowed login failures(over the number of weeks
+                      specified with the -g option)before the user
+                      becomes blacklisted to _m_a_x__t_o_t_a_l, which can be
+                      any value between 0 and 20.  A value of 0
+                      enables blacklisting on any login failure(not
+                      recommended).
+
+          _e_r_p_c_d is the Annex network services daemon.  It is normally
+          started at boot time from ////eeeettttcccc////iiiinnnniiiitttt....dddd////eeeetttthhhheeeerrrrnnnneeeetttt; see _b_r_c(1M).
+
+          The _e_r_p_c_d daemon is responsible for two services:  the block
+          file server used by the Annex to access host files, _b_f_s, and
+          the Annex access control protocol server that handles
+          security requests, _a_c_p.  In both cases, _e_r_p_c_d listens at a
+          well-known UDP port (name "erpc", 121/udp) for messages
+          indicating a request for services from an Annex.  It
+          authenticates these messages and then reads the file
+          eeeesssseeeerrrrvvvviiiicccceeeessss to determine what types of requests to service and
+          which server to execute.
+
+          Although the well-known port can be specified with the ----dddd
+          _n_u_m_b_e_r, the default as specified in eeeesssseeeerrrrvvvviiiicccceeeessss should be
+          used.
+
+          You do not need root privileges to use the ----uuuu option, and
+          there is no interference with any other eeeerrrrppppccccdddd that may be
+          running on the system. Once _f_i_l_e_n_a_m_e is error free and added
+          to aaaaccccpppp____uuuusssseeeerrrriiiinnnnffffoooo you can send the real eeeerrrrppppccccdddd a USR1 signal to
+          cause it to recache the acp user information.  Syntax errors
+          are reported to stderr.
+
+          The _b_f_s service is used by the Annex to down-load various
+          host files from a server host and to up-load crash dump
+          images to a server host. All such files are resident in
+          ////uuuussssrrrr////ssssppppoooooooollll////eeeerrrrppppccccdddd////bbbbffffssss or its subdirectories.  Subdirectories
+          are used for Annex crash dump files.  The name of the dump
+          file depends on the Internet address of the Annex.  The
+          first subdirectory is dddduuuummmmpppp, the next is the Internet network
+          number, and the last is the host number (see _i_n_e_t(3N)).
+          Directories are created when necessary.
+
+          Below are some examples (all pathnames are relative to
+          ////uuuussssrrrr////ssssppppoooooooollll////eeeerrrrppppccccdddd////bbbbffffssss).
+
+
+
+     Page 2                                         (printed 10/13/98)
+
+
+
+
+
+
+     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))                     AAAANNNNNNNNEEEEXXXX                     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))
+
+
+
+               Annex Internet Address  Pathname
+9               63.75                   dump/63/0.0.75      (Class A)
+               131.140.23.1            dump/131.140/23.1   (Class B)
+               195.46.2.15             dump/195.46.2/15    (Class C)
+
+          The dump file names are unique for each Annex but not for
+          each crash dump. An existing dump file is overwritten if the
+          same Annex crashes again.  A dump file is slightly larger
+          than the amount of memory in the Annex.
+
+          When the Annex boots, it uses the _b_f_s service to request
+          three files.  First, the boot rom obtains the Annex
+          operational code that is loaded into Annex main memory. As
+          part of its booting procedure, the Annex operational code
+          requests the files ggggaaaatttteeeewwwwaaaayyyyssss and rrrroooottttaaaarrrriiiieeeessss....  The Annex first
+          requests this file from the host whose address is specified
+          by the nnnnaaaa parameter pppprrrreeeeffff____llllooooaaaadddd____aaaaddddddddrrrr.  If this host does not
+          respond, the Annex broadcasts the request.
+
+          An empty or missing ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file simply means there is
+          no configuration.  It is preferable to use an empty file
+          rather than not having the file exist, as the Annex will
+          find the empty file and thus won't have to wait for its open
+          request to timeout.  The ggggaaaatttteeeewwwwaaaayyyyssss category of the
+          ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file is described in _g_a_t_e_w_a_y_s(4).  The rrrroooottttaaaarrrriiiieeeessss
+          category of the ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file is described in
+          _r_o_t_a_r_i_e_s(4),
+
+          The _a_c_p service is used by the Annex to implement host based
+          security policies that govern Annex operations. See the
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e for more information on
+          the _a_c_p service.
+
+     NNNNOOOOTTTTEEEESSSS
+          The dump subdirectories should be carefully monitored and
+          any crash dumps should be sent to your service
+          representative.
+
+     FFFFIIIILLLLEEEESSSS
+          /usr/spool/erpcd/bfs/dump/*                 crash dumps
+          /usr/spool/erpcd/bfs/annex.*                Annex images
+          /usr/spool/erpcd/bfs/oper.*                 Annex images
+          /usr/spool/erpcd/bfs/config.annex
+          /etc/eservices
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          brc(1M), gateways(4), na(1M), routed(1M).
+          inet(3N), eservices(4), rotaries(4), config.annex(4).
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e.
+
+     BBBBUUUUGGGGSSSS
+9
+
+
+     Page 3                                         (printed 10/13/98)
+
+
+
+
+
+
+     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))                     AAAANNNNNNNNEEEEXXXX                     EEEERRRRPPPPCCCCDDDD((((1111MMMM))))
+
+
+
+          If the ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file is not present on any host, the
+          Annex may take up to an extra minute to complete its booting
+          procedures.
+
+          The ----dddd option takes a space before number; the ----DDDD option
+          does not.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 4                                         (printed 10/13/98)
+
+
+

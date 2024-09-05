@@ -1,0 +1,119 @@
+#!/bin/sh
+
+# This script is used to make two copies of the eservices file.  One
+# copy is set aside to be saved and the other copy will be edited.  It
+# takes three arguments.  The first and second arguments are the names
+# of the files to hold a copy of the original file and the name of the
+# file to hold a copy that will be edited.  There are defaults for
+# these.  The third is the name of the real eservices file that should
+# already be there (if a previous installation was done) or the name of
+# the file that eventually should get installed (if this is a first time
+# installation).  If this is not supplied then the script will look
+# elsewhere for a possible copy.
+
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Initialize
+
+old=save/original/eservices
+new=save/modified/eservices
+real=""
+
+
+# Read the command line
+
+$debug && echo "${dbg_hdr}Entering script that creates copy of eservices"
+if [ $# -gt 0 ]
+then
+    old="$1"
+fi
+if [ $# -gt 1 ]
+then
+    new="$2"
+fi
+if [ $# -gt 2 ]
+then
+    real="$3"
+fi
+
+
+# Make sure things are clean
+
+rm -f $old $new
+
+
+# Get the old file and copy it to both the "save" and the "modify" locations
+
+if [ -n "$real" ]
+then
+    if [ -f $real ]
+    then
+	cp $real $old
+	cp $real $new
+    fi
+fi
+
+if [ -f $new ]
+then
+    $debug && echo "${dbg_hdr}Copied $real to $new"
+    $debug && echo "${dbg_hdr}Exiting script that creates copy of eservices"
+    exit
+fi
+
+
+# If the new eservices file is not there then copy a default one
+# that comes with the distribution
+
+if [ -f src/erpcd/eservices ]
+then
+    cp src/erpcd/eservices $new
+fi
+
+if [ -f $new ]
+then
+    $debug && echo "${dbg_hdr}Copied src/erpcd/eservices to $new"
+    $debug && echo "${dbg_hdr}Exiting script that creates copy of eservices"
+    exit
+fi
+
+
+
+# If the new eservices file is still not there then create one (it's easy).
+# Note that we omit the line enabling acp.  The script that edits the
+# new copy of the file should take care of this.
+
+echo "# erpc remote programs"			>  $new 
+echo "#"					>> $new
+echo "# prog no.      verlo   verhi   name"	>> $new
+echo "#"					>> $new
+echo "1               0       0       bfs"	>> $new
+
+$debug && echo "${dbg_hdr}Script created $new"
+$debug && echo "${dbg_hdr}Exiting script that creates copy of eservices"
+
+exit
+

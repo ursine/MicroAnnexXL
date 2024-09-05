@@ -1,0 +1,465 @@
+'''
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'''
+'''        Copyright 1992, Xylogics, Inc.  ALL RIGHTS RESERVED.
+'''
+''' ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+''' This software is made available solely pursuant to the terms of a
+''' software license agreement which governs its use. 
+''' Unauthorized duplication, distribution or sale are strictly prohibited.
+'''
+''' Man page description:
+'''	rtelnet -- reverse telnet program
+'''
+''' Original Author: Roger Parker		Created on: 30OCT87
+'''
+''' Revision Control Information:
+''' $Id: rtelnet.8,v 1.4 1993/02/04 17:57:36 carlson Rel $
+'''
+''' This file created by RCS from
+''' $Source: /annex/common/src/./newrtelnet/RCS/rtelnet.8,v $
+'''
+''' Revision History:
+''' $Log: rtelnet.8,v $
+''' Revision 1.4  1993/02/04  17:57:36  carlson
+''' Added -a, -uuser and -Mmode flags, and made more widely man-
+''' compatible.
+'''
+''' Revision 1.3  92/12/18  09:41:31  carlson
+''' Updated documentation of -n option and generally touched up the
+''' verbiage.
+''' 
+''' Revision 1.2  92/08/14  10:03:35  carlson
+''' Added documentation of -C and -R options.
+''' 
+''' Revision 1.1  92/08/05  15:40:26  carlson
+''' Initial revision
+''' 
+''' This file is currently under revision by: $Locker:  $
+'''
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'''
+.TH RTELNET 8
+.SH NAME
+rtelnet \- Annex reverse TELNET daemon
+.\"To "rtelnet " "Annex reverse TELNET daemon"
+.SH SYNOPSIS
+.B rtelnet
+[
+.B \-abcdfhkmnoprstCDFOPRTV
+] [
+.B \-l file
+] [
+.B \-u user
+]
+.br
+[
+.B \-M mode
+]
+.I annex
+.I port
+.I device-name
+.SH ARGUMENTS
+.TP 6n
+.B \-a
+Select use of alternate pty set.  If your system has both System V and
+Berkeley pseudo-terminals, then this option will select the use of
+the Berkeley instead of the System V ptys.
+.TP
+.B \-b
+Negotiate
+.SM TELNET
+binary mode when communicating with the Annex.
+This is a useful option for terminal (getty(8)) connections.  This
+option tells
+.I rtelnet
+to negotiate
+.SM TELNET BINARY
+mode, and not to translate CR/LF sequences.  CR will be sent as CR/NUL
+and translated back to CR by the Annex with this option enabled.
+(See also \fB-t\fP and \fB-c\fP options below.)
+.TP
+.B \-c
+Default to
+.SM CBREAK
+mode on the pty to avoid cooked-mode line breaks (see tty(4)).
+Use of this option requires that the slave pty be kept open by
+.I rtelnet
+on System V compliant machines.
+.TP
+.B \-d
+Turn on socket-level debugging.  This just sets the SO_DEBUG
+flag (or equivalent) on the created network connection -- the
+actual operation of this option depends on the underlying
+operating system.
+.TP
+.B \-f
+Enable the \fIconnect on the fly\fP mode, where
+.I rtelnet
+opens the network connection when the slave pty is opened.  This option
+causes
+.I rtelnet
+to wait for the pty to open before it attempts to create the connection
+to the Annex.  This option is incompatible with any option that would
+keep the pty open, such as \fB-o\fP.  The \fB-m\fP switch is usually
+also used with this mode to ensure that
+.I rtelnet
+will drop the connection when the slave device is not in use.
+.TP
+.B \-h
+Send a \fIreset port\fP RPC to the Annex when the slave pseudo device
+is closed.  If this option is used, then the \fB-m\fP switch should also
+be specified.  This option uses the same
+.SM NETADM
+protocol used by \fBna\fP.  This will currently only work on Annexes
+without an \fIannex password\fP parameter set, or with
+\fIannex enable_security\fP set to \fIN\fP.
+.TP
+.B \-k
+Periodically retry network connection.  This option tests the connection
+to the Annex by attempting to reopen the same port every 20 seconds,
+when the connection is quiet.  If this new connection succeeds, then the
+old connection must have become disconnected -- presumably by a reboot
+of the Annex -- and a new one is necessary.  This is useful when the
+traffic is primarily from the Annex to the host and SO_KEEPALIVE is
+unimplemented, since writes from the host to the Annex will be able to
+detect a failed connection, but reads will not.
+.TP
+.B \-l <file>
+Append log output to given file name.  This option opens the requested
+file in append mode so that all error and debugging output is placed
+there once command line parsing is complete.
+.TP
+.B \-m
+Momentarily drop the network connection to the Annex when the slave
+pseudo-device is closed.  This can be used to cause the Annex to drop
+.SM DTR,
+(if the \fIport control_lines\fP parameter is set to
+\fImodem_control\fP or to \fIboth\fP) which can be used to cause a
+dial-out modem to hang up when a program like tip exits.
+.TP
+.B \-n
+Never open slave side of pty.  This option will prohibit some systems
+which require ioctl(2) calls to be made on the slave side from setting
+up default I/O modes.  This is recommended for use when either \fB-f\fP
+or \fB-m\fP or both are specified.
+.TP
+.B \-o
+Hold slave side of pty open at all times.  This is a useful
+option when detecting pty open/close isn't necessary.  Since
+closing the slave pty causes the master pty to close (on most
+systems), there is a small timing window where, if the slave pty
+is closed and then rapidly reopened, the second open will fail
+because the
+.I rtelnet
+process hasn't had a chance to close and
+reopen the master pty.  This most often occurs in scripts where
+one might use:
+.EX
+.in +8
+.sp
+echo "Some text" > /dev/mypty
+.br
+echo "Some more text" > /dev/mypty
+.sp
+.in -8
+.XE
+The second 
+.I echo
+command may fail because the shell will open
+and close the pty too rapidly.  This option will keep the slave
+open at all times so that the master does not need to be
+recycled.
+.TP
+.B \-p
+Give process ID of child on standard output.  This is useful for
+logging the PIDs of all the
+.I rtelnets
+started on a system so that they can be removed quickly.  For example:
+.EX
+.in +8
+.sp
+rtelnet -pt myannex 1 /dev/port1 > rtlist
+.br
+rtelnet -pt myannex 2 /dev/port2 >> rtlist
+.sp
+.in -8
+.XE
+Now to cleanly terminate both connections, type:
+.EX
+.in +8
+.sp
+kill `cat rtlist`
+.in -8
+.XE
+.TP
+.B \-r
+Remove the device
+.I device-name
+if it already exists and if it is not a regular file or directory.
+Without
+\fB-r\fP,
+.I rtelnet
+will exit with an error message if
+.I device-name
+already exists.
+.TP
+.B \-s
+Use a symbolic link instead of a hard link for the slave.  This
+option allows you to place the slave pty anywhere in the file
+system.  If this option isn't specified, then a hard link is
+created by default, and hard links cannot normally span across
+mounted devices.
+.TP
+.B \-t
+Use a transparent TCP connection to the indicated Annex.  This will
+cause the connection to be made through Annex ports in the 7000 range,
+rather than the 5000 range, and no
+.SM TELNET
+option negotiation or CR/LF mapping will be used.  Use this option
+to create a fast, completely transparent data path.  (If used with
+\fB-f\fP option, the pty may not default to RAW mode.)
+.TP
+.B \-u <user>
+This option will cause
+.I rtelnet
+to change its real UID to the given user.  This is useful with System V
+machines, where the owner of the slave pty granted is set to the user
+that requests it.  Without this option, System V will grant all ptys as
+"root," which may make some applications unusable.
+.TP
+.B \-C
+Don't try to fix cooked-mode pseudo terminal problems by inserting LF
+characters.  Ordinarily,
+.I rtelnet
+will attempt to avoid a problem in Unix pseudo terminals that causes the
+slave to lock up if it is in line-buffered ("cooked") mode and too many
+characters are written between line-feed characters.
+.I Rtelnet
+will do this insertion if it cannot determine the line mode or if it
+does find the line in "cooked" mode.  This option disables this action,
+and is useful with binary connections in applications where the mode of
+the slave pseudo terminal can be guaranteed to be unbuffered.
+.TP
+.B \-D [ D ... ]
+Turns on verbose debugging output.  In this case,
+.I rtelnet
+does not fork off a daemon unless the
+.BR \-F
+switch is also used; instead, it displays TELNET option negotiation
+and all received data on the terminal where
+.I rtelnet
+was started.
+.TP
+.B \-F
+Force
+.I rtelnet
+to fork into background, even in debug mode.  This is usually used with
+the \fB-l\fP option (above) when doing long-term testing.
+.TP
+.B \-M <mode>
+Set the default file modes for the slave pty to the octal number given.
+(See chmod(1) for a list of these modes.)
+.TP
+.B \-O
+Disable out-of-band telnet data (for pre-R7.0 Annexes).  For
+compatibility with older Annex operational code, the TELNET IAC DM
+signal, which is used to implement the output flush ioctl(2) system
+call, is disabled with this switch.
+.TP
+.B \-P
+Interpret the
+.I port
+argument as a TCP port (decimal 1 through 65535 or a service name).
+This can be used to establish a slave pty that links to the Annex
+\fIPort Server\fP (port 23), the \fIVCLI\fP (port 5000) or to rotaries
+in the 6000-range.
+.TP
+.B \-R
+Rename the slave pseudo terminal rather than linking the given name to
+it.  This option is provided for systems that assign meanings to the
+major and minor numbers of the pseudo terminal device, and which do not
+expect to see more than one device with the same numbers.  This is a
+dangerous option to use, since an abend of the system may leave some
+slave terminals in an unusable state.
+.TP
+.B \-T
+Truncate (rather than break) lines that would choke the pty in cooked
+mode.
+.TP
+.B \-V
+Display version information on standard output and exit.  This
+information is useful for Xylogics technical support so that they can
+precisely identify the version of software you are using.
+.TP
+.I annex
+The hostname or Internet address
+(in standard Internet dot separated notation)
+of the Annex.
+.TP
+.I port
+The serial port number on the Annex, or the TCP port number or TCP
+service name.  (See \fB-P\fP flag above.)
+.TP
+.I device-name
+name of psuedo device to create (usually in the /dev directory).
+.SH DESCRIPTION
+.I Rtelnet
+is a modified version of the Berkeley telnetd program.  It will
+create a pseudo-tty (pty) device on the host that is connected via
+.I TELNET
+or raw
+.I TCP
+to an Annex serial port.  This allows
+.I UNIX
+programs such as tip(1C) and uucp(1C) to access serial devices attached
+to Annex ports.  Rtelnet works like a telnet daemon program (telnetd)
+except in a reverse fashion; instead of accepting connections from other
+network machines, rtelnet makes connections to Annexes.
+.I Rtelnet
+creates a new file-like device (usually in \fI/dev\fP) that programs
+can open and use like a normal \fI/dev/tty\fP terminal.
+.PP
+Normally,
+.I rtelnet
+makes the connection to the Annex immediately.  This ties the Annex port
+to exactly one host, which is useful for dedicated devices.  On the
+other hand, this will not interact correctly with a port set to
+.B adaptive
+mode, which would normally be used for a dial-in/dial-out modem.
+Such a configuration should use the \fIconnect on the fly\fP (\fB-f\fP)
+option.  In that case,
+.I rtelnet
+will not make the connection immediately,
+but will instead wait until another process opens the slave device.
+When that happens,
+.I rtelnet
+will attempt to make the network connection.  When the connection is
+established, data will flow normally.  If the connection cannot be made,
+.I rtelnet
+will try again using an exponential backoff.
+.PP
+.I Rtelnet
+is designed as a core set of routines that should compile on all
+machines, and a set of machine-dependent files for various systems.
+See the accompanying release notes, and README and INTERN files for
+more information on the internals of
+.I rtelnet.
+.PP
+Example usage:
+.sp
+.RS +5
+A dial-out modem is attached to port 15 of an Annex named "modem-annex".
+To enable its use via \fItip\fP on a 4BSD host:
+.IP 1.
+Configure port 15 using \fIna\fP or local CLI admin to:
+.EX
+.in +8
+.sp
+"control_lines: modem_control"
+.br
+"         mode: slave"
+.in -8
+.XE
+.IP 2.
+Start up \fIrtelnet\fP to create the pseudo-device:
+.EX
+.in +8
+.sp
+rtelnet -rbm modem-annex 15 /dev/modem1
+.sp
+.in -8
+.XE
+Normally, this would be added to the system startup file
+(/etc/rc).
+.IP 3.
+Create new system definition in /etc/remote specifying /dev/modem1
+as the tip (dv) device.  For example:
+.EX
+.in +8
+.sp
+dialer|generic dial-out: \\
+.br
+        :dv=/dev/modem1:cm=^M^JATe1^M^J:at=hayes:du:
+.sp
+.in -8
+.XE
+.SH FILES
+.nf
+.ta \w'/dev/pty[p-s][0-9a-f]   'u
+/dev/ptmx		master pseudo-terminal clone device
+/dev/pty[p-s][0-9a-f]	default list of master pseudo-terminals
+/dev/tty[p-s][0-9a-f]	default list of slave pseudo-terminals
+.fi
+.SH SEE ALSO
+Annex Network Administrator's Guide
+.sp
+chmod(1), su(1), ln(1) and pty(4).
+.SH DIAGNOSTICS
+Messages should be self-explanatory.  Be sure to have the output of
+"rtelnet -V" handy if you need help from Annex support.
+.PP
+Debug messages take the form:
+.EX
+.in +8
+.sp
+TYPE:pid:yyyymmddhhmmss: <message>
+.sp
+.in -8
+.XE
+Where "TYPE" is one of:
+.EX
+.in +8
+.sp
+INIT - Entry or exit message.
+.br
+INFO - Informational message (from debugging code).
+.br
+WARN - Warning message.
+.br
+ERR  - Error message.
+.br
+FATL - Fatal error message -- rtelnet aborted.
+.sp
+.in -8
+.XE
+These tags indicate the severity and content of the message -- they are
+not necessarily tied to the debug level flag.  (Although "ERR " and
+"FATL" messages are usually sent out regardless of debug level.)
+.PP
+Using the \fB-D\fP switch, one may specify the debug level on start-up.
+This number filters the output sent to the log file -- the higher the
+level, the more verbose the output that is sent to the file.  Setting
+level 2, for example, is accomplished by specifying \fB-DD\fP.  The
+levels are roughly defined as:
+.EX
+.in +8
+.sp
+0 - Unexpected system errors and fatal errors only.
+.br
+1 - Exceptional conditions and entry / exit.
+.br
+2 - I/O statistics and verbose TELNET protocol data.
+.br
+3 - Flow control upcalls and system library calls.
+.br
+4 - I/O selection and testing verification.
+.br
+5 - Raw I/O dump
+.br
+    (can be used to reconstruct a session).
+.sp
+.in -8
+.XE
+While rtelnet is running, you may change these levels by issuing a
+SIGUSR1 to increase the debug level, or SIGURG2 to set it back to zero.
+For example, if the pid of the rtelnet process is 9654:
+.EX
+.in +8
+.sp
+kill -USR2 9654
+.sp
+.in -8
+.XE
+This would disable debugging on that copy of rtelnet without aborting
+any current data transfer.

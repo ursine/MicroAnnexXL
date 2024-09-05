@@ -1,0 +1,279 @@
+#!/bin/sh
+
+# This script is called by the main installation script when files have
+# to be extracted from the distribution media or some tarfile.  Some
+# variables should be exported by the main installation script for this
+# to work.  Other values are passed in as arguments.  The first argument
+# is the type of the medium (e.g., tape, cd-rom, etc).  The second
+# argument is the name of the tarfile or the device to read.  The
+# third argument is the name of a file to write return values into.
+# No error checking done on command line as the only expected caller
+# (the main installation script) is under our control.
+
+
+# Initialize value that may be overwritten by the .vars file
+
+if [ -z "$testing" ]
+then
+    testing=false
+fi
+
+REQUIRED_FILES="./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "$SCRIPT_DIR" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+
+
+# Use local version of these if not an exported version:
+
+if [ -z "$floppy" ]
+then
+    floppy="diskette"
+    Floppy="Diskette"
+    floppies="diskettes"
+    Floppies="Diskettes"
+fi
+
+
+# Initialize
+
+medium=unknown
+tarfile=unknown
+tmpfile=""
+
+
+# Read command line
+
+if [ $# -ge 1 ]
+then
+    medium=$1
+fi
+if [ $# -ge 2 ]
+then
+    tarfile="$2"
+fi
+if [ $# -ge 3 ]
+then
+    tmpfile=$3
+fi
+
+
+case $medium in
+	unknown)
+	    : valid choice
+	    ;;
+	f*|F*|d*|D*)
+	    : medium=floppies
+	    ;;
+	t*p*|T*p*|T*P*|t*P*)
+	    : medium=tape
+	    ;;
+	t*r*|T*r*|T*R*|t*R*)
+	    : medium=tarfile
+	    ;;
+	n*|N*)
+	    : medium=nowhere
+	    ;;
+	*)
+#	    # Unexpected answer
+	    echo "ERROR: $0: Unexpected medium ($medium)" 1>&2
+	    exit 1
+	    ;;
+esac
+
+
+
+###########################################################################
+#
+# Ask where the needed files are (i.e., what is the distribution medium).
+# This series of questions should be asked very early on in the installation
+# process.  The information gathered would be used much later in the
+# installation script though.  Do not bother to ask if the data about the
+# medium and tarfile known from the command line.
+#
+
+if [ "$medium" = "unknown" ]
+then
+    ask_q=true
+else
+    $debug && echo "${dbg_hdr}Skipping media prompt, info on cmd line"
+    ask_q=false
+fi
+
+
+while $ask_q
+do
+
+#   # Assume usual case and reset as necessary
+    tarfile="unknown"
+
+    msgid=ma_asktype
+    . $MSG_FILE
+
+    dfltans=1
+    rp="Enter the install source type [$dfltans]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltans
+    fi
+    case $ans in
+	1|f*|F*|d*|D*)
+	    medium=floppies
+	    thing=device
+	    dev_rp="What is the name of the floppy drive that has the tarfile"
+	    break
+	    ;;
+	2|t*p*|T*p*|T*P*|t*P*)
+	    medium=tape
+	    thing=device
+	    dev_rp="What is the name of the tape drive that has the tarfile"
+	    break
+	    ;;
+	3|t*r*|T*r*|T*R*|t*R*)
+	    medium=tarfile
+	    thing=file
+	    dev_rp="What is the fully specified path and name of the tarfile"
+	    break
+	    ;;
+	4|n*|N*)
+	    medium=nowhere
+	    tarfile=unused
+	    break
+	    ;;
+	5|q*|Q*)
+	    msgid=abort_quit
+	    . $MSG_FILE
+	    break
+	    ;;
+	"?")
+	    msgid=ma_explain
+	    . $MSG_FILE
+	    ;;
+	*)
+#	    # Unexpected answer
+	    msgid=validnumprompt
+	    . $MSG_FILE
+	    ;;
+    esac
+done
+
+
+if [ "$tarfile" = "unknown" ]
+then
+    ask_q=true
+else
+    ask_q=false
+fi
+
+
+qmsg=":"
+
+# Now ask for the drive being used to extract the software
+while $ask_q
+do
+    give_help=false
+    echo " "
+    echo "${dev_rp}"
+    rp="Name${qmsg}"
+    . ./.myread
+    qmsg=":"
+    case $ans in
+	q|Q)
+	    msgid=abort_quit
+	    . $MSG_FILE
+	    break
+	    ;;
+	""|"?")
+	    give_help=true
+	    ;;
+	*)
+#	    # Assume a device or file name
+	    if [ -f ./.filexp ]
+	    then
+		ans=`./.filexp "$ans"`
+	    fi
+	    if [ -r $ans ]
+	    then
+		tarfile=$ans
+		break
+	    else
+		qmsg=" (q=quit):"
+		echo " "
+		echo "**** $thing $ans not readable"
+	    fi
+	    ;;
+    esac
+    if $give_help
+    then
+	qmsg=" (q=quit):"
+	msgid=ma_devname
+	. $MSG_FILE
+    fi
+done
+
+# We should never get here with unassigned values but if we do
+# The following are the reasonable defaults
+
+if [ -z "$tarfile" ]
+then
+    tarfile="unused"
+fi
+if [ -z "$medium" ]
+then
+    medium="nowhere"
+fi
+if [ "$medium" = "nowhere" ]
+then
+    tar_needed=false
+else
+    tar_needed=true
+fi
+
+
+# Write the new values of the variables to a file that can be sourced
+# in by the main installation script to allow it to reset the values of
+# its variables with the same name
+
+if [ -n "$tmpfile" ]
+then
+cat << LABEL > $tmpfile
+medium=$medium
+tarfile="$tarfile"
+tar_needed=$tar_needed
+LABEL
+fi
+
+if $testing
+then
+cat << LABEL
+
+TESTING: HERE ARE VARIABLES BEING ASSIGNED:
+medium=$medium
+tarfile="$tarfile"
+tar_needed=$tar_needed
+
+LABEL
+fi
+
+exit 0

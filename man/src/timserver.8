@@ -1,0 +1,42 @@
+'''
+'''	$Header: /annex/common/src/timserver/RCS/timserver.8,v 1.3 1993/06/16 16:53:20 bullock Rel $
+'''
+.ig xy
+.TH TIMSERVER 1M ANNEX
+.xy
+.ie '\*(sy'V' .TH TIMSERVER 1M ANNEX
+.el .TH TIMSERVER 8 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+timserver \- standard Internet time server daemon
+.SH SYNOPSIS
+.B timserver
+.SH DESCRIPTION
+.I timserver
+listens at a well-known
+.SM UDP
+port
+("time" or "timserver", 37/udp)
+for requests to provide the standard Internet machine readable time
+service.
+A single datagram containing 4 bytes
+is sent back to the requester,
+representing an integer in network byte order containing 
+of the number of seconds since midnight, January 1, 1900.
+This service is normally provided under
+.SM 4.3BSD
+by an internal service in
+.IR inetd (8C),
+and is included here only for those systems not having that program.
+This service is used by an Annex terminal server to sync its internal
+clock to the correct time.
+.SH SEE ALSO
+.SM RFC-868
+\*QTime Protocol\*U, from the ARPANET Network Information Center.

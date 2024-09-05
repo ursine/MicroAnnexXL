@@ -1,0 +1,144 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# Check a database file looking for a specified directory.
+# Print the size_in_kb field for the record.
+# If the third argument exists and is not "0" then print the size in MB.
+# If the datafile exists and the directory is listed in it but
+# for some reason there is no size then a default size of $DEFAULT_KB
+# will be used (and possibly translated to MB).
+# If the datafile exists but the directory is not listed then the script
+# will print $BAD_SIZE.
+#
+# The number of MB needed is rounded up:
+#	0 KB	=> 0
+#	1 KB	=> 1
+#	1023 KB	=> 1
+#	1024 KB	=> 1
+#	1025 KB	=> 2
+#	2047 KB	=> 2
+#	2048 KB	=> 2
+#
+#############################################################################
+
+
+# Declare constants
+
+ERROR=1
+OK=0
+
+BAD_SIZE=-1
+
+DEFAULT_KB=100
+KB_PER_MB=1024
+
+
+# Initialize values that the command line may change
+
+datafile=$0
+dir="unknown_directory"
+want_mb=0
+
+# Initialize other variables
+
+err_stat=$OK
+size=$BAD_SIZE
+
+
+# Parse command line
+
+if [ $# -gt 0 ]
+then
+	datafile=$1
+fi
+if [ $# -gt 1 ]
+then
+	dir=$2
+fi
+if [ $# -gt 2 ]
+then
+	want_mb=$3
+fi
+case "$want_mb" in
+	kb) want_mb=0 ;;
+	KB) want_mb=0 ;;
+esac
+
+
+
+
+
+# Under certain conditions this just converts KB to MB in the same
+# way that a normal call would.
+
+if [ "$datafile" = "convert_kb" ]
+then
+	size=$dir
+	size=`expr $size + $KB_PER_MB`
+	size=`expr $size - 1`
+	size=`expr $size '/' $KB_PER_MB`
+	echo $size
+	exit $OK
+fi
+
+
+# This handles the normal call
+
+if [ ! -f $datafile ]
+then
+	err_stat=$ERROR
+else
+#	# Check the database for the directory name
+	line=`sed -e 's:$: :g' -e "s:[ 	][ 	]*: :g" -e "s:^ ::g" $datafile | grep "^$dir " 2> /dev/null`
+
+#	# Add two fields to line in case the line only has 0 or 1 fields.
+#	# If no fields were there originally then the next test catches error.
+#	# If no size field was there we end up giving it the default value.
+	line="$line $DEFAULT_KB $DEFAULT_KB"
+	set $line
+	dirname=$1
+	size_in_db=$2
+
+	if [ "$dirname" = "$DEFAULT_KB" ]
+	then
+#		# Directory name was not found
+		err_stat=$ERROR
+		size=$BAD_SIZE
+	else
+		# Directory name was found
+		size=$size_in_db
+		if [ $size_in_db != "0" ]
+		then
+#			# Non-zero size.
+#			# The final size depends on whether we want kb or mb
+			if [ "$want_mb" != "0" ]
+			then
+#				# Convert size to MB
+				size=`expr $size + $KB_PER_MB`
+				size=`expr $size - 1`
+				size=`expr $size '/' $KB_PER_MB`
+			fi
+		fi
+	fi
+fi
+
+echo $size
+
+exit $err_stat
+
+
+
+#############################################################################
+For testing purposes this file can also be used as the data file.
+Just add the test directory records below in various formats.
+
+src	4000	4
+src/rrr 150	2 3
+bin	8000	5 6
+bin/SCO	800	5 6
+bfs	3000	0
+setup	50
+man	
+dir_with_no_space
+

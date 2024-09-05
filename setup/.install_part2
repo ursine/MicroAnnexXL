@@ -1,0 +1,407 @@
+
+#############################################################################
+# Start: Additional portion of the installation script
+#############################################################################
+#
+# The main installation script has become quite lengthly and difficult
+# to read.  Some portions of the script have been placed into a seperate
+# files.  They will be sourced in by the main script when needed.
+# 
+# This file contains code which asks what should be extracted
+# from the distribution medium.
+#
+
+
+
+# These are used in messages showing how much space is required.
+# If all files are already on disk then we do not need the extra space.
+szmb_src=""
+szmb_binsrc=""
+szmb_bin=""
+szmb_compile=""
+
+# If we must extract from the distribution then reset the above with
+# the sizes of directories that could be downloaded.
+
+if $tar_needed
+then
+
+#   # Add up KB here and then convert to MB
+    szmb_always=0
+    for i in ${ALWAYS_SRC}
+    do
+	tmp=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE $i KB`
+	[ $tmp -lt 0 ] && tmp=0
+	szmb_always=`expr $szmb_always + $tmp`
+    done
+    szmb_always=`sh ${SCRIPT_DIR}/.util_size "convert_kb" $szmb_always MB`
+
+#   # Add up KB for both bfs and man and then convert to MB
+    szmb_bfs=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE bfs KB`
+    [ $szmb_bfs -lt 0 ] && szmb_bfs=3000
+    if [ "$mantype" != "none" ]
+    then
+        tmp=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE man KB`
+	[ $tmp -lt 0 ] && tmp=150
+	szmb_bfs=`expr $szmb_bfs + $tmp`
+    fi
+#   # If a floppy install then we need extra space to assemble files
+    if [ "$medium" != "floppies" ]
+    then
+	szmb_bfs=`expr $szmb_bfs + 1500`
+    fi
+    szmb_bfs=`sh ${SCRIPT_DIR}/.util_size "convert_kb" $szmb_bfs MB`
+
+#   # For the rest, get rounded MB.
+
+    szmb_srcdir=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE src MB`
+    [ $szmb_srcdir -lt 0 ] && szmb_srcdir=5
+
+    szmb_bindir=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE $bindir MB`
+    [ $szmb_bindir -lt 0 ] && szmb_bindir=1
+
+#   # When we add the rounded MBs we get a fudge factor.
+
+    szmb_src=0
+    szmb_src=`expr $szmb_src + $szmb_bfs`
+    szmb_src=`expr $szmb_src + $szmb_srcdir`
+
+    szmb_binsrc=0
+    szmb_binsrc=`expr $szmb_binsrc + $szmb_bfs`
+    szmb_binsrc=`expr $szmb_binsrc + $szmb_srcdir`
+    szmb_binsrc=`expr $szmb_binsrc + $szmb_bindir`
+
+    szmb_bin=0
+    szmb_bin=`expr $szmb_bin + $szmb_bfs`
+    szmb_bin=`expr $szmb_bin + $szmb_always`
+    szmb_bin=`expr $szmb_bin + $szmb_bindir`
+
+#   # Add some MB for objects and binaries that a compile creates
+    szmb_compile=2
+    szmb_compile=`expr $szmb_compile + $szmb_src`
+
+#   # Now change the numbers into text
+    szmb_src="(${szmb_src}MB)"
+    szmb_binsrc="(${szmb_binsrc}MB)"
+    szmb_bin="(${szmb_bin}MB)"
+    szmb_compile="(${szmb_compile}MB)"
+fi
+
+
+
+
+case "${binary_avail}${compiler_avail}" in
+
+########################################
+# No binaries, no compiler
+########################################
+
+    falsefalse)
+	msgid=what_nbnc
+	. $MSG_FILE
+	while true
+	do
+cat << EOSS
+Available installation options are:
+${indent}1. Install source code only, but do not compile ${szmb_src}
+${indent}2. Quit
+
+EOSS
+	    dfltans=1
+	    rp="Enter installation choice [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+		1)
+#		    # no images, sources, no compilation
+		    szmb_all="${szmb_src}"
+		    usebinaries=false
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+		2|Q*|q*)
+		    msgid=abort_quit
+		    . $MSG_FILE
+		    break
+		    ;;
+		"?")
+		    msgid=what_nbnc_help
+		    . $MSG_FILE
+		    continue
+		    ;;
+		*)
+		    msgid=validnumprompt
+		    . $MSG_FILE
+		    continue
+		    ;;
+	    esac
+	done
+	;;
+
+########################################
+# No binaries, have compiler
+########################################
+
+    falsetrue)
+	msgid=what_nbhc
+	. $MSG_FILE
+	while true
+	do
+cat << EOSS
+Available installation options are:
+${indent}1. Install source code and initiate compilation ${szmb_compile}
+${indent}2. Install source code only, but do not compile ${szmb_src}
+${indent}3. Quit
+
+EOSS
+	    dfltans=1
+	    rp="Enter installation choice [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+		1)
+#		    # no images, sources, compilation
+		    szmb_all="${szmb_compile}"
+		    usebinaries=false
+		    getsrcs=true
+		    docomp=true
+		    break
+		    ;;
+		2)
+#		    # no images, sources, no compilation
+		    szmb_all="${szmb_src}"
+		    usebinaries=false
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+		3|Q*|q*)
+		    msgid=abort_quit
+		    . $MSG_FILE
+		    break
+		    ;;
+		"?")
+		    msgid=what_nbhc_help
+		    . $MSG_FILE
+		    continue
+		    ;;
+		*)
+		    msgid=validnumprompt
+		    . $MSG_FILE
+		    continue
+		    ;;
+	    esac
+	done
+	;;
+
+########################################
+# Have binaries, no compiler
+########################################
+
+    truefalse)
+	msgid=what_hbnc
+	. $MSG_FILE
+	while true
+	do
+cat << EOSS
+Available installation options are:
+${indent}1. Install binary images only ${szmb_bin}
+${indent}2. Install source code only, but do not compile ${szmb_src}
+${indent}3. Get both binary images and source code, but do not compile ${szmb_binsrc}
+${indent}4. Quit
+
+EOSS
+	    dfltans=1
+	    rp="Enter installation choice [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+		1)
+#		    # images, no sources, no compilation
+		    szmb_all="${szmb_bin}"
+		    usebinaries=true
+		    getsrcs=false
+		    docomp=false
+		    break
+		    ;;
+		2)
+#		    # no images, sources, no compilation
+		    szmb_all="${szmb_src}"
+		    usebinaries=false
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+		3)
+#		    # images, sources, no compilation
+		    szmb_all="${szmb_binsrc}"
+		    usebinaries=true
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+		4|Q*|q*)
+		    msgid=abort_quit
+		    . $MSG_FILE
+		    break
+		    ;;
+		"?")
+		    msgid=what_hbnc_help
+		    . $MSG_FILE
+		    continue
+		    ;;
+		*)
+		    msgid=validnumprompt
+		    . $MSG_FILE
+		    continue
+		    ;;
+	    esac
+	done
+	;;
+
+########################################
+# Have binaries, have compiler
+########################################
+
+    truetrue)
+	msgid=what_hbhc
+	. $MSG_FILE
+	while true
+	do
+cat << EOSS
+Available installation options are:
+${indent}1. Install binary images only ${szmb_bin}
+${indent}2. Install source code only, but do not compile ${szmb_src}
+${indent}3. Get both binary images and source code, but do not compile ${szmb_binsrc}
+${indent}4. Quit
+
+EOSS
+	    dfltans=1
+	    rp="Enter installation choice [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case $ans in
+	    1)
+#		    # images, no sources, no compilation
+		    szmb_all="${szmb_bin}"
+		    usebinaries=true
+		    getsrcs=false
+		    docomp=false
+		    break
+		    ;;
+	    2)
+#		    # no images, sources, no compilation
+		    szmb_all="${szmb_src}"
+		    usebinaries=false
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+	    3)
+#		    # images, sources, no compilation
+		    szmb_all="${szmb_binsrc}"
+		    usebinaries=true
+		    getsrcs=true
+		    docomp=false
+		    break
+		    ;;
+
+# The following are possible but not implemented
+#		5)
+#		    # no images, sources, compilation
+#		    usebinaries=false
+#		    getsrcs=true
+#		    docomp=true
+#		    break
+#		    ;;
+#		6)
+#		    # images, sources, compilation
+#		    usebinaries=true
+#		    getsrcs=true
+#		    docomp=true
+#		    break
+#		    ;;
+		4|Q*|q*)
+		    msgid=abort_quit
+		    . $MSG_FILE
+		    break
+		    ;;
+		"?")
+		    msgid=what_hbhc_help
+		    . $MSG_FILE
+		    continue
+		    ;;
+		*)
+		    msgid=validnumprompt
+		    . $MSG_FILE
+		    continue
+		    ;;
+	    esac
+	done
+	;;
+
+esac
+
+ask_q=false
+if $tar_needed
+then
+#   # Need to make sure there is enough space to extract the software - ask.
+    ask_q=true
+
+#   # Translate the string from the last message for use with the next message.
+    szmb_all=`echo "${szmb_all}" | sed -e 's:(::' -e 's:MB): MB:' `
+
+#   # Print the message.
+    msgid=youneedmb
+    . $MSG_FILE
+fi
+
+while $ask_q
+do
+    dfltans=y
+    rp="Are you ready to continue (y/q=quit) [$dfltans]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltans
+    fi
+    case $ans in
+	Y*|y*)
+	    ask_q=false
+	    break
+	    ;;
+	Q*|q*)
+	    ask_q=false
+	    msgid=abort_quit
+	    . $MSG_FILE
+	    break
+	    ;;
+	"?")
+	    msgid=youneedmbhelp
+	    . $MSG_FILE
+	    continue
+	    ;;
+	*)
+	    msgid=yqonly
+	    . $MSG_FILE
+	    continue
+	    ;;
+    esac
+done
+#############################################################################
+# End: Additional portion of the installation script
+#############################################################################
+

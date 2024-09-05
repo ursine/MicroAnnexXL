@@ -1,0 +1,165 @@
+################################################################################
+# Annex.dci - Bay Networks Annex Family Import dictionary
+# 
+# (See README.DCT for more details on the format of this file)
+################################################################################
+#
+# NOTE: These are the attribute definitions from the Remote Annex R13.1-R14.0
+#       reference dictionary supplied with the Host Tools software kit.
+#       They can be used to Import user profile files from older installations
+#       using the supplied dictionary.
+#
+ATTRIBUTE	User-Name		1	string	ca
+ATTRIBUTE	Password		2	string	c
+ATTRIBUTE	CHAP-Password		3	string	c
+ATTRIBUTE	NAS-IP-Address		4	ipaddr	C
+ATTRIBUTE	NAS-Port		5	integer	Ca
+ATTRIBUTE	Service-Type    	6	integer	Cr
+ATTRIBUTE	Framed-Protocol		7	integer	Cr
+ATTRIBUTE	Framed-IP-Address	8	ipaddr	Cr
+ATTRIBUTE	Framed-IP-Netmask	9	ipaddr	Cr
+ATTRIBUTE	Framed-Routing		10	integer	r
+ATTRIBUTE	Filter-Id	        11	string	R
+ATTRIBUTE	Framed-MTU		12	integer	r
+ATTRIBUTE	Framed-Compression	13	integer	CR
+ATTRIBUTE	Login-IP-Host		14	ipaddr	Cr
+ATTRIBUTE	Login-Service		15	integer	r
+ATTRIBUTE	Login-TCP-Port		16	integer	r
+ATTRIBUTE	Old-Password		17	string	r
+ATTRIBUTE	Reply-Message		18	string	RO
+ATTRIBUTE	Callback-Number		19	string	Cr
+ATTRIBUTE	Callback-Id		20	string	r
+ATTRIBUTE	Expiration		21	time	cr
+ATTRIBUTE	Framed-Route		22	string	R
+ATTRIBUTE	Framed-IPX-Network	23	ipaddr	r
+ATTRIBUTE	State   		24	string  c
+ATTRIBUTE	Class			25	string  Ra
+ATTRIBUTE	Vendor-Specific		26	string
+ATTRIBUTE	Session-Timeout		27	integer r
+ATTRIBUTE	Idle-Timeout		28	integer r
+ATTRIBUTE	Termination-Action	29	integer r
+ATTRIBUTE	Called-Station-Id	30	string  C
+ATTRIBUTE	Calling-Station-Id	31	string  C
+ATTRIBUTE	NAS-Identifier		32	string  C
+ATTRIBUTE	Proxy-State		33	string
+ATTRIBUTE	Login-LAT-Service	34	string  Cr
+ATTRIBUTE	Login-LAT-Node		35	string  Cr
+ATTRIBUTE	Login-LAT-Group		36	string  Cr
+ATTRIBUTE	Framed-AppleTalk-Link	37	integer r
+ATTRIBUTE	Framed-AppleTalk-Network 38	integer R
+ATTRIBUTE	Framed-AppleTalk-Zone	39	string  r
+ATTRIBUTE	Acct-Status-Type	40	integer	a
+ATTRIBUTE	Acct-Delay-Time		41	integer	a
+ATTRIBUTE	Acct-Input-Octets	42	integer a
+ATTRIBUTE	Acct-Output-Octets	43	integer a
+ATTRIBUTE	Acct-Session-Id		44	string  a
+ATTRIBUTE	Acct-Authentic		45	integer a
+ATTRIBUTE	Acct-Session-Time	46	integer a
+ATTRIBUTE	Acct-Input-Packets	47	integer a
+ATTRIBUTE	Acct-Output-Packets	48	integer a
+ATTRIBUTE	Acct-Terminate-Cause	49	integer a
+ATTRIBUTE	Acct-Multi-Session-Id	50	string  a
+ATTRIBUTE	Acct-Link-Count 	51	integer a
+ATTRIBUTE	CHAP-Challenge		60	string
+ATTRIBUTE	NAS-Port-Type		61	integer C
+ATTRIBUTE	Port-Limit		62	integer Cr
+ATTRIBUTE	Login-LAT-Port		63	string  Cr
+
+#
+#	Integer Translations
+# NOTE: All names must be unique or overloading will occur
+#
+
+#	User Service Types
+
+VALUE		Service-Type	Login-User		1
+VALUE		Service-Type	Framed-User		2
+VALUE		Service-Type	Callback-Login-User	3
+VALUE		Service-Type	Callback-Framed-User	4
+VALUE		Service-Type	Outbound-User		5
+VALUE		Service-Type	Administrative-User	6
+VALUE		Service-Type	NAS-Prompt		7
+VALUE		Service-Type	Authenticate-Only	8
+VALUE		Service-Type	Callback-NAS-Prompt	9
+
+#	Framed Protocols
+
+VALUE		Framed-Protocol		PPP			1
+VALUE		Framed-Protocol		SLIP			2
+VALUE		Framed-Protocol		ARAP			3
+VALUE		Framed-Protocol		Gandalf-SL/MLP		4
+VALUE		Framed-Protocol		IPX/SLIP		5
+
+#	Framed Routing Values
+
+VALUE		Framed-Routing		None			0
+VALUE		Framed-Routing		Broadcast		1
+VALUE		Framed-Routing		Listen			2
+VALUE		Framed-Routing		Broadcast-Listen	3
+
+#	Framed Compression Types
+
+VALUE		Framed-Compression	None			0
+VALUE		Framed-Compression	Van-Jacobson-TCP-IP	1
+VALUE		Framed-Compression	IPX-Header		2
+
+#	Login Services
+
+VALUE		Login-Service		Telnet			0
+VALUE		Login-Service		Rlogin			1
+VALUE		Login-Service		TCP-Clear		2
+VALUE		Login-Service		PortMaster		3
+VALUE		Login-Service		LAT			4
+
+#	Accounting Status Types
+
+VALUE		Acct-Status-Type	Start			1
+VALUE		Acct-Status-Type	Stop			2
+VALUE		Acct-Status-Type	Alive			3
+VALUE		Acct-Status-Type	Modem-Start		4
+VALUE		Acct-Status-Type	Modem-Stop		5
+VALUE		Acct-Status-Type	Cancel			6
+VALUE		Acct-Status-Type	Accounting-On		7
+VALUE		Acct-Status-Type	Accounting-Off		8
+
+#	Authentication Types
+
+VALUE		Acct-Authentic		None			0
+VALUE		Acct-Authentic		RADIUS			1
+VALUE		Acct-Authentic		Local			2
+
+#	Termination Options
+
+VALUE		Termination-Action	Default			0
+VALUE		Termination-Action	RADIUS-Request		1
+
+#	Termination Cause
+
+VALUE           Acct-Terminate-Cause    User-Request            1
+VALUE           Acct-Terminate-Cause    Lost-Carrier            2
+VALUE           Acct-Terminate-Cause    Lost-Service            3
+VALUE           Acct-Terminate-Cause    Idle-Timeout            4
+VALUE           Acct-Terminate-Cause    Session-Timeout         5
+VALUE           Acct-Terminate-Cause    Admin-Reset             6
+VALUE           Acct-Terminate-Cause    Admin-Reboot            7
+VALUE           Acct-Terminate-Cause    Port-Error              8
+VALUE           Acct-Terminate-Cause    NAS-Error               9
+VALUE           Acct-Terminate-Cause    NAS-Request             10
+VALUE           Acct-Terminate-Cause    NAS-Reboot              11
+VALUE           Acct-Terminate-Cause    Port-Unneeded           12
+VALUE           Acct-Terminate-Cause    Port-Preempted          13
+VALUE           Acct-Terminate-Cause    Port-Suspended          14
+VALUE           Acct-Terminate-Cause    Service-Unavailable     15
+VALUE           Acct-Terminate-Cause    Callback                16
+VALUE		Acct-Terminate-Cause	User-Error		17
+VALUE		Acct-Terminate-Cause	Host-Request		18
+
+
+#	NAS Port Types
+
+VALUE		NAS-Port-Type	Async			0
+VALUE		NAS-Port-Type	Sync			1
+VALUE		NAS-Port-Type	ISDN-Sync		2
+VALUE		NAS-Port-Type	ISDN-Async-V.120	3
+VALUE		NAS-Port-Type	ISDN-Async-V.110	4
+VALUE		NAS-Port-Type	Virtual			5

@@ -1,0 +1,1139 @@
+
+#############################################################################
+# Start: Additional portion of the installation script
+#############################################################################
+#
+# The main installation script has become quite lengthly and difficult
+# to read.  Some portions of the script have been placed into a seperate
+# files.  They will be sourced in by the main script when needed.
+# 
+# This file contains code which modifies the source code.
+#
+
+# 
+# Part I
+#
+case $tmp_net_type in
+    BSD)
+	netware_type="BSD"
+	;;
+    EXOS)
+	netware_type="EXOS" nettype="EXOS"
+	HWFLAG="$HWFLAG -DEXOS"
+	tryLIBFLAG="-lsocket"
+	if [ $hw_type = "PC" -a $os_type = "XENIX" ]; then
+#	    # known bug in EXOS on XENIX-PC
+	    htonl='need'
+	    ntohl='need'
+#
+# clear "print warning for ntoh need" flag
+#
+	    warning_ntoh=false
+	fi
+	;;
+    CMC)
+	netware_type="CMC" nettype="CMC"
+	HWFLAG="$HWFLAG -DCMC"
+	tryLIBFLAG="-lcmcnet"
+	;;
+    WINS)
+	netware_type="WINS" nettype="WINS"
+	HWFLAG="$HWFLAG -DWINS"
+	tryLIBFLAG="-lnet -lnsl_s"
+#	# WINS has broken sendmsg/recvmsg
+	sendmsg='need'
+	recvmsg='need'
+	;;
+    SLIP)
+	netware_type="SLIP"
+	SRCDIRS="$SRCDIRS slipd"
+	HWFLAG="$HWFLAG -DSLIP"
+	LIBANX_C="$LIBANX_C ip_layer.c udp_layer.c socket_layer.c
+	    slip_layer.c in_cksum.c"
+	LIBANX_O="$LIBANX_O ip_layer.o udp_layer.o socket_layer.o
+	    slip_layer.o in_cksum.o"
+	echo " " > src/inc/netinet/in.h
+	echo " " > src/inc/sys/socket.h
+	echo " " > src/inc/sys/time.h
+	gethostbyname='need'
+	gethostbyaddr='need'
+	getservbyname='need'
+	htonl='need'
+	htons='need'
+	inet_addr='need'
+	inet_ntoa='need'
+	ntohl='need'
+	ntohs='need'
+	recvfrom='need'
+	recvmsg='need'
+	sendmsg='need'
+	sendto='need'
+	;;
+    TLI)
+	netware_type="TLI" nettype="TLI"
+	HWFLAG="$HWFLAG -DTLI -DTLIPOLL"
+	case "$hw_type" in
+	GENERIC)
+# Should this indeed be used anywhere at all?  It causes problems on
+# Sequent PTX and on Solaris 2.2.
+	    sockdefs='need'
+	    funclist="$funclist sockdefs(0)"
+	    ;;
+	PRIME)
+	    $cp /usr/include/time.h src/inc/sys/time.h
+	    $cat /usr/include/sys/bsd_time.h >> src/inc/sys/time.h
+	    ;;
+	esac
+	;;
+esac
+
+
+# 
+# Part II
+#
+portfile=''
+case $netware_type in
+    CMC)
+    MAPNAMES="#include \"$incdir/longnames.h\""
+
+    portfile="#include <port/CMC.h>"
+
+#   # hack around CMC include file stupidity
+    $cat << EOF                >> src/inc/config.h
+/*
+ * kludge for CMC's "recursive" includes
+ */
+#include "$incdir/types.h"
+#include "$incdir/errno.h"
+#include "$incdir/signal.h"
+EOF
+    $cat $incdir/inet.h            > src/inc/arpa/inet.h
+    $cat $incdir/telnet.h            > src/inc/arpa/telnet.h
+    $cat $incdir/netdb.h            > src/inc/netdb.h
+    $cat $incdir/in.h            > src/inc/netinet/in.h
+    $cat $incdir/socket.h            > src/inc/sys/socket.h
+    echo " "                > src/inc/sys/time.h
+    echo '#ifndef ANNEX_SYS_TYPES'        > src/inc/sys/types.h
+    echo '#define ANNEX_SYS_TYPES'        >> src/inc/sys/types.h
+    $cat /usr/include/sys/types.h        >> src/inc/sys/types.h
+    echo '#endif'                >> src/inc/sys/types.h
+
+    INCLUDES="$preincdir -I../inc"
+    ;;
+    WINS)
+#   # We currently only support the NCR/WINS combination
+#   # Slight modifications might be necessary for other versions
+#   # of the WINS package
+    if [ $hw_type = "NCR" ]; then
+	$cat << EOF            >> src/inc/config.h
+/*
+ * Need <sys/twg_config.h> for WINS
+ */
+#include <sys/twg_config.h>
+EOF
+#	# put in.h where we will can find it
+	$cat $incdir/sys/in.h        > src/inc/netinet/in.h
+
+	if [ "$os_type" = "SYS_V" ]; then
+	    portfile="#include <port/SYS_V.h>"
+	fi
+	INCLUDES="-I../inc $INCLUDES"
+    else
+	echo "Warning!"
+	echo "WINS network package may not be supported."
+    fi
+    ;;
+    EXOS)
+    portfile="#include <port/EXOS.h>"
+
+    INCLUDES="-I../inc $INCLUDES"
+    ;;
+    SLIP)
+    portfile="#include <port/SLIP.h>"
+
+    INCLUDES="-I../inc $INCLUDES"
+    ;;
+    TLI)
+    portfile="#include <port/SYS_V.h>"
+
+    INCLUDES="-I../inc $INCLUDES"
+    ;;
+    BSD)
+    if [ "$os_type" = "SYS_V" ] ; then
+	portfile="#include <port/SYS_V.h>"
+    fi
+
+    INCLUDES="-I../inc $INCLUDES"
+    ;;
+esac
+
+#****************************************************************
+# End: of nwinstall
+#****************************************************************
+
+
+if $debug
+then
+    echo "${dbg_hdr}Debug information:  selected system info"
+    echo "${dbg_hdr}System Type  = $hw_type"
+    echo "${dbg_hdr}OS TYPE      = $os_type"
+    echo "${dbg_hdr}NETWARE TYPE = $netware_type"
+fi
+
+###############################################################################
+# End: Get type of system
+###############################################################################
+
+
+
+
+
+###############################################################################
+# Start: of compile prep
+###############################################################################
+
+
+#
+# set HWFLAG with information just gained...
+#
+    HWFLAG="$HWFLAG -D$hw_type"
+
+
+# Check for/install auxiliary libraries
+    $debug && echo "${dbg_hdr}Running auxlibinstall"
+######################################################################
+#
+# auxlibinstall
+#
+######################################################################
+# 
+# Encore is no longer a supported platform and it was a special case below.
+# Ignore the "Encore" and the complicated statement below can be simplified
+# for reading as:
+#    If netware type is not BSD then ask question.
+#    If netware type is BSD but your O/S isn't then ask question.
+
+    auxlib=false
+    $didfixedconfig || case "$tryLIBFLAG" in
+      '')
+	if [ \( "$netware_type" = "BSD" -a "$os_type" != "BSD" -a "$hw_type" != "ENCORE" \) -o "$netware_type" != "BSD" ]
+	then
+	  while true
+	  do
+	    echo " "
+	    rp="Does your system have any auxiliary libraries for network code? (y/n) [n]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans="N"
+	    fi
+	    case "$ans" in
+	      n*|N*)
+		break
+		;;
+	      y*|Y*)
+		auxlib=true
+		break
+		;;
+	      "?")
+		msgid=auxlibdirhelp
+		. $MSG_FILE
+		continue
+		;;
+	      *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	  done
+	fi
+	;;
+      *)
+	auxlib=true
+	;;
+    esac
+
+    if $auxlib
+    then
+	case "$tryLIBFLAG" in
+	  '')
+	    dflt='' dfltstr=''
+	    ;;
+	  *)
+	    dflt="$tryLIBFLAG"
+	    dfltstr=" [$dflt] "
+	    ;;
+	esac
+	echo " "
+	echo "Enter any additional loader options for the $nettype libraries."
+	echo "(ex: \"-lnet\" or \"-lsocket\")"
+	rp="Loader options${dfltstr}:"
+	. ./.myread
+	LIBFLAG="$ans"
+
+	[ "$dflt" != "" -a "$LIBFLAG" = "" ] && LIBFLAG=$dflt
+	echo "(using: $LIBFLAG)"
+    fi
+    auxinc=false
+    $didfixedconfig || case $netware_type in
+      EXOS)
+	auxinc=true
+	incdir=`./.loc . /usr/src/exos/include/exos /usr/include/exos`
+	;;
+      CMC)
+	auxinc=true
+	incdir=`./.loc . /usr/include/CMC`
+	;;
+      WINS)
+	auxinc=true
+	incdir=`./.loc . /usr/netinclude`
+	;;
+      BSD)
+	if [ "$hw_type" = "MIPS" -o "$hw_type" = "SGI" ]
+	then
+	    auxinc=true
+	    incdir=`./.loc . /usr/include/bsd`
+	elif [ "$os_type" != "BSD" -a "$hw_type" != "ENCORE" ]
+	then
+
+	  while true
+	  do
+	    echo " "
+	    echo "Does your system have an alternate include directory"
+	    rp="for network code (y/n) [n]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans="N"
+	    fi
+	    case "$ans" in
+	      n*|N*)
+		break
+		;;
+	      y*|Y*)
+		auxinc=true
+		incdir=''
+		break
+		;;
+	      "?")
+		msgid=altincdirhelp
+		. $MSG_FILE
+		continue
+		;;
+	      *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	  done
+	fi
+	;;
+    esac
+
+    if $auxinc
+    then
+# determine where auxillary include directory is
+	case "$incdir" in
+	  '')
+	    dflt='' dfltstr=''
+	    ;;
+	  *)
+	    dflt="$incdir"
+	    dfltstr=" [$dflt]"
+	    ;;
+	esac
+	incdir='blurfl/dyick'
+
+	while [ ! -d "$incdir" ]
+	do
+	    case "$incdir" in
+	      blurfl*)
+		;;
+	      *)
+		echo "$incdir does not appear to exist." ;;
+	    esac
+	    echo " "
+	    rp="Where are the $nettype include files located?$dfltstr"
+	    . ./.myread
+	    incdir=`./.filexp "$ans"`     
+	    test "$dflt" && case "$incdir" in
+	      '') incdir=$dflt ;;
+	    esac
+	done
+
+	preincdir="$INCLUDES"
+	INCLUDES="$INCLUDES -I$incdir"
+    fi
+
+########################
+#***********************
+# End of auxlibinstall
+#***********************
+##############################################################################
+#
+#
+    $debug && echo "${dbg_hdr}Testing for existence of compiler."
+
+    $debug && echo "${dbg_hdr}Creating config.h"
+    $cat > src/inc/config.h <<EOSS
+/*
+ *
+ * $package src/inc/config.h `$date`
+ *
+ * hardware "$hw_type" software "$os_type" network "$netware_type"
+ *
+ */
+EOSS
+#
+######################################################################
+#
+#
+
+    echo " "				>> src/inc/config.h
+    for fn in $INCFILES
+    do
+	echo "#include <$fn>"		>> src/inc/config.h
+    done
+    echo " "				>> src/inc/config.h
+    echo "/* map function names */"	>> src/inc/config.h
+    echo $MAPNAMES			>> src/inc/config.h
+    echo " "				>> src/inc/config.h
+    export MAPNAMES
+
+case "$hw_type" in
+  IUNIX)
+    echo "#define EWOULDBLOCK EAGAIN" >> src/inc/config.h
+    echo "#define POSIX_JC" >> src/inc/config.h
+# Fix IUNIX bogosity.  if.h shouldn't include if_arp.h.
+    sed -e "/if_arp.h/d" < /usr/include/net/if.h > src/inc/net/if.h
+  ;;
+esac
+
+#
+######################################################################
+#
+    $debug && echo "${dbg_hdr}Creating .ckfunc"
+    echo "" > errors/ckfunc
+    cat >.ckfunc <<EOX
+echo "Testing function \$*" >> errors/ckfunc
+cat >.ckfunc.c <<EOS
+#include "config.h"
+/* include these to check for macros (i.e., ntohs and friends) */
+#include ".ckincs.h"
+\$MAPNAMES
+int bar;
+int
+main() {
+\$*
+;
+}
+EOS
+
+# Possible Enhancement:
+#    Note that below we are checking the exit status of cc.  But are we sure
+#    that all compilers return a valid status?  Maybe we should check to
+#    see if the executable were actually created.
+
+$cc -Isrc/inc $INCLUDES .ckfunc.c $LIBFLAG >> errors/ckfunc 2>&1
+STATUS=\$?
+if [ \$STATUS -ne 0 ]
+then
+	$debug && cat .ckincs.h .ckfunc.c
+	echo "cc line:  $cc -Isrc/inc $INCLUDES .ckfunc.c $LIBFLAG >> errors/ckfunc 2>&1" >> errors/ckfunc
+	echo "contents of .ckfunc.c:" >> errors/ckfunc
+	cat .ckfunc.c >> errors/ckfunc
+	echo "contents of src/inc/config.h:" >> errors/ckfunc
+	cat src/inc/config.h >> errors/ckfunc
+	echo "contents of .ckincs.h:" >> errors/ckfunc
+	cat .ckincs.h >> errors/ckfunc
+	echo "end of error report" >> errors/ckfunc
+fi
+rm -f a.out .ckfunc.c
+exit \$STATUS
+EOX
+    chmod 755 .ckfunc
+
+#
+######################################################################
+#
+# Possible Enhancement:
+# It looks as though we should put a check in here or something
+# so if cc is not found or cannot compile even a simple program, all
+# the include checks and function checks are skipped.
+
+    $debug && echo "${dbg_hdr}Creating .ckincl"
+    echo "" > errors/ckincl
+    cat >.ckincl <<EOX
+echo "Testing include directive \$*" >> errors/ckincl
+cat >.ckincl.c <<EOS
+#include "config.h"
+/* include these to check for macros (i.e., ntohs and friends) */
+#include ".ckincs.h"
+\$MAPNAMES
+\$*
+int
+main() {
+printf("Hello, world.\n");
+}
+EOS
+$cc -Isrc/inc \$INCLUDES .ckincl.c \$LIBFLAG >> errors/ckincl 2>&1
+STATUS=\$?
+if [ \$STATUS -ne 0 ]
+then
+	$debug && cat .ckincs.h .ckincl.c
+	echo "cc line:  $cc -Isrc/inc \$INCLUDES .ckincl.c \$LIBFLAG >> errors/ckincl 2>&1" >> errors/ckincl
+	echo "contents of .ckincl.c:" >> errors/ckincl
+	cat .ckincl.c >> errors/ckincl
+	echo "contents of src/inc/config.h:" >> errors/ckincl
+	cat src/inc/config.h >> errors/ckincl
+	echo "contents of .ckincs.h:" >> errors/ckincl
+	cat .ckincs.h >> errors/ckincl
+	echo "end of error report" >> errors/ckincl
+fi
+rm -f a.out .ckincl.c
+exit \$STATUS
+EOX
+    chmod 755 .ckincl
+
+
+#
+######################################################################
+#
+    if $brief
+    then
+	echo " "
+	echo " "
+	echo $n "Checking for system features...$c"
+    else
+	echo " "
+	echo "Checking your system for these features..."
+    fi
+
+#
+# check for some other include files (that we can deal with)
+#
+# Warning:  Ultrix doesn't like to see more than one space between
+#	    tokens on input to its "read" command, so do NOT try to
+#	    beautify this "cat" data!
+#
+    echo "#include <stdio.h>" > .ckincs.h
+    (
+	cat << EOF
+sys/types.h c
+unistd.h c "echo '' > src/inc/unistd.h"
+signal.h C
+sys/socket.h c
+netdb.h n netdb
+EOF
+	for fn in $EINCFILES
+	do
+		echo "$fn c"
+	done
+	cat << EOF
+net/if.h C "echo '' > src/inc/net/if.h"
+netinet/in.h C
+netinet/in_var.h C "echo '' > src/inc/netinet/in_var.h"
+netinet/if_ether.h C "echo 'struct ether_addr { u_char ether_addr_octet[6]; };' >> src/inc/netinet/if_ether.h"
+EOF
+	${CKBSDINC-false} && cat << EOF
+strings.h C "$cat /usr/include/string.h > src/inc/strings.h"
+sys/uio.h X "$cat src/inc/port/xuio.h > src/inc/sys/uio.h"
+sys/wait.h X "echo '' > src/inc/sys/wait.h"
+EOF
+    ) |
+    while read hname htype worka
+    do
+#	NOTE: Special caution must be exercised here.  This while loop
+#	      is being run in a sub-shell.  Do not set environment
+#	      variables that you expect to use in the main shell.
+	$brief || echo $n "#include <$hname> $c"
+	if ./.ckincl "#include <$hname>"
+	then
+	    $brief || echo "ok"
+	    case "$htype" in
+	    C)
+		echo "#include <$hname>" >> .ckincs.h
+		;;
+	    c)
+		echo "#include <$hname>" >> src/inc/config.h
+		;;
+	    n)
+		eval ${worka}=have
+		echo "#include <$hname>" >> .ckincs.h
+		;;
+	    esac
+	else
+	    $brief || echo $n "not found, $c"
+	    $brief && echo $n "$hname not found, $c"
+	    if [ -n "$worka" ]
+	    then
+# This portion of code has been tested on SCO Unix.  Please notify me
+# if it has to change for some reason.  -- jdc.
+# Also tested on Umax, Sun, SGI, Ultrix, NCR and MIPS.
+		$brief || echo "attempting workaround"
+		eval worka=`echo $worka`
+		eval $worka
+		case "$htype" in
+		C)
+		    echo "#include <$hname>" >> .ckincs.h
+		    ;;
+		c)
+		    echo "#include <$hname>" >> src/inc/config.h
+		    ;;
+		n)
+		    > .needsome
+		    eval ${worka}=need
+		    echo "#define need_$worka" >> src/inc/config.h
+		    ;;
+		esac
+	    else
+		$brief || echo "hoping I can do without it"
+	    fi
+	fi
+    done
+
+# Possible Enhancement:
+# The following code segment should be moved down past the binary installs
+# since we may need this only if compiling.
+
+# if compiler not found do something sensible
+    for func in $funclist
+    do
+	tfunc=`expr "$func" : "\([^(]*\)"`
+	eval val=`echo '$'$tfunc`
+	if [ "$val" = "" ]
+	then
+	    $brief || echo $n "$tfunc() $c"
+	    if ./.ckfunc "$func"
+	    then
+		$brief || echo "ok"
+		eval $tfunc='have'
+	    else
+		$brief || echo "not found, added to libannex"
+		$brief && echo $n "$tfunc() not found, added to libannex"
+		eval $tfunc='need'
+	    fi
+	fi
+    done
+
+    if [ "$netware_type" != "TLI" ]
+    then
+	for func in $sfunclist
+	do
+	    tfunc=`expr "$func" : "\([^(]*\)"`
+	    eval val=`echo '$'$tfunc`
+	    if [ "$val" = "" ]
+	    then
+		$brief || echo $n "$tfunc() $c"
+		if ./.ckfunc "$func"
+		then
+		    $brief || echo "ok"
+		    eval $tfunc='have'
+		else
+		    $brief || echo "not found, added to libannex"
+		    $brief && echo $n "$tfunc() not found, added to libannex"
+		    eval $tfunc='need'
+		fi
+	    fi
+	done
+    fi
+
+    rhost=''
+    if [ "$gethostbyname" = "need" ]
+    then
+	$brief || echo $n "rhost() $c"
+	if ./.ckfunc "rhost(0)"
+	then
+	    rhost="have"
+	    $brief || echo "ok"
+	else
+	    $brief || echo "not found, added to libannex"
+	    rhost='need'
+	    funclist="$funclist rhost(0)"
+	fi
+	$brief && echo $n ".$c"
+    fi
+
+    $brief || echo " "
+
+    for func in $funclist
+    do
+	tfunc=`expr "$func" : "\([^(]*\)"`
+	eval val=`echo '$'$tfunc`
+	case $val in
+	  need)
+	    > .needsome
+	    echo "" >> src/inc/config.h
+	    echo "#define need_$tfunc" >> src/inc/config.h
+	    echo "#define $tfunc xylo_$tfunc" >> src/inc/config.h
+	    file=`awk '$1 == f { print $2 ; exit(0) }' \
+		f=$tfunc src/libannex/contents`
+	    eval val=`echo '$'$file\_c`
+# we may not have a .c file to map to
+	    if [ -n "$file" -a "$val" != "need" ]
+	    then
+		LIBANX_C="$LIBANX_C $file.c"
+		LIBANX_O="$LIBANX_O $file.o"
+		eval $file\_c="need"
+	    fi
+	    ;;
+	have)
+	    ;;
+# Convertable functions -- all we need to do is specify a wrapper to
+# go around the function and convert it to some internal function.
+	*)
+	    echo "#define $val" >> src/inc/config.h
+	    ;;
+	esac
+    done
+
+    if [ "$netware_type" != "TLI" ]
+    then
+	for func in $sfunclist
+	do
+	    tfunc=`expr "$func" : "\([^(]*\)"`
+	    eval val=`echo '$'$tfunc`
+	    if [ "$val" = "need" ]
+	    then
+		> .needsome
+		echo "" >> src/inc/config.h
+		echo "#define need_$tfunc" >> src/inc/config.h
+		echo "#define $tfunc xylo_$tfunc" >> src/inc/config.h
+		file=`awk '$1 == f { print $2 ; exit(0) }' \
+		    f=$tfunc src/libannex/contents`
+		eval val=`echo '$'$file\_c`
+# we may not have a .c file to map to
+		if [ -n "$file" -a "$val" != "need" ]
+		then
+		    LIBANX_C="$LIBANX_C $file.c"
+		    LIBANX_O="$LIBANX_O $file.o"
+		    eval $file\_c="need"
+		fi
+	    fi
+	done
+    fi
+
+# Unisys Sequent_PTX
+    if [ "$hw_type" = "U6070" ]
+    then
+	echo " "                                >> src/inc/config.h
+	echo "#include <netdb.h>"               >> src/inc/config.h
+	echo "#define strings__h"               >> src/inc/config.h
+	echo " "                                >> src/inc/config.h
+    fi
+
+# Sequent PTX.  This is done so that u_char, et al, can be used.
+    if [ "$hw_type" = "SEQUENT_PTX" ]
+    then
+	echo " "			>> src/inc/config.h
+	echo "#include <sys/socket.h>"	>> src/inc/config.h
+	echo " "			>> src/inc/config.h
+    fi
+
+#
+# Check for additional functions, typedefs, etc
+#
+# Warning:  Ultrix doesn't like to see more than one space between
+#	    tokens on input to its "read" command, so do NOT try to
+#	    beautify this "cat" data!
+#
+# Note that, in order to check for structures, it is necessary to use
+# sizeof, since most compilers will allow a declaration to an unknown
+# structure as long as the size of the structure isn't required and as
+# long as it's never dereferenced.  Also note that a global variable
+# (bar) is required to work around those compilers which completely
+# optimize these checks out.
+#
+    (
+    cat << EOF
+index "index(0,0)"
+rindex "rindex(0,0)"
+select "select(0,0,0,0,0)"
+u_char "u_char foo"
+u_short "u_short foo"
+u_long "u_long foo"
+void "extern void foo()"
+EOF
+# Work around a stupid BSDI & FreeBSD Bourne shell bug.
+    if [ "$hw_type" = "BSDI" -o "$hw_type" = "FREEBSD" ]
+    then
+	cat << EOF
+hostent "struct hostent foo; bar=sizeof(foo)"
+servent "struct servent foo; bar=sizeof(foo)"
+ether_addr "struct ether_addr foo; bar=sizeof(foo)"
+EOF
+    else
+	cat << EOF
+hostent "struct hostent foo\; bar=sizeof(foo)"
+servent "struct servent foo\; bar=sizeof(foo)"
+ether_addr "struct ether_addr foo\; bar=sizeof(foo)"
+EOF
+    fi
+    if [ "$netware_type" = "EXOS" ]
+    then
+	echo "experror experror"
+    fi
+    ) |
+# Be careful here:  the input redirection means that variables
+# set below are lost (it's a subshell).
+    while read func testcode
+    do
+# This causes the typedef name in the first column to be evaluated
+# as a shell variable -- thus if "index=have" has been executed,
+# we won't even test for it.  Sort of a short-cut.
+	eval val=`echo '$'$func`
+	if [ "$val" = "" ] 
+	then
+	    $brief || echo $n "$func $c"
+	    eval testcode=`echo $testcode`
+	    if ./.ckfunc "$testcode"
+	    then
+		$brief || echo "ok"
+		eval $func="have"
+	    else
+		$brief || echo "not found, substituting"
+		eval $func="need"
+	    fi
+	fi
+	eval val=`echo '$'$func`
+	if [ "$val" = "need" ] 
+	then
+	    > .needsome
+	    echo "#define need_$func" >> src/inc/config.h
+	elif [ "$val" != "have" ]
+	then
+	    echo "#define $val" >> src/inc/config.h
+	fi
+	$brief && echo $n ".$c"
+    done
+
+
+    $debug && echo "${dbg_hdr}This should be the end of checking"
+
+
+###############################################################################
+# End: of compile prep
+###############################################################################
+
+
+
+#
+# WARNING: Specific needs for various hosts are put here.
+#
+mayneedfprintf=false
+case "$hw_type" in
+
+LINUX)
+    cat >> src/inc/config.h << EOFLINUX
+#include <sys/types.h>
+EOFLINUX
+    $debug && echo "${dbg_hdr}Done with Linux check"
+    ;;
+BULL)
+    cat >> src/inc/config.h << EOFBULL
+#include <sys/types.h>
+#define have_iovec
+EOFBULL
+    $debug && echo "${dbg_hdr}Done with Bull check"
+    ;;
+
+# Send/recv mods for Siemens MX300 System V using socket libraries...
+MX300)
+    cat >> src/inc/config.h << EOSR
+/* sendrecv mods for Siemens System V with sockets.. */
+#define need_sendmsg
+#define sendmsg xylo_sendmsg
+#define need_recvmsg
+#define recvmsg xylo_recvmsg
+#ifndef have_msghdr
+#define have_msghdr
+#endif
+#define need_sendto
+#define sendto xylo_sendto
+#define NEED_0_SENDTO
+EOSR
+    $debug && echo "${dbg_hdr}Done with MX300 check"
+    ;;
+
+#
+# Convergent and HP include a broken "struct msghdr" in their socket.h
+#
+CONVERGENT|HP)
+    if [ "$recvmsg" = "need" -o "$sendmsg" = "need" ]
+    then
+	echo "#define msghdr bogus_msghdr" >> src/inc/sys/socket.h
+	cat /usr/include/sys/socket.h >> src/inc/sys/socket.h
+	cat >> src/inc/sys/socket.h << EOSS
+#if msghdr == bogus_msghdr
+#undef msghdr
+#endif
+EOSS
+    fi
+    $debug && echo "${dbg_hdr}Done with Convergent and HP check"
+    ;;
+
+#
+# SCO UNIX Specific
+#
+SCO|SCO5)
+    if [ "$recvmsg" = "need" -o "$sendmsg" = "need" ]
+    then
+	echo "#define msghdr bogus_msghdr" >> src/inc/sys/socket.h
+	cat /usr/include/sys/socket.h >> src/inc/sys/socket.h
+    	cat >> src/inc/sys/socket.h << EOSS
+#if msghdr == bogus_msghdr
+#undef msghdr
+#endif
+EOSS
+    fi
+    mayneedfprintf=true
+    if $needcrypt
+    then   
+      LIBANX_C="$LIBANX_C crypt.c"
+      LIBANX_O="$LIBANX_O crypt.o"
+      cat << EOFSCO > src/libannex/crypt.c
+char *crypt(key,salt)
+char    *key;
+char    *salt;
+{
+	static char     buff[200];
+	strcpy(buff,key);
+	return buff;
+}
+EOFSCO
+    fi
+# use "other" rtelnet for SCO.  (Newrtelnet has already been linked.)
+    if [ -f src/rtelnet/rtelnet.smns ]
+    then
+	$mv src/rtelnet/rtelnet.c src/rtelnet/rtelnet.old
+	$cp src/rtelnet/rtelnet.smns src/rtelnet/rtelnet.c
+    fi
+    $debug && echo "${dbg_hdr}Done with SCO check"
+    ;; 
+
+DPX300)
+    cat >> src/inc/config.h << EODPX3
+#include <sys/types.h>
+#define have_iovec
+EODPX3
+    $debug && echo "${dbg_hdr}Done with DPX300 check"
+    ;;
+
+MOTO_88K)
+    (
+	echo "#ifndef have_msghdr" 
+	echo "#define have_msghdr"
+	echo "#endif"
+    ) >> src/inc/config.h
+    $debug && echo "${dbg_hdr}Done with Motorola 88000 check"
+    ;;
+
+AIX|SGI|MIPS)
+    echo "#define NEED_SIGNED_CHARS" >> src/inc/config.h
+    $debug && echo "${dbg_hdr}Done with AIX, SGI and MIPS check"
+    ;;
+
+PRIME)
+    if [ "$os_type" = "SVR4" ]
+    then
+	echo "#define NEED_SIGNED_CHARS" >> src/inc/config.h
+    fi
+    $debug && echo "${dbg_hdr}Done with Prime check"
+    ;;
+
+DPX200)
+    if [ "$recvmsg" = "need" -o "$sendmsg" = "need" ]
+    then
+	echo "#define msghdr bogus_msghdr" >> src/inc/sys/socket.h
+	cat /usr/include/sys/socket.h >> src/inc/sys/socket.h
+	cat >> src/inc/sys/socket.h << EOSS
+#if msghdr == bogus_msghdr
+#undef msghdr
+#endif
+EOSS
+    fi
+    cat >> src/inc/config.h << EODPX2
+#include <sys/types.h>
+#define have_iovec
+#define NEED_0_SENDTO
+EODPX2
+    $debug && echo "${dbg_hdr}Done with DPX200 check"
+    ;;
+
+#
+# Interactive UNIX Specific
+#
+IUNIX)
+    $cp /usr/include/netinet/in.h src/inc/netinet/in.h
+    $cp /usr/include/sys/bsdtypes.h src/inc/sys/bsdtypes.h
+    $debug && echo "${dbg_hdr}Done with Interactive check"
+    ;;
+
+PYRAMID)
+    if [ "$netware_type" != "BSD" ]
+    then
+	echo "#define NEED_SIGNED_CHARS" >> src/inc/config.h
+    fi
+    $debug && echo "${dbg_hdr}Done with Pyramid check"
+    ;;
+
+SSFT)
+    if [ -f src/rtelnet/rtelnet.ssft ]
+    then
+	$mv src/rtelnet/rtelnet.c src/rtelnet/rtelnet.old
+	$cp src/rtelnet/rtelnet.ssft src/rtelnet/rtelnet.c
+    fi
+    $debug && echo "${dbg_hdr}Done with StarServer check"
+    ;;
+
+*)
+    $debug && echo "${dbg_hdr}Done with unknown check"
+    ;;
+esac
+
+if $mayneedfprintf
+then
+    $debug && echo "${dbg_hdr}Checking for broken fprintf alignment."
+    cat > .ckalign.c << EOF
+#include <stdio.h>
+int main(argc,argv)
+int argc;
+char **argv;
+{ printf("%d\n",sizeof(FILE)); return 0; }
+EOF
+    if
+	$cc -o .ckalign1 $HWFLAG .ckalign.c > errors/ckalign &&
+	$cc -o .ckalign2 .ckalign.c >> errors/ckalign
+    then
+	s1=`./.ckalign1`
+	s2=`./.ckalign2`
+	if [ "$s1" != "" -a "$s1" != "$s2" ]
+	then
+	    $debug && echo "${dbg_hdr}Fixing fprintf alignment from $s1 to ${s2}."
+	    echo "#define fprintf xylo_fprintf" >> src/inc/config.h
+	    LIBANX_C="$LIBANX_C fprintf.c"
+	    LIBANX_O="$LIBANX_O fprintf.o"
+	    cat << EOSC > src/libannex/fprintf.c
+#include <stdio.h>
+int
+xylo_fprintf(chan,f,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16)
+FILE *chan;
+char *f,*a1,*a2,*a3,*a4,*a5,*a6,*a7,*a8,*a9,*a10,*a11,*a12,*a13,*a14,*a15,*a16;
+{
+	if (chan >= _iob && chan < _iob+_NFILE)
+		chan = (FILE *)((((char *)chan-(char *)_iob)/$s1)*$s2+
+			(char *)_iob);
+	return fprintf(chan,f,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16);
+}
+EOSC
+	else
+	    $debug && echo "${dbg_hdr}No fix for fprintf alignment required."
+	fi
+    else
+	$debug && echo "${dbg_hdr}Can't compile alignment tests.  Hope this is ok!"
+    fi
+    rm -f .ckalign.c .ckalign1 .ckalign2
+else
+    $debug && echo "${dbg_hdr}Not checking for broken fprintf alignment."
+fi
+
+###############################################################################
+#
+
+$didfixedconfig || $brief || (
+#   #
+#   # issue some warnings
+#   #
+    needs=
+    [ "$ntohl" = need ] && needs="$needs ntohl"
+    [ "$htonl" = need ] && needs="$needs htonl"
+    [ "$ntohs" = need ] && needs="$needs ntohs"
+    [ "$htons" = need ] && needs="$needs htons"
+#
+# if needs has been set and warning flag is set 
+#   then print warnings about needs list
+#
+    if [ "$needs" != "" ] && $warning_ntoh
+    then
+	echo " "
+	echo "**** Warning:"
+	echo "This host requires these byte order routines: $needs"
+	echo " "
+	echo "The hton[ls] and ntoh[ls] routines supplied in libannex"
+	echo "may not be correct for the byte ordering on this host."
+	echo "Check the comments in the file src/libannex/inet.c to"
+	echo "see if they will work as-is on this host."
+	echo " "
+    fi
+)
+
+#
+###############################################################################
+#
+
+if [ -f .needsome ]
+then
+#   # add compatibility declarations
+    echo ""
+    echo "/* libannex linkage */"
+    echo "#include <port/libannex.h>"
+    echo ""
+    echo "/* and additional port linkage */"
+    echo $portfile
+fi >> src/inc/config.h
+
+if [ "$netdb" != "need" ]; then
+    if [ "$hw_type" = "NCR_TOWER" ]; then
+	cat << EOSS > src/inc/netdb.h
+
+/* clean up for mess in <netdb.h> on NCR Tower */
+#ifdef gethostbyname
+#undef gethostbyname
+#endif
+#ifdef getservbyname
+#undef getservbyname
+#endif
+
+#include <netdb.h>
+
+/* clean up for mess in <netdb.h> on NCR Tower */
+#ifdef need_gethostbyname
+#ifdef gethostbyname
+#undef gethostbyname
+#endif
+#define gethostbyname _gethostbyname
+#endif
+
+#ifdef need_getservbyname
+#ifdef getservbyname
+#undef getservbyname
+#endif
+#define getservbyname _getservbyname
+#endif
+EOSS
+    fi
+else
+#   # we'll do without it (see libannex.h), but make sure #includes work
+    > src/inc/netdb.h
+fi
+
+# Hack around some stupidity in the per-user code.
+echo "#ifndef ANNEX_CONFIG_H"		>> src/inc/config.new
+echo "#define ANNEX_CONFIG_H"		>> src/inc/config.new
+echo ""					>> src/inc/config.new
+cat src/inc/config.h			>> src/inc/config.new
+echo ""					>> src/inc/config.new
+echo "#endif /* ANNEX_CONFIG_H */"	>> src/inc/config.new
+$mv src/inc/config.new src/inc/config.h
+
+$brief && echo $n ".$c"
+
+
+#############################################################################
+# End: Additional portion of the installation script
+#############################################################################
+

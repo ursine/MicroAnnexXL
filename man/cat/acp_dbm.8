@@ -1,0 +1,132 @@
+
+
+
+     AAAACCCCPPPP____DDDDBBBBMMMM((((1111MMMM))))                   AAAANNNNNNNNEEEEXXXX                   AAAACCCCPPPP____DDDDBBBBMMMM((((1111MMMM))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          acp_dbm - Annex database services utility
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          aaaaccccpppp____ddddbbbbmmmm [ ----ssss _u_s_e_r ] [ ----cccc _u_s_e_r ] [ ----dddd _u_s_e_r ] [ ----llll ]
+
+
+     AAAARRRRGGGGUUUUMMMMEEEENNNNTTTTSSSS
+          ----ssss _u_s_e_r      This option sends to stdout information about
+                      that user stored in the apc_dbm database.
+                      First it outputs the following line:
+
+                      Number of failed logins since last success: N
+
+                      then it outputs a list of the previous login
+                      failures, up to 20, the ultimate maximum of
+                      login failures that can be stored.  The format
+                      of each failure:
+
+                      Login failure on Sun Sep 16 01:03:52 1973.
+
+          ----cccc _u_s_e_r      This option clears the user from the blacklist
+                      and clears the history of login failures as
+                      well.  Use this option to remove a user from the
+                      blacklist.  Make sure you have investigated this
+                      account and are confident it is not under
+                      attack.  This option only clears the blaclist
+                      login failure logs; it does not clear the
+                      password history or any other user information
+                      stored in the acp_dbm database.
+
+          ----dddd _u_s_e_r      This option deletes the user record from the
+                      acp_dbm database.  Use this option when you wish
+                      to delete a user entirely.  Note that you will
+                      still have to delete references to the user in
+                      any ACP files(i.e. acp_passwd, acp_userinfo,
+                      etc.); this option will only delete the user
+                      from acp_dbm.
+
+          ----llll           This option lists all usernames stored in the
+                      acp_dbm.
+
+          _a_c_p__d_b_m is the Annex database services daemon.  It supports
+          the use of blacklisting features which is, the authorization
+          of users based on their previous login history.  The
+          blacklisting can be achieved in two ways.  One way is to set
+          the maximum number of consecutive failures and the other way
+          is to set the number of total allowable login failures over
+          a certain period of time.
+
+          The utility always displays the current list of blacklisted
+          users apart from the options specified on the command line.
+
+
+
+     Page 1                                         (printed 10/13/98)
+
+
+
+
+
+
+     AAAACCCCPPPP____DDDDBBBBMMMM((((1111MMMM))))                   AAAANNNNNNNNEEEEXXXX                   AAAACCCCPPPP____DDDDBBBBMMMM((((1111MMMM))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 2                                         (printed 10/13/98)
+
+
+
+
+
+

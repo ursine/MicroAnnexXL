@@ -1,0 +1,143 @@
+
+			Annex Manager R2.3 Release Notes 
+
+Annex Manager is an SNMP-based management application that uses the
+X/Motif graphical environment. Annex Manager is specifically designed
+to manage Bay Networks Annex Remote Access Servers, and is not intended
+as a general purpose network manager. While Annex Manager can detect 
+SNMP devices that are not Annexes, you cannot use it to configure any 
+non-Annex network device.Annex Manager R2.3 runs on a workstation 
+platform running BSD Unix (Sun Sparc, HP, RS/6000, SCO). The user 
+interface is built to the X/Motif standard. Annex Manager is designed
+to run stand-alone. It contains all necessary SNMP protocol routines 
+and X/Motif binary libraries. The installation process copies the
+appropriate binary executable and all associated help and data files
+from the distribution media onto the workstation's disk store.
+Annex Manager can be loosely coupled with several standard network
+management products such as SunNet Manager, HP/Openview, or Netview 
+for AIX. Annex Manager does not use the API interfaces provided by 
+those products. 
+
+Why Use Annex Manager?
+
+Annex Manager allows a system administrator to monitor and configure
+Annexes in a network. Annex Manager is a host based, window oriented,
+configuration and management application. The displays and user 
+interface conform to the X/Motif standard. Annex Manager works best 
+with a color monitor directly attached to a workstation or a color
+X-windows terminal connected to a Unix host over the network. In 
+addition, it supports a grey-scale X-window terminal attached to a 
+workstation. Annex Manager's configuration tool is easy to learn and 
+use. It supports the functionality of the older host-based na
+configuration tool in an easier to use format. Annex Manager is 
+specifically designed to configure and manage Annex products. 
+Its features depend on the proprietary MIB defined for the Annex and 
+on the various standard MIBs supported by the Annex. As such, Annex 
+Manager cannot manage other SNMP-manageable nodes in the network. 
+Annex Manager is not intended to be a generic SNMP management tool.
+Annex Manager provides features that have not been available with the
+na utility. Users can:
+
+       	Configure Annexes with Setup or Customize mode: 
+        Setup mode allows users to configure one or more Annexes by 
+        setting the most commonly used parameters.
+        Customize mode lets users set individual Annex parameters and
+        provides access to all main menu commands. 
+	Save current configuration parameter settings in Script files
+        and restore the parameters from those files.
+	Edit script files with a common editor on the workstation.
+	Compare the configuration parameters of two ports on the same
+        Annex or on different Annexes.
+	Copy the current configuration parameter settings from one port
+        to another or one Annex to another.
+	Retrieve basic status and statistics information from the Annex
+	Define parameter groups to simplify configuration operations.
+	Define site specific defaults.
+	Discover Annexes in the network.
+	Save Annex address lists after discovery and add names to the
+        lists manually.
+	Display default values for each configuration parameter on 
+        demand.
+	Display on-line documentation for all Annex configuration
+        parameters, all Annex Manager windows and all widgets on the
+        screens.
+	Boot and reset an Annex.
+	Broadcast messages to users on Annex ports.
+	Automatically reset ports or Annex subsystems after changing 
+        configuration parameters.
+	Use the editor specified in the user's environment to locate
+        and edit an Annex configuration file.
+
+Annex Manager R2.3 supports the following Remote Annex hardware running 
+the specified Annex Software Release:
+
+RA2000  R13.3
+RA4000 R13.3
+RA6100 R13.3
+5390 R13.3
+5391 R13.3
+5393  R13.3
+RA6300 R13.3
+Annex 3 R10.0
+Micro Annex R10.0
+MicroCS R10.0
+Cabletron CSMIMII R13.3
+Cabletron CSMIMT1 R13.3
+Cabletron MODMIM R13.3
+3COM 6133C-XS R13.3
+3COM 6117C-XS R13.3
+
+System Requirements
+Annex Manager Release 2.3 runs on several popular UNIX systems. The 
+following sections list the hardware and software requirements for
+installing and running Annex Manager.  
+For all systems, a minimum of 10MB of free disk space must be available 
+prior to installation. A minimum of 32 MB of RAM is recommended,
+although specific memory requirements will vary, depending on the type
+of workstation and the other tasks that may be concurrent with Annex 
+Manager. In all cases, a color monitor or X-terminal is recommended,
+although Annex Manager is usable with a monochrome X-terminal.
+
+Sun Requirements
+Annex Manager runs under Sun OS releases 4.1.3c and 4.1.4 and Solaris
+releases 2.4 and 2.5.1 on SPARC systems. The following patches are 
+required for SunOS versions earlier than 4.1.3c:
+
+	Patch number 100444-48 OpenWindows 3.0: OpenWindows V3.0 
+        Server Patch 3000-86.
+	Patch number 100492-01_09 OpenWindows 3.0: jumbo patch for
+        olwm 3.0.
+
+HP Requirements
+Annex Manager runs under HP-UX 9.0.5 and 10.10 on HP 9000 Series 700
+Workstations.
+
+IBM Requirements
+Annex Manager runs on an IBM RS/6000 workstations under AIX 4.1.4.
+
+SCO Requirements
+Annex Manager runs under SCO/Unix releases 3.2 and 5.0 and the X 
+windowing system. You should have a 486 CPU with 16 mb RAM, 20 mb of
+available disk space, and a CDROM drive or a 3.5" floppy drive to
+install the software.
+
+Remote Display Requirements
+If you use Annex Manager on an X-terminal, we recommend that you have
+more than 2mb of memory to avoid problems when you have several windows
+open at the same time.
+
+New Features and Commands
+Annex Manager Release 2.3 now lets you manage Multilink PPP, CCP 
+compression, internal CSU parameters for the RA6300 and Bay
+Networks 5393, DVS/UDAS parameters and DHCP configuration parameters.
+For more information on these features, please see the R13.3 Release 
+Notes and the updated Annex Manager User Guide.
+
+Known Problems/Limitations
+Selecting the Configuration->Edit Configuration menu option  will cause
+the Annex Manager to crash if the selected Annex is booted from a host 
+that is different than its default host.  This will only happen if
+Annex Manager is installed on a Solaris 2.5.1 or a HP-UX10.10 platform.
+The work around for this problem is to boot the Annex from its default 
+host.
+

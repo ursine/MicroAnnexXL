@@ -1,0 +1,95 @@
+#!/bin/sh
+
+# Return 0 if the invoker is user "root" else return a non-zero exit status.
+# This script should write nothing to stdout or stderr.
+
+
+# Assign this with the exit value that indicates that we are not root.
+
+am_root_status=1
+
+
+# These constants are used in sed substitutions:
+ADD_LEADING_BLANK='s/^/ /'
+REMOVE_LEADING_WHITESPACE='s/^[ 	][ 	]*//'
+REMOVE_TRAILING_WHITESPACE='s/[ 	][ 	]*$//g'
+REMOVE_WHITESPACE='s/[ 	][ 	]*//g'
+
+# This constant is slightly mis-named, it also lets "=" pass.
+WANT_ONLY_ALPHANUMERICS='s/[^a-zA-Z0-9=]/ /g'
+
+# These constants are also used in sed substitutions.
+# However, these assume that there is no leading whitespace:
+REMOVE_FIRST_FIELD='s/[^ 	]*[ 	]/ /'
+REMOVE_ALL_BUT_FIRST_FIELD='s/[ 	].*//'
+
+
+#############################################################################
+#
+# Get the name of the invoker two ways.
+#
+# NOTE: We execute "id" and "whoami" in sub-shells and discard stderr in
+# case the shell gives a "not found" error message.
+# 
+# The manipulation of the "id" output with "sed" works this way:
+# 	First get the "id" output:
+# 		uid=10060(imhacker) gid=400(annex) groups=400(annex)
+# 	Next, blank out non-alphanumerics ("=" is an exception):
+# 		uid=10060 imhacker  gid=400 annex  groups=400 annex
+# 	Then get the second field.
+
+
+# Use "id" to get the username
+
+name1=`(id 2> /dev/null) 2> /dev/null | sed 			\
+	-e "$WANT_ONLY_ALPHANUMERICS"		\
+	-e "$REMOVE_LEADING_WHITESPACE"		\
+	-e "$REMOVE_FIRST_FIELD"		\
+	-e "$REMOVE_LEADING_WHITESPACE"		\
+	-e "$REMOVE_ALL_BUT_FIRST_FIELD"	\
+	-e "$REMOVE_TRAILING_WHITESPACE"
+    `
+
+
+# Use whoami to get the username
+
+name2=`(whoami 2>/dev/null) 2>/dev/null | sed -e "$REMOVE_WHITESPACE"`
+
+
+#############################################################################
+#
+# Perform checks on the names.  If one way got a null name then use the other.
+# If both names are non-null then they better be equal.
+
+
+# Initialize name with a value that is assumed to have been gotten both ways. 
+
+name="$name1"
+
+# Now check the assumption:
+
+if [ -n "$name1" -a -n "$name2" ]
+then
+#   # We have two non-null names.  Are they equal?
+#   # If they are not then treat as if we got nothing for names.
+    if [ "$name1" != "$name2" ]
+    then
+	name=""
+    fi
+else
+#   # One or both are null.  Set "name" to the value of the non-null variable.
+#   # Note that if they were both null then "name" will be null.
+    name="$name1$name2"
+fi
+
+
+if [ -n "$name" ]
+then
+    case $name in
+	root) am_root_status=0 ;;
+    esac
+# else if the name were null we could check $USER or $LOGNAME
+fi
+
+exit $am_root_status
+

@@ -1,0 +1,146 @@
+'''
+'''	$Header: /annex/common/src/./erpcd/RCS/config.annex.5,v 1.2 1993/11/21 13:48:59 raison Rel $
+'''
+.ig xy
+.TH CONFIG.ANNEX 4 ANNEX
+.xy
+.ie '\*(sy'V' .TH CONFIG.ANNEX 4 ANNEX
+.el .TH CONFIG.ANNEX 5 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+config.annex \- Annex configuration file
+.SH DESCRIPTION
+The default configuration file is
+.B config.annex.
+It resides on the preferred boot host. This file contains all Annex
+configuration information which previously existed in the 
+.I gateways, rotaries
+or
+.I macros
+files.
+.PP
+There are two keywords use in the
+.B config.annex
+file:
+.I include
+and 
+.I category.
+While the former is the way to incorporate a separate file into
+the
+.B config.annex
+file, the latter is the way to organize the entries. The following
+details these keywords:
+.SH "INCLUDE STATEMENT"
+.B syntax:	%include <filename>
+.PP
+The syntax of the include statement is % sign at the first column
+followed by
+.I include
+keyword, one or more spaces and then the filename. The filename
+can be any UNIX legal filename.
+.PP
+The only restriction in the file is that all the statements in the
+file should belong to the same 
+.B category.
+.SH "CATEGORY STATEMENT"
+.sp
+.PP
+.B syntax:	%keyword
+.PP
+The
+.B category
+statement begins with the % sign at the first column followed by
+the 
+.I keyword.
+The
+.I keyword
+is one of the following:
+.I gateway, macro, rotary, modem,
+or
+.I service.
+.PP
+The 
+.B keyword
+statement needs to be specified first before defining each category entry.
+Failing to do so will result in a format error.
+.PP
+All the statements under the
+.B %keyword
+should belong to the same 
+.I category
+including any statements in an included file.
+.SH EXAMPLE
+.PP
+The following is an example of a
+.B config.annex
+file which contains the 
+.I include
+and 
+.I category
+statements described above. The pound sign (#) in the first column in
+a line represents a comment.
+.Pp
+.nf
+#
+# The following are definitions of the gateways entries
+#
+%gateway
+net 129.91.0.0 gateway 132.245.1.1 metric 1 hardwired
+
+annex 192.9.200.228
+	net 129.123.0.0 gateway 132.245.2.1 metric 1 hardwired
+end
+#
+# Configure SNMP
+#
+snmp community public
+snmp traphost 192.9.200.95
+.bp
+#
+# Macro Definition
+#
+%macro
+alias |Show users on the Annex|
+	keyin "3" 1-6,10-16,v@192.9.200.245
+{
+<who
+<pause
+}
+menu "ANNEX MENU"
+	keyin "menu1" 1-6,10-16,v@192.9.200.245
+	init_cli 1-6,10-16,v@192.9.200.245
+	cmd_list bg,fg,hosts,jobs,rlogin,3
+{
+MY MENU SCREEN
+Commands: bg,fg,hosts,jobs,rlogin,3
+
+Enter Command:
+}
+#
+# Rotary Definitions
+#
+%rotary
+titanic_co:	2@192.9.200.232
+.SH COMPATIBILITY ISSUES
+.PP
+Since each entry of the new configuration file is identical to those of 
+the old files, the new file parser is able to maintain the backward
+compatibility.
+
+.SH SEE ALSO
+.ie '\*(sy'V' \{
+erpcd(1M), rotaries(4), gateways(4).
+\}
+.el \{
+.br
+erpcd(8), rotaries(5), gateways(5)
+\}
+.br
+\f2Annex Network Administrator's Guide\f1.

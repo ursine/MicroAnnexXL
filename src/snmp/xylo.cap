@@ -1,0 +1,364 @@
+--
+--      Xylogics Annex Capabilities Statement
+--
+--  Copyright 1994, 1997 Bay Networks, Inc.  ALL RIGHTS RESERVED.
+--
+--  ALL RIGHTS RESERVED. Licensed Material - Property of Bay Networks, Inc.
+--  This software is made available solely pursuant to the terms of a
+--  software license agreement which governs its use.
+--  Unauthorized duplication, distribution or sale are strictly prohibited.
+--
+--  This information is subject to change without notice, and should
+--  not be construed as a commitment by Bay Networks, Inc.  Bay Networks, Inc.,
+--  assumes no responsibility for any errors that may appear in this
+--  document.
+--
+--  $Id: xylo.cap,v 1.2 1995/10/16 08:58:51 abbas Exp abbas $
+--
+
+
+-- agent capabilities statement
+-- Append this to the end of a Bay Networks Remote Annex Private Enterprise MIB
+
+
+xylogicsAnnexAgent	AGENT-CAPABILITIES
+    PRODUCT-RELEASE	"Annex software release R9.0"
+    STATUS		current
+    DESCRIPTION		"SNMPv1 agent for Annex software."
+
+SUPPORTS		RFC1213-MIB
+    INCLUDES		{ system, interfaces, at, ip, icmp,
+			  tcp, udp, snmp }
+
+    VARIATION		ifAdminStatus
+	SYNTAX		INTEGER { up(1), down(2) }
+	ACCESS		read-only
+	DESCRIPTION	"Not settable.  Does not return all values."
+
+    VARIATION		ifOperStatus
+	SYNTAX		INTEGER { up(1), down(2) }
+	DESCRIPTION	"Does not return all values."
+
+    VARIATION		atEntry
+	DESCRIPTION	"Does not allow creation of new rows."
+
+    VARIATION		ipRouteEntry
+	DESCRIPTION	"Does not allow creation of new rows."
+
+    VARIATION		ipRouteProto
+	SYNTAX		INTEGER { local(2), icmp(4), rip(8) }
+	DESCRIPTION	"Limits on route protocol types."
+
+    VARIATION		ipNetToMediaEntry
+	DESCRIPTION	"Does not allow creation of new rows."
+
+    VARIATION		ipNetToMediaType
+	SYNTAX		INTEGER { dynamic(3), static(4) }
+	WRITE-SYNTAX	INTEGER { invalid(2), dynamic(3), static(4) }
+	DESCRIPTION	"Only 'dynamic' and 'static' can be read.  If
+			set to 'invalid', the row in the table is
+			no longer retrievable."
+
+
+SUPPORTS		RFC1623-MIB
+    INCLUDES		{ dot3StatsEtherChipSet }
+
+    VARIATION		dot3CollIndex
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+
+SUPPORTS		RFC1316-MIB
+    INCLUDES		{ char }
+
+    VARIATION		charPortName
+	SYNTAX		DisplayString
+	ACCESS		read-write
+	DESCRIPTION	"Accepts 16 character long string"
+
+    VARIATION		charPortAdminStatus
+	SYNTAX		INTEGER { enabled(1), disabled(2), off(3) }
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		charPortOperStatus
+	SYNTAX		INTEGER { up(1), down(2), active(5) }
+        DESCRIPTION     "Does not return all values."
+
+    VARIATION		charPortInFlowType
+	SYNTAX		INTEGER { none(1), xonXoff(2), hardware(3) }
+	DESCRIPTION	"Does not support all values."
+
+    VARIATION		charPortOutFlowType
+	SYNTAX		INTEGER { none(1), xonXoff(2), hardware(3) }
+	DESCRIPTION	"Does not support all values."
+
+    VARIATION		charPortInCharacters
+	SYNTAX		Counter
+	DESCRIPTION	"Does not support VCLI ports"
+
+    VARIATION		charPortOutCharacters
+	SYNTAX		Counter
+	DESCRIPTION	"Does not support VCLI ports"
+
+    VARIATION		charPortReset
+	SYNTAX		INTEGER { ready(1), execute(2) }
+	DESCRIPTION	"Does not support VCLI ports"
+
+    VARIATION		charPortAdminOrigin
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		charPortSessionMaximum
+	ACCESS		read-write
+	DESCRIPTION	"The valid range of number of session allowed is 
+			1 to 16. The default is 3."
+
+    VARIATION		charSessKill
+        ACCESS          read-only
+        DESCRIPTION     "Not settable."
+
+    VARIATION		charSessState
+	SYNTAX		INTEGER { connected(2) }
+	DESCRIPTION	"Does not return all values."
+
+    VARIATION		charSessConnectionId
+	SYNTAX		InstancePointer
+	DESCRIPTION	"Not supported.  Returns nullConnectionId."
+
+SUPPORTS		RFC1317-MIB
+    INCLUDES		{ rs232 }
+
+    VARIATION  		rs232PortInSpeed
+	SYNTAX 		INTEGER
+	DESCRIPTION	"same as rs232PortOutSpeed"
+
+    VARIATION  		rs232PortOutSpeed
+	SYNTAX 		INTEGER
+	DESCRIPTION	"same as rs232PortInSpeed"
+
+    VARIATION		rs232AsyncPortStopBits
+	SYNTAX		INTEGER { one(1), two(2), one-and-half(3) }
+	DESCRIPTION	"dynamic(4) maps to one(1)."
+
+    VARIATION		rs232SyncPortInterruptedFrames
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		rs232SyncPortAbortedFrames
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		rs232AsyncPortParity
+	SYNTAX		INTEGER { none(1), odd(2), even(3) }
+	DESCRIPTION	"mark(4) space(5) maps to none(1)."
+
+
+
+SUPPORTS		RFC1318-MIB
+    INCLUDES		{ paraNumber, paraPortTable, paraInSigTable }
+    
+
+SUPPORTS		RFC1389-MIB
+    INCLUDES		{ rip2GlobalGroup, rip2IfStatTable, rip2IfConfTable }
+
+    VARIATION		rip2IfStatStatus
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		rip2IfConfDomain
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		rip2IfConfAuthKey
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		rip2IfConfStatus
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+SUPPORTS		RFC1243-MIB
+    INCLUDES		{ aarp, atport, ddp, atecho }
+
+    VARIATION		atportType
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		atportNetStart
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		atportNetEnd
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		atportNetAddress
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		atportStatus
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		atportZone
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		atportIfIndex
+	ACCESS		read-only
+	DESCRIPTION	"Not settable."
+
+    VARIATION		ddpOutRequests
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		ddpInLocalDatagrams
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		ddpNoProtocolHandlers
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		ddpBroadcastErrors
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		ddpShortDDPErrors
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+    VARIATION		ddpHopCountErrors
+	ACCESS		not-implemented
+	DESCRIPTION	"Not supported."
+
+SUPPORTS		RFC1406-MIB
+    INCLUDES		{ ds1 }
+
+    VARIATION  		dsx1LineType
+	SYNTAX 		INTEGER { dsx1ESF(2), dsx1D4(3) }
+	DESCRIPTION	"dsx1LineType is no longer supported. 
+			 Use anxt1dsx1LineType"
+
+    VARIATION  		dsx1LineCoding
+	SYNTAX 		INTEGER { dsx1B8ZS(2), dsx1AMI(5), dsx1HDB3(3) }
+	DESCRIPTION	"above values supported"
+
+    VARIATION  		dsx1SendCode
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1CircuitIdentifier
+	SYNTAX 		DisplayString
+	DESCRIPTION	"string length limited to 128 bytes"
+
+    VARIATION  		dsx1LineStatus
+	ACCESS		INTEGER 
+	DESCRIPTION	"following values are supported:
+			1      	dsx1NoAlarm
+			2      	dsx1RcvFarEndLOF
+			4      	dsx1XmtFarEndLOF
+			8	dsx1RcvAIS
+			16	dsx1XmtAIS
+			32	dsx1LossOfFrame
+			64	dsx1LossOfSignal
+			128	dsx1LoopbackState"
+
+    VARIATION  		dsx1SignalMode
+	SYNTAX 		INTEGER { robbedBit(2) }
+	ACCESS		read-only
+	DESCRIPTION	"Read only and robbedBit(2) supported"
+
+    VARIATION  		dsx1Fdl
+	SYNTAX 		INTEGER { dsx1Ansi-T1-403(2),
+				  dsx1Att-54016(4) }
+	DESCRIPTION	"dsx1Ansi-T1-403(2),
+			dsx1Att-54016(4) supported"
+
+    VARIATION  		dsx1CurrentSEFSs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1CurrentPCVs	
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1CurrentLESs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1CurrentDMs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1CurrentLCVs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1IntervalSEFSs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1IntervalPCVs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1IntervalLeSs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1IntervalDMs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1IntervalLCVs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1TotalSEFs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1TotalPCVs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1TotalLESs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1TotalDMs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1TotalLCVs
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1FarEndCurrentTable
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1FarEndIntervalTable
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1FarEndTotalTable
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+    VARIATION  		dsx1FracTable
+	ACCESS		not-implemented
+	DESCRIPTION	"not supported"
+
+SUPPORTS		ANX-MIB-R9
+    INCLUDES		{ xylogics }
+
+
+    ::= { xylogics 1 10 }
+
+
+   END
+
+

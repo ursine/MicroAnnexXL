@@ -1,0 +1,108 @@
+#!/bin/sh
+
+#-----------------------------------------------------------------------------
+cat << EOSS > /dev/null
+
+This is a script that will be run by the installation script to
+produce a copy of the /etc/services file (or, if NIS is found to be
+running, the services database).  The actual file edited is passed in
+on the command line.
+
+EOSS
+#-----------------------------------------------------------------------------
+
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Initialize
+
+$debug && echo "${dbg_hdr}Entering script that creates copy of services"
+nis=false
+saved=save/original/services
+modified=save/modified/services
+real=/etc/services
+
+
+# Read the command line
+
+if [ $# -gt 0 ]
+then
+    saved="$1"
+fi
+if [ $# -gt 1 ]
+then
+    modified="$2"
+fi
+if [ $# -gt 2 ]
+then
+    real="$3"
+fi
+
+
+# Cleanup from past installs
+
+rm -f $saved $modified
+
+
+#############################################################################
+#
+# Is the services files under NIS?
+
+sh ${SCRIPT_DIR}/.not_nis
+case $? in
+    0)
+	if [ -f "$real" ]
+	then
+	    cp $real $saved
+	    $debug && echo "${dbg_hdr}Copied $real to $saved"
+	fi
+	;;
+
+    1)
+	ypcat services > $saved 2>&1
+	if [ -f "$saved" ]
+	then
+	    $debug && echo "${dbg_hdr}Created $saved from ypcat"
+	fi
+	;;
+
+    *)
+	nis=true
+	$debug && echo "${dbg_hdr}Created $saved from ypcat"
+	;;
+esac
+
+
+# If we managed to get a copy of the services database then
+# copy it to where we can modify it
+
+if [ -f "$saved" ]
+then
+    cp $saved $modified
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that creates copy of services"
+exit

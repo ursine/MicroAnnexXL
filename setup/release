@@ -1,0 +1,39 @@
+# This file contains release information.  There are three sections:
+#    1) User readable product version information
+#    2) Information on how the release was built
+#    3) Variable assignments used by the installation process
+# All lines should start with a "#" except for the lines with variable
+# assignment statements.
+#
+#
+# PRODUCT INFORMATION:
+# 
+# Product: Comm.Server Software    Release: R10.0B
+# Product: Annex Manager         Release: R2.3
+#
+#
+# BUILD INFORMATION:
+#
+# Date: Tue Oct 13 10:15:58 EDT 1998
+# View: /view/X14.2.24
+# Kit:  R10.0B
+#
+#
+# VARIABLE ASSIGNMENT STATEMENTS (USED BY INSTALLATION SCRIPTS):
+
+Box="Comm.Server"
+box=""
+vers=""
+
+HST_TOOLS="Comm.Server Software"
+HST_SPACES=" "
+HST_REL="R10.0B"
+HST_DIR_LEAD="cs_"
+GUI_TOOLS="Annex Manager"
+GUI_SPACES="      "
+GUI_REL="R2.3"
+GUI_DIR_LEAD="gui_am_"
+IMG_PLATFORMS="42 52 55"
+IMG_VERSIONS="R10.0 R10.0"
+IMG_TOOLS="Annex hardware platforms"
+HST_REL_DATE="October 13th, 1998"

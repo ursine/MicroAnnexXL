@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+######################################
+#
+# Example of laser1 from 
+#
+# Network Administrators Guide, Release 7.0
+#
+# Book A, Printers Chapter
+#
+# Note: The utility "makebanner" is not supplied.
+#
+######################################
+
+for file in $*
+do
+    makebanner $file
+    cat $file
+done | aprint -Aannex01 -L15

@@ -1,0 +1,80 @@
+#!/bin/sh
+
+# This script is used to make a copy of the acp_restrict file.
+#
+# The first argument (optional) is the name of the file to hold a copy
+# of the original file.
+#
+# The second argument (optional) is the name of the original file.
+# 
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Initialize
+
+bck_of_real=save/original/acp_restrict
+real=""
+
+
+# Read the command line
+
+$debug && echo "${dbg_hdr}Entering script that creates copy of acp_restrict"
+if [ $# -gt 0 ]
+then
+    bck_of_real="$1"
+fi
+if [ $# -gt 1 ]
+then
+    real="$2"
+fi
+
+
+# Make sure things are clean
+
+rm -f $bck_of_real
+
+
+# Get the old file and copy it to the "save" location
+
+if [ -n "$real" ]
+then
+    if [ -f $real ]
+    then
+	cp $real $bck_of_real
+    fi
+else
+    $debug && echo "${dbg_hdr}Did not supply name of file to copy"
+fi
+
+if [ -f $bck_of_real ]
+then
+    $debug && echo "${dbg_hdr}Copied $real to $bck_of_real"
+else
+    $debug && echo "${dbg_hdr}Did not copy $real to $bck_of_real"
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that creates copy of acp_restrict"
+exit
+

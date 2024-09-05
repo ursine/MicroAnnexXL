@@ -1,0 +1,81 @@
+########################################
+#
+# Example of lp interface file from the
+#
+# Network Administrator's Guide, Release 7.0
+#
+# Book A, Printers Chapter
+#
+########################################
+#
+# lp interface for line printers
+#
+# SCCS @(#) lp 1.2
+
+#
+# Change the next two lines to direct output to the correct place.
+# ANNEX is the name of the Annex, and ANNEXLINE is the port number on
+# the Annex (0 for parallel printer).
+#
+ANNEX=annex01
+ANNEXLINE=0
+#
+# Change this line if your Annex software is
+# installed in a different directory.
+#
+PATH=$PATH:/usr/annex
+export PATH
+
+# This will be executed when a request is cancelled
+
+trap "echo '\n\n\n\nRequest Cancelled'; \
+     echo '\-14\c'; \
+     sleep 30; \
+     exit 0" 15
+
+#
+# THE OPEN PARENTHESIS APPLIES ONLY TO APRINT
+#
+(
+#
+x="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+echo "\014\c"
+echo "$x$x\n$x$x\n$x$x\n"
+banner "$2"
+echo "\n"
+user=`grep "^$2:" /etc/passwd | line | cut -d: -f5`
+if [ -n "$user" ]
+then
+    echo "User: $user\n"
+else
+    echo "\n"
+fi
+echo "Request id: $1 Printer: `basename $0`\n"
+date
+echo "\n"
+if [ -n "$3" ]
+then
+    banner $3
+fi
+copies=$4
+echo "\014\c"
+shift;shift;shift;shift;shift
+files="$*"
+i=1
+while [ $i -le $copies ]
+do
+    for file in $files
+    do
+	cat "$file" 2>&1
+	echo "\014\c"
+    done
+    i=`expr $i + 1`
+done
+
+#
+# THE FOLLOWING TWO LINES APPLY ONLY TO APRINT
+#
+) |
+  aprint -A$ANNEX -L$ANNEXLINE -f
+
+exit 0

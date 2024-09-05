@@ -1,0 +1,293 @@
+#!/bin/sh
+
+# This script is used to make two copies of the erpcd start/kill script.
+# One copy is set aside to be saved and the other copy will be edited.
+
+# It takes four optional arguments.  The first argument is the name of
+# the directory where the erpcd start/kill script should be found.  The
+# second and third arguments are the names of the files to hold a copy
+# of the original file and the name of the file to hold a copy that will
+# be edited.  The fourth is the name of a file that can be used as a
+# template when creating a new version of the erpcd start/kill script.
+
+REQUIRED_FILES="./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Constants
+
+erpcdcmd='/erpcd'
+
+
+# Initialize variables that may get overwritten by the command line
+
+startup_dir=/etc/rc2.d
+saved=save/original/annex-initd
+modified=save/modified/annex-initd
+template=src/erpcd/annex-initd
+
+
+# Initialize other variables
+
+$debug && echo "${dbg_hdr}Entering script that creates copy of annex-initd"
+make_new=false
+
+
+
+# Read the command line.
+# Although normally the file names will be known we want to
+# be able to pass in overriding values to make testing easier.
+
+if [ $# -gt 0 ]
+then
+    startup_dir="$1"
+fi
+if [ $# -gt 1 ]
+then
+    saved="$2"
+fi
+if [ $# -gt 2 ]
+then
+    modified="$3"
+fi
+if [ $# -gt 3 ]
+then
+    template="$4"
+fi
+
+
+# Make sure things are clean
+
+rm -f $saved $modified
+
+
+# Find any old files that have erpcd command lines in them
+
+if [ -d $startup_dir ]
+then
+    files=`(cd $startup_dir; grep -l "$erpcdcmd" *) 2> /dev/null`
+else
+    files=""
+fi
+files=`echo "" $files`
+
+
+# How many are there
+
+number_files=`echo "" $files | wc -w | sed -e "s:[ 	]::g"`
+
+
+# Make a copy of the correct one
+
+case "$number_files" in
+    "")
+	make_new=true
+	;;
+    0)
+	make_new=true
+	;;
+
+    1)
+	files=`echo $files`
+	cp $startup_dir/$files $saved
+	$debug && echo "${dbg_hdr}Copied $startup_dir/$files to $saved"
+	;;
+
+    *)
+	# More than one file.  The easiest way to choose is to ask.
+	# This would be tricky otherwise.
+
+	msgid=mi_pickone
+	. $MSG_FILE
+	while true
+	do
+	    echo " "
+	    dfltans="?"
+	    rp="Which file do you want to use? :"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans="$dfltans"
+	    fi
+	    picked=$ans
+
+	    if [ "$picked" = "?" ]
+	    then
+		msgid=mi_help
+		. $MSG_FILE
+		continue
+	    fi
+
+	    picked=`echo "" $picked | sed -e "s:^[ 	]::"`
+# Possible Enhancement:	: Allow the user a way to tell us to supply one default
+##	    if [ "$picked" = "CREATE_ONE_FOR_ME" ]
+##	    then
+##		make_new=true
+##		break
+##	    fi
+
+	    # Check to see if the chosen filename has a "/" in it.
+	    # If so then the user picked some other file.
+	    # This is ok as long as there is an erpcd command line.
+
+	    tmp=`echo "" $picked | sed -e "s:/::g" -e "s:^[ 	]::"`
+	    if [ "$picked" = "$tmp" ]
+	    then
+		# No slash in name
+		picked="$startup_dir/$picked"
+	    fi
+
+	    if [ ! -f "$picked" ]
+	    then
+		echo " "
+		echo "**** File not found: $picked ****"
+		continue
+	    fi
+
+	    # Double check answer to see if the file contains erpcd
+	    tmp=`grep -l "$erpcdcmd" $picked 2> /dev/null`
+	    tmp=`echo "" $tmp | sed -e "s:^[ 	]::"`
+	    if [ -z "$tmp" ]
+	    then
+		echo " "
+		echo "**** File does not contain an erpcd command line ****"
+		continue
+	    fi
+
+	    # The picked file is a candidate for editing
+	    cp $picked $saved
+	    break
+	done
+	;;
+esac
+
+
+# If there was already a version of the file being used
+# then we saved a copy of it.  Copy that file to the place
+# where we will edit it.
+
+if [ -f "$saved" ]
+then
+    cp $saved $modified
+fi
+
+
+# Do we create a new version of the start/kill script?
+
+if $make_new
+then
+	$debug && echo "${dbg_hdr}No old version of file available"
+
+# Do not use a template right now. It is too error prone.
+# Instead we create the file we need right here.
+##	if [ -f "$template" ]
+##	then
+##	    # There is a template available
+##	    cp $template $modified
+##	    $debug && echo "${dbg_hdr}Copied $template to $modified"
+##	else
+
+	    # Create something reasonable
+	    $debug && echo "${dbg_hdr}Making our own version of $modified"
+
+#	    # Note that the /etc/erpcd hardcoded here will be modified to
+#	    # the new directory name when the file is run through the initd
+#	    # editing script.
+
+	    message="for /etc/init.d"
+	    message=""
+
+# Write the first part of the file with variable substitution (unquoted label)
+cat << EOSS > $modified
+#!/bin/sh
+#
+# The ERPCD daemon startup and shutdown script $message
+#
+# It should be linked to appropriate files in $startup_dir
+#
+
+USAGE="Usage: annex-initd {start | stop}"
+
+EOSS
+
+# Write the next part of the file without variable substitution (quoted label)
+cat << "EOSS" >> $modified
+if [ ! -d /usr/bin ]
+then			# /usr not mounted ??
+	exit 
+fi
+
+case "$1" in
+'start')
+	#
+	# These commands bring up the Annex-related network daemons
+	#
+
+	echo "starting Annex network daemons"
+
+	# NOTE: If you want to start erpcd in a sub-shell do it on
+	# a line by itself with the parenthesis on the lines before
+	# and after. Like this:
+	(
+		/etc/erpcd &
+	) # Expedited Remote Procedure Call Daemon
+	
+	echo "Annex network daemon startup complete"
+	;;
+
+'stop')
+	#
+ 	# kill the Annex daemons if any are still running
+	#
+
+	killdemon() {
+ 		pid=`/bin/ps -ef 2>/dev/null \
+			| /usr/bin/egrep $1 | /bin/grep -v grep \
+ 			| /bin/sed -e 's/  *[a-z0-9]*  *//' -e 's/ .*//'`
+ 		if [ "${pid}" != "" ]
+ 		then
+			echo killing Annex network daemons $1
+ 			/bin/kill -$2 ${pid}
+			sleep $3
+ 		fi
+	}
+	killdemon erpcd 15 2
+	killdemon erpcd  1 2
+	killdemon erpcd  9 1
+
+	;;
+*)
+	echo ${USAGE}
+	exit 1
+	;;
+esac
+EOSS
+##	fi
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that creates copy of annex-initd"
+exit
+

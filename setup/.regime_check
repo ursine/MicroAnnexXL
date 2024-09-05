@@ -1,0 +1,346 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# This script prompts for the default security regime if there is none
+# already defined.  It will add the default security regime to the
+# acp_regime file otherwise.
+# 
+# Some commented-out code does some checking to see if a reasonable value
+# was picked.
+# 
+# Some variables should be exported by the main installation script for this
+# script to work (the same ones seen in the "[ -z "$SCRIPT_DIR" ]" code
+# section below.
+# 
+# Other values are passed in as arguments.
+# The first argument is the name of the installation directory.
+# The second argument is the name of the directory containing the acp data
+# files.  This could be the same directory name as the first argument.
+# 
+#############################################################################
+
+
+REQUIRED_FILES="./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+        . ./.vars
+    else
+#       # The following line can be commented out to get test versions running
+        echo "**** $0: No environment is setup" ; exit 1
+        SCRIPT_DIR="setup"
+        MSG_FILE="${SCRIPT_DIR}/.msg_file"
+        indent="    "
+        dbg_hdr="DEBUG: "
+        debug=true
+        n=''
+        c=''
+    fi
+fi
+
+
+err=false
+for file in $REQUIRED_FILES $MSG_FILE
+do
+    if [ ! -f $file ]
+    then
+	echo " "
+	echo "PROGRAMMER ERROR: A required file is missing: $file"
+	echo "                  This error should never happen."
+	echo " "
+    fi
+done
+if $err
+then
+    exit 1
+fi
+
+
+
+# Local constants
+
+acppwfile=acp_passwd
+kbbtickdir="/tmp/tkt_erpcd_"
+
+
+# Read command line
+
+if [ $# -lt 2 ]
+then
+    echo
+    echo "ERROR: $0: Usage: Requires two directory names" 1>&2
+    echo
+    exit 1
+fi
+
+instdir=$1
+acpdir=$2
+
+
+#############################################################################
+#
+# 			NOW FOR THE CODING
+#
+#############################################################################
+
+
+# New "constant" variable that should be assigned here.
+# Note that it depends upon instdir which gets set to a user specified value.
+
+regimefile=$acpdir/acp_regime
+
+
+# Get the default regime if the acp_regime file does not exist
+regime="skip"
+if [ -f $regimefile ]
+then
+    $debug && echo "${dbg_hdr}Already have file: $regimefile"
+    regime=skip
+else
+    $debug && echo "${dbg_hdr}Must create file: $regimefile"
+    regime=""
+    msgid=dfltregimehdr
+    . $MSG_FILE
+fi
+
+
+while [ -z "$regime" ]
+do
+    warning=false
+    xydef=""
+    xystub=""
+    shar=""
+
+cat << EOM
+
+What is your default security regime:
+${indent}1) acp
+${indent}2) native UNIX
+${indent}3) SecureID
+${indent}4) safeword
+${indent}5) kerberos
+${indent}6) deny (access will be denied)
+${indent}7) none (access is unconditionally granted)
+${indent}8) radius
+
+EOM
+
+    dfltans=1
+    rp="Enter security regime [$dfltans]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltans
+    fi
+
+    case "$ans" in
+	1|[Aa]*)
+	    regime=acp
+	    xydef=ACPPASSWD
+	    ;;
+	2|[Nn][Aa]*|[Uu]*)
+	    regime=native
+	    xydef=NATIVEPASSWD
+	    ;;
+	3|[Ss][Ee]*)
+	    regime=securid
+	    xydef=SECURID_CARD
+	    xystub=STUB_SID
+	    shar=libsid.so
+	    ;;
+	4|[Ee]*|[Ss][Aa]*)
+	    regime=safeword
+	    xydef=ENIGMA_SAFEWORD
+	    xystub=STUB_SW
+	    shar=libsw.so
+	    ;;
+	5|[Kk]*)
+	    regime=kerberos
+	    xydef=KERBEROS
+	    xystub=STUB_KRB
+	    shar=libkrb.so
+	    ;;
+	6|[Dd]*)
+	    regime=deny
+	    break
+	    ;;
+	7|[Nn][Oo]*)
+	    regime=none
+	    break
+	    ;;
+	8|[Rr]*)
+	    regime=radius
+	    xydef=RADIUS
+	    break
+	    ;;
+	"?")
+	    msgid=whatisregime
+	    . $MSG_FILE | more
+	    ;;
+	*)
+	    msgid=validnumprompt
+	    . $MSG_FILE
+	    ;;
+    esac
+
+
+#  # Enhancement:
+#  # Check if the regime entered is actually available:
+#  # 
+#  # In this commented out code there is checking for valid regimes.
+#  # This requires that erpcd have the XY messages built in.
+#  # In the future we might be able to use new option "erpcd -H" to get
+#  # list of defines (if -H is added, see garvey,slu,mikeo for info on this).
+#  # 
+#  # There are no real specs on this yet.  The McKinley project manager,
+#  # wants the simple approach.  And that is not to check if the erpcd code
+#  # supports the regime or to check for the libraries.  The following code
+#  # was written earlier than that instruction though.  So, in case
+#  # something changes and this is to be restored, this code will be
+#  # commented out.
+#
+#    if [ -n "$xydef" ]
+#    then
+#	xy=`strings $instdir/erpcd | grep "$xydef"`
+#	if [ -z "$xy" ]
+#	then
+#	    warning=true
+#	    msgid=regimenotbuilt
+#	    . $MSG_FILE
+#	    xystub=""
+#	fi
+#    fi
+#
+#    if [ -n "$xystub" ]
+#    then
+#	xy=`strings $instdir/erpcd | grep "$xystub"`
+#	if [ -n "$xy" ]
+#	then
+#	    # erpcd built to use stub shared library.  See if there is
+#	    # a shared library available that isn't a stub
+#	    xy=`ls -1 $instdir/${shar}.* 2>/dev/null`
+#	    xy=`echo " $xy " | sed -e "s! $instdir/${shar}.1.0 ! !g"`
+#	    xy=`echo $xy`
+#	    if [ -z "$xy" ]
+#	    then
+#		$warning || echo
+#		# No shared libarary available or only the stub is available
+#		msgid=sharregimeprob
+#		. $MSG_FILE
+#		warning=true
+#	    fi
+#	fi
+#    fi
+#
+#    # If there was a warning then give the user a chance to change his mind
+#    if $warning
+#    then
+#	msgid=diffregime
+#	. $MSG_FILE
+#	while true
+#	do
+#	    dfltans=y
+#	    rp="Do you want to choose a different regime (y/n) [$dfltans]:"
+#	    . ./.myread
+#	    if [ -z "$ans" ]
+#	    then
+#		ans=$dfltans
+#	    fi
+#
+#	    case $ans in
+#		Y*|y*)
+#		    regime=""
+#		    break
+#		    ;;
+#		N*|n*)
+#		    break
+#		    ;;
+#		"?")
+#		    msgid=erpcdregerr
+#		    . $MSG_FILE
+#		    continue
+#		    ;;
+#		*)
+#		    msgid=ynonly
+#		    . $MSG_FILE
+#		    continue
+#		    ;;
+#	    esac
+#	done
+#    fi
+
+done
+
+
+# For some regimes we must ask for additional information (password file or
+# ticket directory) to be added to the acp_regime file.
+
+if [ "$regime" = "acp" -o "$regime" = "kerberos" ]
+then
+    msgid=regimeneedinfo
+    . $MSG_FILE
+    while true
+    do
+	case $regime in
+	    acp)
+		tmpmsgid=acppasswd
+		dfltans=$acpdir/$acppwfile
+		echo "Enter the name of the password file for the acp regime."
+		prompt="Password file"
+		;;
+	    kerberos)
+		tmpmsgid=krbpasswd
+		dfltans=$kbbtickdir
+		echo "Enter the ticket directory prefix for the $regime regime."
+		prompt="Ticket directory prefix"
+		;;
+	esac
+
+#	# Prompt for the additional data
+	rp="$prompt [$dfltans]:"
+	. ./.myread
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case "$ans" in
+	    "?")
+		msgid=$tmpmsgid
+		. $MSG_FILE
+		;;
+	     *)
+		pwfile="$ans"
+		if [ "$regime" = "acp" ]
+		then
+		    if [ ! -f "$pwfile" ]
+		    then
+			msgid=regimenofile
+			. $MSG_FILE
+			pwfile="$pwfile"
+		    fi
+		fi
+#		# Break out of prompting loop
+		break
+		;;
+	esac
+    done
+fi
+
+
+# If we have the default regime then we must write down the default regime
+# and any extra data to the acp_regime file
+if [ -n "$regime" -a "$regime" != "skip" ]
+then
+    $debug && echo "${dbg_hdr}Creating file: $regimefile"
+    echo ":${regime}:${pwfile}" >> $regimefile
+fi
+
+exit 0

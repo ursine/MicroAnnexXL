@@ -1,0 +1,314 @@
+! "Hayes Ultra - 6/28/91"
+@ORIGINATE
+@ANSWER
+!
+@LABEL 1
+serreset 9600, 0, 8, 1
+!
+! first recall the factory configuration
+!
+matchclr
+settries 0
+matchstr 1 3 "OK\13\10"
+@LABEL 2
+write "AT&F\13"
+matchread 30
+inctries
+iftries 2 59
+jump 2
+!
+! Next, Set up the configuration: Echo off, disable flow control
+!
+@LABEL 3
+matchstr 1 4 "OK\13\10"
+write "ATE0&K0\13"
+matchread 30
+jump 59
+!
+! Next, turn off error control
+!
+@LABEL 4
+matchstr 1 5 "OK\13\10"
+matchstr 2 5 "ERROR\13\10"
+write "AT&D3&Q0\13"
+matchread 30
+!
+! If speaker on flag is true, jump to label 8.  Else turn off the speaker
+@LABEL 5
+matchclr
+ifstr 2 8 "1"
+matchstr 1 8 "OK\13\10"
+write "ATM0\13"
+matchread 30
+jump 59
+!
+! The modem is ready.  So enable answering, or originate a call
+!
+@LABEL 8
+ifANSWER 30
+note "Dialing ^1" 3
+write "ATS0=0DT^1\13"
+!
+@LABEL 9
+matchstr  1 11 "CONNECT 1200\13\10"
+matchstr  2 12 "CONNECT 2400\13\10"
+matchstr  3 13 "CONNECT 4800\13\10"
+matchstr  4 14 "CONNECT 9600\13\10"
+matchstr  5 15 "CONNECT 19200\13\10"
+matchstr  6 50 "NO CARRIER\13\10"
+matchstr  7 50 "ERROR\13\10"
+matchstr  8 52 "NO DIALTONE\13\10"
+matchstr  9 53 "BUSY\13\10"
+matchstr 10 54 "NO ANSWER\13\10"
+matchread 700
+jump 59
+!
+@LABEL 11
+note "Communicating at 1200 bps." 2
+serreset 1200, 0, 8, 1
+jump 16
+!
+@LABEL 12
+note "Communicating at 2400 bps." 2
+serreset 2400, 0, 8, 1
+jump 16
+!
+@LABEL 13
+note "Communicating at 4800 bps." 2
+serreset 4800, 0, 8, 1
+jump 16
+!
+@LABEL 14
+note "Communicating at 9600 bps." 2
+serreset 9600, 0, 8, 1
+jump 16
+!
+@LABEL 15
+note "Communicating at 19.2 kbps." 2
+serreset 19200, 0, 8, 1
+!
+@LABEL 16
+ifANSWER 17
+jump 110
+pause 30
+@LABEL 17
+exit 0
+!
+! @ANSWER
+! Set up the modem to answer
+@LABEL 30
+write "ATS0=1\13"
+matchstr 1 31 "OK\13\10"
+matchread 30
+jump 59
+!
+@LABEL 31
+matchstr 1  32 "RING\13\10"
+matchstr 2  11 "CONNECT 1200\13\10"
+matchstr 3  12 "CONNECT 2400\13\10"
+matchstr 4  13 "CONNECT 4800\13\10"
+matchstr 5  14 "CONNECT 9600\13\10"
+matchstr 6  15 "CONNECT 19200\13\10"
+matchstr 7  50 "NO CARRIER\13\10"
+matchstr 8  50 "ERROR\13\10"
+matchstr 9  52 "NO DIALTONE\13\10"
+matchstr 10 53 "BUSY\13\10"
+matchstr 11 54 "NO ANSWER\13\10"
+matchread 700
+jump 31
+!
+@LABEL 32
+userhook 1
+note "Answering phone…" 2
+jump 31
+!
+! 50: error messages
+!
+@LABEL 50
+exit -6021
+!
+@LABEL 52
+exit -6020
+!
+@LABEL 53
+exit -6022
+!
+@LABEL 54
+exit -6023
+!
+@LABEL 59
+exit -6019
+!
+! Hang up the modem
+!
+@HANGUP
+@LABEL 60
+settries 0
+@LABEL 61
+write "ATH0\13"
+matchclr
+matchstr 1 64 "OK\13\10"
+matchstr 2 63 "NO CARRIER\13\10"
+matchstr 3 64 "ERROR\13\10"
+matchread 15
+inctries
+iftries 3 64
+! no response, try escape sequence
+write "+++"
+matchclr
+matchstr 1 62 "OK\13\10"
+matchread 18
+! No response from modem, toggle DTR
+!
+DTRClear
+pause 10
+DTRSet
+jump 61
+!
+@LABEL 62
+matchclr
+matchstr 1 64 "OK\13\10"
+matchstr 2 63 "NO CARRIER\13\10"
+write "ATH0\13"
+matchread 50
+jump 61
+!
+@LABEL 63
+pause 45
+flush
+!
+! Recall the factory settings
+!
+@LABEL 64
+matchclr
+matchstr 1 65 "OK\13\10"
+write "AT&F\13"
+matchread 30
+!
+@LABEL 65
+matchstr 1 66 "OK\13\10"
+write "ATS0=0\13"
+matchread 30
+!
+@LABEL 66
+exit 0
+@LABEL 110
+! XYLOGICS -- Log in through all the current security programs on the annex.
+! and start up ARA.  This includes ACP CLI username/password, port password, 
+! SECURID Passcode, local security, and access code for nodial.
+! It relies upon these assumptions:
+!   1) Use standard erpcd/acp_policy.h prompt strings.  If you change them
+!      you must change the expect strings.  Each matchstr has a comment to
+!      map it to the prompt define when applicable.
+!   2) The prompt is unique from the above strings.  IE the annex prompt
+!      can't be Annex since it would be a substring of the Annex Username string
+!      from acp.  If you change your prompt then fix the matchstr.
+!   3) We can't support dialback with this script, so only a direct connect
+!      access code will work.
+!
+
+
+! Setup all the possible strings we care about.
+matchclr
+
+! ACP_USERPROMPT - ACP user name prompt
+matchstr 1 114 "Annex username:"
+! ACP_PASSPROMPT - ACP password prompt 
+matchstr 2 115 "Annex password:"
+! ACP_PERMDENIED - ACP denial
+matchstr 3 116 "Permission denied"
+! ACP_USERPROMPT - ACP Securid username message
+matchstr 5 114 "Username:"
+! ACP_PASSPROMPT - ACP passcode message
+matchstr 6 118 "Enter PASSCODE"
+! ACP_PERMDENIED - ACP Securid deny message
+matchstr 8 116 "Access Denied"
+! ACP_INCORRECT - Securid deny message #2
+matchstr 9 116 "Username/PASSCODE Incorrect"
+! ACP_ACCESSCODEPROMPT - ACP dialback message, only nodial suported
+matchstr 10 119 "Access Code:"
+! ACP_PORTPROMPT - Port Password option from ACP.
+matchstr 11 120 "Port password:"
+! annex prompt - Looks for annex:.  
+matchstr 12 121 "annex:"
+! AppleTalk not enabled error message
+matchstr 13 122 "CLI: Command not found."
+! ARAP starting message
+matchstr 14 123 "Switching to ARAP"
+! CLI local security, unchangeable by the administrators
+matchstr 15 124 "Annex administrator password:"
+
+@LABEL 111
+! Settries to 0 for each new token search
+settries 0
+pause 20
+
+@LABEL 112
+! Read for above strings
+matchread 30
+inctries
+iftries 7 113
+! if we don't see what we want send a CR and try to autobaud
+write "\13"
+jump 112
+
+@LABEL 113
+! Looped many times, and saw nothing.  Give up
+exit -6002 "Annex script failure."
+
+@LABEL 114
+! Ask for username and send to server, then back to the state machine
+ask 0 "Annex Username:"
+write "^*\13" 
+jump 111
+
+@LABEL 115
+! Get annex password 
+ask 1 "Annex Password:"
+write "^*\13" 
+jump 111
+
+@LABEL 116 
+! ACP denial.  Exit with error.  Used by ACP CLI Security and Securid
+exit -6002 "Access denied by Annex"
+
+@LABEL 118 
+! Get securid PASSCODE
+ask 0 "PASSCODE:"
+write "^*\13" 
+jump 111
+
+@LABEL 119 
+! Get Access Code.  Only supports a direct connect access code
+ask 0 "Access Code:"
+write "^*\13" 
+jump 111
+
+@LABEL 120
+! Get an send port password
+ask 1 "Port Password:"
+write "^*\13" 
+jump 111
+
+@LABEL 121
+! Got to the CLI prompt, send ARAP command
+write "arap\13"
+jump 111
+
+@LABEL 122 
+! Error, arap not enabled on this annex!
+exit -6002 "ARAP not enabled on the Annex"
+
+@LABEL 123
+! ARA started on cli port.  
+exit 0
+
+@LABEL 124
+! Get an send port password
+ask 1 "Annex Administrators Password:"
+write "^*\13" 
+jump 111
+
+
+
+

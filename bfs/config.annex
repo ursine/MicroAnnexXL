@@ -1,0 +1,93 @@
+# Sample configuration file for all Xylogics Annex products.
+
+# You'll probably want at least the two lines below, to pick up the
+# standard modem definitions.
+
+%modem
+%include modems.annex
+
+
+# Sample session parameter blocks (SPBs) for the Primary Rate ISDN (PRI)
+# Remote Annex RA6300, RAC 5393, or RAC 5399 PRI/CAS products.
+
+# WARNING FOR PRIOR USERS OF RA6300 OR 5393 PRODUCTS (pre-14.0
+# operational software):
+#	THE DEFAULT ACTION WAS TO REJECT CALLS WHICH DO NOT MATCH A
+#	DEFINED SPB.  THIS HAS BEEN CHANGED TO SUPPORT AUTOMATIC
+#	PROTOCOL DETECTION.  THE NEW DEFAULT IS TO ***ACCEPT*** ALL
+#	CALLS UNLESS A MATCHING SPB WITH "call_action reject" IS
+#	ENCOUNTERED.  If you want to retain the prior behavior, you
+#	will need to install your own SPBs.
+
+# These set configuration parameters for sessions (calls) based on
+# dialed number, calling number, and call type.  Each incoming call is
+# compared against each SPB, in order, until there is a match; if no
+# match is found, the call is rejected.  See the accompanying
+# documentation for more information.
+
+# No SPBs are necessary for proper operation.  By default, all calls
+# will be answered and automatic protocol detection will be run.  You
+# may use SPBs to customize parameters or behavior in cases where either
+# automatic protocol detection is not sufficient, or where additional
+# features are necessary.
+
+# Use either %wan or %pri; these are equivalent.
+%wan
+%pri
+
+#
+# NOTE: The SPB below will cause the RAC to answer all "voice"
+# bearer calls with a modem.
+#
+
+# begin_session modem
+# bearer voice
+# call_action modem
+# set mode auto_detect
+# end_session
+
+#
+# NOTE: The SPBs below are suggested templates for handling V.120 and
+# sync PPP calls.  To enable these SPBs, edit the "called_no" line in
+# each.  Change it to include the telephone numbers specific to your PRI
+# line, using different numbers for each service.  You must also remove
+# the comment ("#") characters in front of each line.
+#
+# It is not always necessary to discriminate calls based on called
+# number.  If all data calls will be V.120, for instance, and never
+# sync PPP, then such a distinction is unnecessary.
+#
+
+#begin_session v120
+#called_no Replace_this_string_with_your_V.120_telephone_number
+#bearer data
+#call_action v120
+#set mode auto_detect
+#end_session
+
+#begin_session sync
+#called_no Replace_this_string_with_your_SYNC_PPP_telephone_number
+#call_action sync
+#set mode ppp
+#end_session
+
+# These SPBs are identical to the built-in default SPBs.  They're
+# presented here just as an illustration of the simplicity of protocol
+# detection.
+
+# begin_session auto_detect
+# call_action detect
+# end_session
+# begin_session auto_select
+# detected any
+# end_session
+
+# This SPB isn't strictly necessary, but illustrates how to arbitrarily
+# disconnect undesired calls.  Any call-matching information that can
+# be used in a normal SPB could be used here, so, for instance, an SPB
+# like this could be used to reject calls from a particular phone
+# number if desired.
+
+# begin_session unmatched
+# call_action reject
+# end_session

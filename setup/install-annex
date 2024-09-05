@@ -1,0 +1,6204 @@
+#!/bin/sh
+
+###############################################################################
+#
+# Installation Script for Annex host tools
+#
+# Usage: install-annex [-f] [-b] [-d] [-<medium> tarfile]
+# 			-b = brief mode (default = verbose mode)
+# 			-d = debug on
+# 			-f = allow fixed config (default = false)
+#
+#			The "-<medium>" option is unsupported for users.
+#			The "-<medium>" option is one of:
+#			    -cd-rom, -tape, -floppies, -tarfile, -nowhere
+#			and tarfile is the name of the tarfile or device.
+#
+# Some features are based upon rn's "Configure", by Larry Wall
+#
+###############################################################################
+#
+# 9/95 -- An extensive re-design of the installation procedure.
+#
+###############################################################################
+#
+# Edited for Ultrix -- 07OCT92 by jdc -- notes to script hackers:
+#	- the sh "read" command doesn't like more than one space between
+#	  tokens, unlike other Unixes.
+#	- the sh "eval" command is apt to execute things unexpectedly.
+#	  Use eval $iname=`echo $that` instead of eval $iname=$that.
+#
+###############################################################################
+
+#xxx Seek out "xxyyzz" for known platform changes that must be made
+
+# Possible Enhancement:
+#
+# Create a MAN_DIR variable to serve as a constant for the man directory in
+# the install-annex directory so we can grep for "$MAN_DIR" instead of
+# grep-ping/searching for "man" (yech!).  This directory appears to be used in
+# usedir=../man/<dir> but could also show up elsewhere. Check.
+
+
+###############################################################################
+#
+# sanity checks
+#
+# Setup path so that it is functional
+#
+OLD_PATH="$PATH"
+OUR_PATH="/bin:/usr/bin:/usr/ucb:/usr/etc:/etc:/usr/local/bin:/usr/local:/usr/lbin:/usr/BSDbin:/usr/5bin:/usr/ccs/bin:/usr/sbin:$OLD_PATH"
+PATH="$OUR_PATH"
+#
+# export path, if fails then isn't being run under a shell.
+# force the issue and issue a shell.
+#
+export PATH || (echo "WARNING: Re-invoking the installation script using sh"; sh $0; kill $$)
+
+cwd=`pwd`
+
+#
+###############################################################################
+
+# DEVELOPERS NOTE:
+#	Search for "Stub", "Possible Enhancement", "Redundant"
+#	"Mckinley2" (to see prepared code),
+#	"Fake_It" (to see where test code can be placed)
+
+#
+# Names of the main installation file, other installation files and
+# the name of the directory where they are located.
+# Have $INST_SCRIPT the first name in the "needed" list.
+#
+INST_SCRIPT=install-annex
+SCRIPT_DIR="setup"
+export SCRIPT_DIR
+MSG_FILE=${SCRIPT_DIR}/.msg_file
+export MSG_FILE
+FILEDATAFILE=${SCRIPT_DIR}/.filedatafile
+
+needed="$INST_SCRIPT .install_part2 .install_part3 .msg_file .filedatafile .media_ask .media_read .daemon .util_size .update_files .mk_eservices .mk_initd .mk_rc .mk_services .ed_eservices .ed_rc .ed_services .am_root .not_nis .get_pids"
+
+# Make sure that tempfiles is not null so the rm command does not blurfl
+tempfiles=/tmp/blurfl/dyick
+
+#
+# reasonable defaults
+#
+############
+
+notbuilt=true
+notinstalled=true
+notroot=false
+denynonroot=true
+
+install_freebsdi=false
+
+allowfixedconfig=false
+didfixedconfig=false
+
+#
+# Default values for arguments:
+#    default verbose mode
+#    default no-debug messages
+#
+brief=false
+suicidal=false
+needcrypt=false
+
+#
+# These determine what our output looks like.
+# Export these so the values can be used in scripts that we may call.
+#
+dbg_hdr="DEBUG: "
+indent="    "
+debug=false
+n=""
+c=""
+export indent dbg_hdr debug n c
+
+#
+# These allow consistent naming across scripts (if exported)
+#
+floppy="floppy"
+Floppy="Floppy"
+floppies="floppies"
+Floppies="Floppies"
+
+export floppy Floppy floppies Floppies
+
+#
+# When installing man pages they sometimes go into directories named after
+# the product.  We use these variables to name the directories used.
+#
+manprod=annex
+MANPROD=ANNEX
+
+# Can erpcd be built with native passwd and can erpcd be built with
+# dynamic libraries?  These can be reset on a platform basis.
+
+native_allowed=false
+dynamic_allowed=false
+
+#
+# Do we ask about the default security directory?  We may not want to
+# if the user indicates that the acp security service is not wanted or
+# we may not want to if we want the questions asked in this version of
+# the installation to match the questions in prevous installation scripts.
+# If set to "true" we use directory without asking, if "false" we ask.
+#
+use_dflt_sdir=true
+acpdir=""
+
+#
+# Do we know where the distribution is coming from?
+#
+medium="unknown"
+tarfile=""
+errmsg=""
+
+#
+# Later, if these are not null, we will link the files whose
+# names they contain to other files.
+#
+machdepfile=""
+dbgfile=""
+
+#
+# These are actions that we take (or not) by default
+#
+# The variable "wantmanpages" is described far below in a special note.
+wantmanpages=false
+getmanpages=true
+tar_needed=true
+do_edits=true
+do_daemon=true
+tobuild=""
+toinstall=""
+usemake=true
+testing=false
+export testing
+
+# Default directory to use for annex-initd (or if rc.local not found in
+# /etc then this is the name of an alternate directory to look it).
+startup_dir=/etc/rc2.d
+
+# Initial assumptions about install methods
+no_support=false
+compiler_avail=true
+binary_avail=false
+bindir=""
+
+# Version names to use if real names cannot be gotten
+OLDvers="older"
+vers="newer"
+
+# Does the newly installed erpcd need the -s (acp) or -f (bfs) options
+reqdiracp=true
+reqdirbfs=true
+
+# To get around problem where we cannot find amount of space available
+# assume that we have all we need
+mb_avail=1000
+kb_avail=1024000
+
+# When we extract directories from the distribution we do not always get
+# all the "src" directory but we almost always get these (the exception being
+# when the user says he does not want the source directory overwritten).
+minimum_src="src/examples src/snmp src/erpcd"
+
+#
+# Look for these UNIX programs; they are required
+#
+loclist="ar awk cat cc chown chmod cp date echo expr grep mkdir mv ranlib rm sed"
+
+#
+# Look for these UNIX programs; they are optional
+#
+trylist="inetd pack strip"
+
+#
+# We look for these functions
+#
+funclist="bcopy(0,0,0) bzero(0,0) dup2(0,0)
+	  gethostbyname(0) gethostbyaddr(0,0,0) gethostname(0,0)
+          getservbyname(0,0) htonl(0) htons(0) ntohl(0) ntohs(0)
+          inet_addr(0) inet_ntoa(0) sigmask(1) strncasecmp(0,0,0)
+	  strcasecmp(0,0) ether_aton(0) mrand48() srand48(1)"
+
+
+#
+# Socket type API functions, not needed for TLI.
+#
+sfunclist="recvfrom(0,0,0,0,0,0) recvmsg(0,0,0) sendmsg(0,0,0)
+	sendto(0,0,0,0,0,0)"
+
+#
+# set flag so that if ntoh files are needed a Warning will
+# be printed.
+#
+warning_ntoh=true
+
+#
+#  initialize constants
+#
+n='' c='' startsh=''
+
+
+#
+# generic manual page handling
+#
+mantype='' manlayout='' mansrc='' manext=''
+freebsdman=''
+dfltinst=n
+# This is for handling man versus cat directory names.
+MAN="man"
+packed=false
+
+#
+# build/compile parameters
+#
+ANXSRC="libannex netadm na erpcd"
+CH_PASSWD="ch_passwd"
+SUPSRC="ien-116 timserver"
+# SOCSRC not for XENIX.... we will now allow for UMAX V.
+SOCSRC="aprint"
+ALLSRC="$ANXSRC $SUPSRC $SOCSRC"
+SRCDIRS=""
+nortelnet=false
+
+INSTALL_INITD=""
+OTHERINSTALL="install-bfs"
+
+DEF="#define"
+
+# -Ipath include directory list.
+INCLUDES=''
+
+# -lname library search list.
+LIBFLAG=''
+
+# -Dname symbols and compiler flags needed for this platform.
+HWFLAG=''
+
+# Any files listed here will be included by src/inc/config.h.
+INCFILES=""
+EINCFILES=""
+
+instdir=''
+system=''
+os_type='' netware_type='' hw_type=''
+os_default=''
+nettype="network"
+hp_os=''
+LIBANX_C="erpc_subr.c srpc.c api_if.c asn1.c"
+LIBANX_O="erpc_subr.o srpc.o api_if.o asn1.o"
+tryLIBFLAG=
+ERPCD="/usr/spool/erpcd"
+USER_BFS=''
+ARFLAGS="vur"
+export hw_type
+
+
+#######################################################################
+#
+# We want to create a number of temporary files.
+# Let's put them somewhere out of the way.
+# Create a special directory for them (variable auxdir).
+# Do this before assigning values to variables "tempfiles" and "keepfiles".
+
+auxdir=/tmp/installdir.$$
+mkdir /tmp $auxdir 2> /dev/null
+if [ ! -d  $auxdir ]
+then
+    echo " "
+    echo "**** Directory not found: $auxdir"
+    echo "**** The installation attempted to create directory $auxdir"
+    echo "**** to store temporary files but was not successful."
+    echo " "
+    exit 1
+fi
+
+# Because instman.mk and instman.sh are in $auxdir they are not hidden with a "."
+
+tempfiles=".loc .filexp .ckfunc .ckincl .ckfunc.o .ckincl.o .needsome .ckincs.h .ckalign1 .ckalign2 $auxdir/instman.mk .tmpfile"
+
+# We do not want to remove these files if debugging (when we will want to
+# keep them for use by scripts that can be called independently of this script).
+keepfiles=".myread .mkpath .contains .vars $auxdir/instman.sh"
+
+#
+# default release information
+# may be changed if a "release" file exists.
+#
+box=annex Box=Annex type= TYPE= release=R relword= vers=R11.1
+
+# Possible Enhancement: Have the above assignments done on a line apiece.
+# This has not been done because by the time this was noticed much testing
+# had been done and it was not going to be redone.
+
+
+#############################################################################
+#
+# Exit if I/O is not from/to the terminal.
+# Ignore this check if in testing mode.
+
+if $testing
+then
+    echo "TESTING: YOU ARE IN TEST MODE. ENTER A CARRIAGE RETURN TO CONTINUE"
+    read
+else
+#   # Possible Enhancement: have these messages go to /dev/tty in addition
+#   # or instead.
+    tmp=false
+    if [ ! -t 0 ]
+    then
+	tmp=true
+	echo "Your standard input must be connected to a terminal" 1>&2
+    fi
+    if [ ! -t 1 ]
+    then
+	tmp=true
+	echo "Your standard output must be connected to a terminal" 1>&2
+    fi
+    $tmp && exit 1
+fi
+
+
+#################################################################
+#
+# Create a trap handler
+# 1 = hangup (SIGHUP)	2 = interrupt (SIGINT)	3 = quit (SIGQUIT)
+# 15 = software termination signal from kill (SIGTERM)
+
+trap 'echo " "; rm -rf $tempfiles $auxdir ; exit 3' 1 2 3 15
+
+
+#############################################################################
+# 
+# Check to see if the call to the installation script were made from an
+# appropriate directory (the current directory should be the directory
+# where the distribution was downloaded to).  If called from somewhere
+# else then try to get to the appropriate directory.
+# 
+
+# First, copy the executing script to a known place so we can do a file
+# comparison even after possibly changing working directories below.
+
+cp $0 $auxdir/$INST_SCRIPT
+
+# Before calling this script the user may have changed the working directory
+# from where he did the first extract. Attempt to get this executing in the
+# correct place.
+
+case $0 in
+    ${INST_SCRIPT})
+	cd ..
+	;;
+    ./${INST_SCRIPT})
+	cd ..
+	;;
+    ${SCRIPT_DIR}/${INST_SCRIPT})
+	;;
+    */${SCRIPT_DIR}/${INST_SCRIPT})
+#	# The full name of the installation script was on the command line.
+#	# cd to the directory where ${SCRIPT_DIR}/${INST_SCRIPT} can be found.
+	cd `expr $0 : "\(.*\)/${SCRIPT_DIR}/${INST_SCRIPT}"`
+	;;
+esac
+cwd=`pwd`
+
+# Do we have the directory containing the installation scripts?
+
+if [ ! -d ${SCRIPT_DIR} ]
+then
+    echo " "
+    echo "**** Directory not found: ${SCRIPT_DIR}"
+    echo "**** This error is most probably due do a bad extraction from"
+    echo "**** the installation medium."
+    echo " "
+    rm -f $auxdir/$INST_SCRIPT
+    rm -f $tempfiles
+    exit 1
+fi
+
+# Are the installation script and other needed scripts actually in the directory
+# containing the installation scripts?  If not, name all that were not found.
+
+tmp=false
+tmp2=""
+for tmpfile in $needed
+do
+    if [ ! -f ${SCRIPT_DIR}/$tmpfile ]
+    then
+	tmp=true
+	tmp2="$tmp2 $tmpfile"
+    fi
+done
+if $tmp
+then
+    echo "**** Missing needed files in the \"${SCRIPT_DIR}\" directory: $tmp2"
+    echo "**** This error is most probably due do a bad extraction from"
+    echo "**** the installation medium."
+    rm -f $auxdir/$INST_SCRIPT
+    rm -f $tempfiles
+    exit 1
+fi
+
+
+# Is this script the same as the one that should have been called?
+cmp $auxdir/$INST_SCRIPT ${SCRIPT_DIR}/$INST_SCRIPT 1> /dev/null 2>&1
+if [ $? -ne 0 ]
+then
+    echo " "
+    echo "**** This script does not match ${SCRIPT_DIR}/$INST_SCRIPT"
+    echo " "
+    rm -f $auxdir/$INST_SCRIPT
+    rm -f $tempfiles
+    exit 1
+fi
+rm -f $auxdir/$INST_SCRIPT
+errmsg=""
+
+
+
+#################################################################
+#
+# check arguments passed at command line.
+#
+# Debug            : used in debug of script or new install
+# Brief            : output less to the user...quicker...quieter
+# allowfixedconfig : is an OEM flag. if true then check for oem
+#                    files to do special install "stuff"
+#
+# n.b. allowfixedconfig condition has been changed (11/13) so 
+#      that if the flag is used on the "% install-annex" command 
+#      line then the flag will be set.
+#################################################################
+tmp=0
+for arg
+do
+    case "$arg" in
+    -e)
+# Just leave this undocumented.  We can use it when necessary.
+	(
+	echo "Automatic install-annex bug reporting mechanism."
+	echo " "
+	tar -cf - errors | compress -c | uuencode errors.tar.Z
+	) | /usr/bin/mail support@xylogics.com
+	exit 0
+	;;
+    -n)
+	denynonroot=false
+	;;
+    -b)
+	brief=true
+	;;
+    -f)
+	allowfixedconfig=true
+	;;
+    -d)
+	debug=true
+	;;
+    -k)
+#	# Allows user to force installation in an inappropriate directory.
+	suicidal=true
+	;;
+
+#   #------------------------------------------------------------
+#   # Start: of special options
+#   #------------------------------------------------------------
+#   # The following options are not meant to be called by the user.
+#   # They are provided for use by wrapper scripts which call this one.
+#   # The wrappers pass in an option indicating the distribution medium.
+#   # Note that the options are the same names as valid assignments to
+#   # the "medium" variable (except that the options have a preceeding
+#   # "-".  This allows for easy calling by wrapper scripts (which
+#   # probably got the values by calling the same .media_ask script
+#   # which this script does).
+
+    -cd-rom)
+	medium=cd-rom
+	tmp=`expr $tmp + 1`
+	thing=file
+	;;
+    -tape)
+	medium=tape
+	tmp=`expr $tmp + 1`
+	thing=device
+	;;
+    -floppies)
+	medium=floppies
+	tmp=`expr $tmp + 1`
+	thing=device
+	;;
+    -tarfile)
+	medium=tarfile
+	tmp=`expr $tmp + 1`
+	thing=file
+	;;
+    -nowhere)
+	medium=nowhere
+	tmp=`expr $tmp + 1`
+	thing=file
+	tar_needed=false
+	;;
+    *)
+	tarfile="$arg"
+	;;
+#   #------------------------------------------------------------
+#   # End: of special options
+#   #------------------------------------------------------------
+
+    esac
+done
+
+case "$tmp" in
+    0)
+	if [ -n "$tarfile" ]
+	then
+	    errmsg="Unknown flag $tarfile"
+	fi
+	;;
+    1)
+	if $tar_needed
+	then
+	    if [ -z "$tarfile" ]
+	    then
+		errmsg="$thing install without a specified $thing"
+	    else
+#		# tarfile is not null
+		if [ ! -r "$tarfile" ]
+		then
+		    errmsg="$thing not found or readable: $tarfile"
+		fi
+	    fi
+	else
+#	    # Do not need a tar file
+	    if [ -n "$tarfile" ]
+	    then
+		errmsg="Unknown flag $tarfile"
+		if [ "$medium" = "nowhere" ]
+		then
+#		    # This allows wrapper scripts to pass in a tarfile
+#		    # argument without its having to check for "nowhere"
+		    errmsg=""
+		fi
+	    fi
+	fi
+	;;
+    *)
+	errmsg="Use only one of: -cd-rom, -tape, -floppies, -tarfile, -nowhere"
+	;;
+esac
+
+if [ -n "$errmsg" ]
+then
+	echo " "
+	echo ERROR: "$errmsg"
+	echo " "
+	rm -f $tempfiles
+	exit 1
+fi
+
+#
+#############################################################################
+#
+
+
+if $debug
+then
+    echo "${dbg_hdr}Brief=" $brief
+    echo "${dbg_hdr}Debug=" $debug
+    echo "${dbg_hdr}Allow fixed config=" $allowfixedconfig
+else
+#   # If not debugging then get rid of extra files
+    tempfiles="$tempfiles $keepfiles"
+fi
+
+# This has to be done before any files are modified!
+# The variable "tmp" is used here to mean we have a special case directory.
+tmp=false
+case "$cwd" in
+    /)		tmp=true ;;
+    /us*/*)	tmp=false ;;
+    /us*)	tmp=true ;;
+    /u*/*)	tmp=false ;;
+esac
+if $tmp
+then
+#   # We have a special case directory
+    if $suicidal
+    then
+	$debug && echo "${dbg_hdr}Installing in $cwd against my better judgment."
+    else
+	msgid=usekoption
+	. $MSG_FILE
+	rm -f $tempfiles
+	exit 1
+    fi
+fi
+
+
+# Remove and recreate "errors" directory for debugging and testing
+# install problems.
+rm -rf errors > /dev/null 2>&1
+mkdir errors > /dev/null 2>&1
+
+# Redirect this shell's stderr output to a file so that any commands
+# executed without redirection will save their messages here.
+# Nifty, eh?
+exec 2> errors/shell
+
+#
+###############################################################################
+#
+# Include the subroutines now....
+########################################################################3
+#
+# read in release information (if file exists)
+#
+if [ -f ${SCRIPT_DIR}/release ]
+then
+    . ${SCRIPT_DIR}/release
+else
+    if [ -f release ]
+    then
+	. ./release
+    fi
+fi
+
+#
+# read in possible OEM configuration
+# if allowfixedconfig == true and oem file exists
+#   then set majormode = configure
+#        execute the oem script
+#
+tmp="oem"
+if [ -f ${SCRIPT_DIR}/oem ]
+then
+    tmp=${SCRIPT_DIR}/oem
+else
+    if [ -f oem ]
+    then
+	tmp="./oem"
+    fi
+fi
+if $allowfixedconfig && [ -f $tmp ]
+then
+    majormode=configure
+    . $tmp
+fi
+
+
+# Redundant: We have already tested for "-t 0" but this message may be
+# more useful.
+#
+# Tell user to use a shell command to run install script.  OEM may
+# change "box" parameter, so this has to be done after the OEM stuff.
+#
+if [ ! -t 0 ]
+then
+    echo "Do not invoke the installation script with a form like 'sh < install-$box'"
+    echo "Use a form like './install-$box' or 'sh install-$box'"
+    rm -f $tempfiles
+    exit 1
+fi
+
+#
+# If running an OEM install, set verbose mode.
+#
+# if allowfixedconfig == true, don't change brief
+# if allowfixedconfig == false, then set brief = false
+#
+if $allowfixedconfig
+then
+    brief=false
+fi
+
+package=$Box
+if [ "$TYPE" ]
+then
+    package=$package'-'$TYPE
+fi
+if [ "$vers" ]
+then
+    package=$vers
+fi
+
+# 
+# if this is an X25 install then clear the CH_PASSWD parameter
+# i.e. don't compile ch_passwd.
+#
+case $type in
+[xX]*25)
+    CH_PASSWD=""
+    ;;
+esac
+#
+#########################################################################
+#
+# Introductory instructions
+#
+# if didfixedconfig == true and oem file exists
+#   then do oem script with intromsg set
+#
+tmp="oem"
+if [ -f ${SCRIPT_DIR}/oem ]
+then
+    tmp=${SCRIPT_DIR}/oem
+else
+    if [ -f oem ]
+    then
+	tmp="./oem"
+    fi
+fi
+if $didfixedconfig && [ -f $tmp ]
+then
+    majormode=intromsg
+    . $tmp
+# 
+# if brief mode == true and majormode doesn't == introdone
+#   then ...
+#
+    if $brief && [ "$majormode" != introdone ]
+    then
+	echo " "
+	echo "Installing the $package software on your"
+	echo "$desc."
+	echo " "
+
+	if [ "$toinstall" = "y" ]
+	then
+	    insmsg=" installed" inssep=" and" bldsep=","
+	fi
+	if [ "$tobuild" = "y" ]
+	then
+	    bldmsg=" compiled" bldsep=${bldsep-" and"}
+	fi 
+
+	echo "Everything will be automatically configured$bldsep$bldmsg$inssep$insmsg"
+	[ "$instdir" ] && insinmsg="with the utilities installed in"
+	echo "for your system$insinmsg$instdir."
+	echo " "
+	echo "If you don't wish to use the default configuration,"
+	echo "then rerun `basename $0` with the \"-f\" option."
+	echo " "
+    fi
+fi
+
+
+#
+# Long introductory instructions
+#
+# if brief == true then don't display following text
+#
+msgid=greetings
+$brief || . $MSG_FILE
+
+#
+###############################################################################
+#
+# some greps do not return status, grrr.
+echo "grimblepritz" > .grimble
+c=true
+if grep blurfldyick .grimble >/dev/null 2>errors/grep-test
+then
+    :
+else
+    if grep grimblepritz .grimble >/dev/null 2>>errors/grep-test
+    then
+	c=false
+    fi
+fi
+rm -f .grimble
+echo "" > errors/grep-run
+if $c
+then
+    cat > .contains << EOSS
+grep \$* > .greptmp 2>>errors/grep-run && \
+	cat .greptmp >/dev/null 2>>errors/grep-run && \
+	test -s .greptmp 1>>errors/grep-run 2>&1 && exit 0
+exit 1
+EOSS
+else
+    cat > .contains << EOSS
+grep \$* >/dev/null 2>>errors/grep-run && exit 0
+exit 1
+EOSS
+fi
+chmod 755 .contains
+
+# first determine how to suppress newline on echo command
+(echo "hi there\c" ; echo " ") >.echotmp
+if ./.contains c .echotmp
+then
+    n='-n'
+    c=''
+else
+    n=''
+    c='\c'
+fi
+rm -f .echotmp
+
+#
+###############################################################################
+#
+# Now set up to do reads with possible shell escape
+#
+shell=sh
+test -n "$SHELL" && shell="$SHELL"
+echo " " > errors/userinput
+cat > .myread << EOSC
+if [ -z "\$prevcmd" ]
+then
+    prevcmd=echo
+fi
+cont=true
+echo "\$rp" >> errors/userinput
+while \$cont
+do
+    echo $n "\$rp $c"
+    read ans
+    case "\$ans" in
+    !)
+	PATH="$OLD_PATH"
+	$shell
+	PATH="$OUR_PATH"
+	echo " "
+	;;
+    !!)
+	PATH="$OLD_PATH"
+	$shell -c "\$prevcmd"
+	PATH="$OUR_PATH"
+	echo " "
+	;;
+    !*)
+	ans=\`expr "\$ans" : "\![ ]*\(.*\)"\`
+	PATH="$OLD_PATH"
+	$shell -c "\$ans"
+	PATH="$OUR_PATH"
+	prevcmd="\$ans"
+	echo " "
+	;;
+    *)
+	cont=false
+    esac
+    echo ">> '\$ans'" >> errors/userinput
+done
+rp='Your answer:'
+EOSC
+
+#
+###############################################################################
+#
+# Redundant: We have already tested for "-t 1" but this check is being left
+# as it was prior to putting in that check.
+
+if $brief || [ -t 1 ]
+then
+    while true
+    do
+	rp="Type carriage return to continue. Your cursor should be here-->"
+	. ./.myread
+	case "$ans" in
+	    "?")
+		msgid=greetingshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *) break ;;
+	esac
+    done
+fi
+
+#
+###############################################################################
+#
+
+#############################################################################
+#
+# See if we are being run by root.  Note that this is checked out AFTER
+# printing the introduction.  This way if a non-root user called the script
+# he would have enough information to know if he should call it as root.
+
+# Fake_It: This is the place to fake being root
+
+if $denynonroot
+then
+    sh ${SCRIPT_DIR}/.am_root
+    if [ $? -ne 0 ]
+    then
+	msgid=youarenotroot
+	. $MSG_FILE
+	rm -f $tempfiles
+	exit 1
+    fi
+fi
+
+#
+#############################################################################
+
+
+
+# Before we create a new file holding values of variables used in
+# this installation read in some of the variables used last time.
+if [ -f .vars ]
+then
+    tmpfile=$auxdir/tmpvars
+    grep vers= .vars | sed -e "s/^vers=/OLDvers=/g" > $tmpfile
+    . $tmpfile
+    rm -f $tmpfile
+fi
+
+
+# Create a record of variables used in this installation
+$debug && echo "${dbg_hdr}Creating .vars"
+cat << EOSS > ./.vars
+# Created by $0 on `date`
+#
+# This file contains variable assignments for use by other
+# scripts.  These will source in this file to get access to
+# the variable values if they were not obtainable by the
+# main script exporting them.
+#
+# Since those scripts use other files as well this file
+# will give warnings if those other files are not found.
+#
+SCRIPT_DIR="${SCRIPT_DIR}"
+MSG_FILE="$MSG_FILE"
+indent="$indent"
+dbg_hdr="$dbg_hdr"
+debug="$debug"
+testing="$testing"
+vers="$vers"
+n="$n"
+c="$c"
+# test -f .myread   || echo "WARNING: File not found: .myread"   1>&2
+# test -f .contains || echo "WARNING: File not found: .contains" 1>&2
+# test -f .mkpath   || echo "WARNING: File not found: .mkpath"   1>&2
+EOSS
+
+
+
+###########################################################################
+#
+# Now, if we have not gotten this information from the command line
+# get the method of the distribution (e.g., tape, floppies, etc)
+# and the device or file from which we do the extraction.
+#
+
+if [ "$medium" = "unknown" ]
+then
+
+#   Remove a temp file needed to store variable assignments
+    tmpfile=/tmp/tmpfile.$$
+    rm -f $tmpfile
+
+#   Call on another script to actually ask for media information
+    sh ${SCRIPT_DIR}/.media_ask "$medium" "$tarfile" "$tmpfile"
+
+#   Check for an abort or user request to quit (exit values 2 or 3)
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+
+#   Read in the new values for medium, tarfile and tar_needed
+#   from a file that was written to by the above script 
+    . $tmpfile
+    rm -f $tmpfile
+fi
+
+#
+###########################################################################
+#
+
+
+
+#
+###############################################################################
+#
+
+echo " "
+echo "Locating common programs..."
+
+# Possible Enhancement:
+# On Solaris machines this "pth" path might cause a disfunctional compiler
+# to be found instead of a real one. Some tweaking of the path might work
+# but because it might break things too, it will not be changed until there
+# is timee to do more exploration.
+
+pth="/bin /usr/bin /usr/ucb /usr/local /usr/local/bin /usr/lbin /usr/etc /etc /usr/lib /usr/ccs/bin /usr/cs/bin"
+
+echo " " > errors/locator
+cat > .loc << EOSC
+$startsh
+thing=\$1
+shift
+dflt=\$1
+shift
+echo "Locating \$thing in \$*" >>errors/locator
+for dir
+do
+    case "\$thing" in
+    ".")
+	if test -d \$dir 2>>errors/locator
+	then
+	    echo \$dir
+	    exit 0
+	fi
+	;;
+    *)
+	if test -f \$dir/\$thing 2>>errors/locator
+	then
+	    echo \$dir/\$thing
+	    exit 0
+	fi
+	;;
+    esac
+done
+echo \$dflt
+exit 1
+EOSC
+chmod 755 .loc
+
+
+#####################################################################
+#
+# If brief is set then don't print info, else print status of search
+#
+#####################################################################
+for file in $loclist
+do
+    tmp=`./.loc $file $file $pth`
+    case "$tmp" in
+    /*)
+	$brief || echo "${indent}$file is in $tmp."
+	;;
+    ranlib)
+	$brief || echo "I don't find ranlib; assuming it does not need to be run on a library"
+	tmp="echo done with library"
+	;;
+    cc)
+#	# Do not have cc compiler; check for gcc
+	tmp=`./.loc gcc gcc $pth`
+	case "$tmp" in
+	gcc) 
+	    tmp=cc
+	    echo "I will not be able to compile the tools without a C compiler"
+	    compiler_avail=false
+	    nomake=true
+	    ;;
+	*)
+	    $brief || echo "I don't know where $file is.  Using gcc compiler."
+	    ;;
+	esac
+	;;
+    esac
+    eval $file=\"$tmp\"
+    $brief && echo $n ".$c"
+done
+
+# Fake_It: This is the place to fake not having a compiler 
+## cc=foobar ; compiler_avail=false
+
+#
+#######################################################################
+#
+$brief || echo " "
+$brief || echo "Don't worry if any of the following aren't found..."
+for file in $trylist
+do
+    tmp=`./.loc $file $file $pth`
+    eval $file=\"$tmp\"
+    case "$tmp" in
+    /*)
+	$brief || echo "${indent}$file is in $tmp."
+	;;
+    *)
+	$brief || echo "${indent}file not found: $file"
+	;;
+    esac
+    $brief && echo $n ".$c"
+done
+
+#
+###############################################################################
+# What?
+if [ "$inetd" != "inetd" ]
+then
+	HWFLAG="$HWFLAG -DINETD"
+fi
+
+$brief && echo " "
+
+#
+###############################################################################
+#
+
+# set up shell script to do ~ expansion
+cat > .filexp << EOSS
+$startsh
+# expand filename
+case "\$1" in
+~/*|~)
+    echo \$1 | $sed "s|~|\${HOME-\$LOGDIR}|"
+    ;;
+~*)
+    if test -f /bin/csh
+    then
+	/bin/csh -f -c "glob \$1"
+	echo ""
+    else
+	name=\`$expr x\$1 : '..\([^/]*\)'\`
+	dir=\`$sed </etc/passwd -n -e "/^${name}:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:\([^:]*\).*"'\$'"/\1/" -e p -e q -e '}'\`
+	if test ! -d "\$dir"
+	then
+	    me=\`basename \$0\`
+	    echo "\$me: can't locate home directory for: \$name" >&2
+	    exit 1
+	fi
+	case "\$1" in
+	*/*)
+	    echo \$dir/\`$expr x\$1 : '..[^/]*/\(.*\)'\`
+	    ;;
+	*)
+	    echo \$dir
+	    ;;
+	esac
+    fi
+    ;;
+*)
+    tmp=\`echo \$1 | sed -e "s:^/::"\`
+    if [ "\$tmp" = "\$1" ]
+    then
+	echo \`pwd\`/\$1
+    else
+	echo \$1
+    fi
+    ;;
+esac
+EOSS
+chmod 755 .filexp
+
+#
+###############################################################################
+#
+
+# Clean up for repeated execution (even more below in the configuration section)
+$rm -f $auxdir/srcmodcmds
+
+$debug && echo "${dbg_hdr}Creating .mkpath"
+# If no leading slash then prepend cwd to directory name.
+# Otherwise some platforms can get in infinite loop (for example, HPUX 10).
+cat > .mkpath << MKPATH
+DIR=\$1
+DIRL=
+case "\$DIR" in
+	/*) ;;
+	*) DIR=\`pwd\`/"\$DIR" ;;
+esac
+while [ ! -z "\$DIR" ]
+do
+	DIRL="\$DIR \$DIRL"
+	DIR=\`$expr /\$DIR : '/\(.*\)/.*'\`
+done
+for i in \$DIRL
+do
+	if [ ! -d \$i ]
+	then
+		$mkdir \$i
+		if [ ! -d \$i ]
+		then
+			exit 1
+		fi
+	fi
+done
+exit 0
+MKPATH
+chmod 755 .mkpath
+
+
+
+###############################################################################
+# Start: Get type of system
+###############################################################################
+#
+# This is an extremely lengthy section. Scrolling to the end is time consuming.
+# Search for "End:" if you want to skip this section.
+#
+# To get the platform type we first try to get the type of system from uname
+# and other methods so we do not have to ask a stupid question.  If we
+# can't find the type of system then we present a menu of those systems that
+# we do not know how to identify and ask the user to select.
+
+name=`(uname 2>/dev/null) 2>/dev/null`
+
+# Fake_It:
+# For testing purposes do 'name=""' so even known systems
+# cause the system menu to come up
+
+if [ -n "${name}" ]
+then
+#   # uname works
+    unamer=`uname -r 2>/dev/null`
+    unamev=`uname -v 2>/dev/null`
+    unames=`uname -s 2>/dev/null`
+    unamet=""
+
+    subtype=""
+    case $unames in
+	ULTRIX)
+            hw_type="ULTRIX"
+	    subtype=SUPPORTED
+            ;;
+        SunOS)
+            hw_type="SUN"
+	    subtype=SUPPORTED
+            ;;
+        FreeBSD)
+            hw_type="FREEBSD"
+	    subtype=SUPPORTED
+            ;;
+	Linux)
+	    hw_type="LINUX"
+            subtype=SUPPORTED
+            ;;
+	HP-UX)
+unamer=`echo "$unamer" | sed -e "s/^[a-zA-Z]\.0//" -e "s/^[a-zA-Z]\.//"`
+	    hw_type="HP"
+	    subtype=""
+	    case "$unamer" in
+		    8*)  subtype=SUPPORTED ; unamer=8 ;;
+		    9*)  subtype=SUPPORTED ; unamer=9 ;;
+		    10*) subtype=SUPPORTED ; unamer=10 ;;
+	    esac
+            ;;
+	AIX)
+            EINCFILES="$EINCFILES sys/select.h"
+	    hw_type="AIX"
+            subtype=SUPPORTED
+#	    # Translate uname -v and uname -r
+	    unamet="$unamev"
+	    unamev="$unamer"
+	    unamer="$unamet"
+            ;;
+
+	*)
+	    unamem=`uname -m 2>/dev/null`
+	    case "$unamem" in
+		[Aa][Vv][Ii][Ii][Oo][Nn])
+	            hw_type="DG"
+		    subtype=SUPPORTED
+	            ;;
+		alpha)
+		    case "$unames" in
+			OSF1)
+			    hw_type="ALPHA"
+			    subtype=SUPPORTED
+			    ;;
+		    esac
+		    ;;
+		*)
+		    if echo $unamer | grep FreeBSD > /dev/null
+		    then
+			    hw_type="FREEBSD"
+	        	    subtype="SUPPORTED"
+		    fi
+		    if echo $unamev | grep "BSDI " > /dev/null
+		    then
+			    hw_type="BSDI"
+	        	    subtype="SUPPORTED"
+		    fi
+		    if [ -f /unix ]
+		    then
+			strings /unix > /tmp/strings.$$
+			grep "IRIX Release" /tmp/strings.$$ 1> /dev/null 2>&1
+			if [ $? -eq 0 ]
+			then
+			    hw_type="SGI"
+	        	    subtype="SUPPORTED"
+			fi
+			grep "INTERACTIVE UNIX System" /tmp/strings.$$ 1> /dev/null 2>&1
+			if [ $? -eq 0 ]
+			then
+			    hw_type="IUNIX"
+	        	    subtype="SUPPORTED"
+			fi
+#xxyyzz Could look for these in /tmp/strings.$$ to identify UNIXWARE
+# NetWare UNIX Client v3.12
+# Authorized NetWare Client
+# UnixWare %v for the Intel386(tm) Family
+			rm -f /tmp/strings.$$
+		    fi
+		    ;;
+	    esac
+	;;
+    esac
+fi
+
+
+#############################################################################
+#
+# Ask what type of system we are (if we haven't already determined that)
+# Answers can be either number or a name.
+# This will loop around until an acceptable system has been chosen.
+
+# SPECIAL NOTE: In case there is a situation where the platform is being
+# automatically determined but being determined incorrectly then this
+# script can be edited and run again.  The easy edit is to uncomment the
+# 'hw_type=""' line below.  When the installation is re-run the menu
+# will come up and the user can enter the platform.
+#
+# hw_type=""
+
+
+autodetected=false
+if [ -z "$hw_type" ]
+then
+cat << EOSS
+
+Select the most appropriate machine type
+
+1. Sun                            10. BSDI
+2. HP                             11. DG Aviion (UNSUPPORTED)
+3. IBM RS/6000 (AIX)              12. NCR (UNSUPPORTED)
+4. DEC                            13. SGI
+5. UnixWare                       14. UNISYS (UNSUPPORTED)
+6. SCO Unix (except Version 5)	  15. Sequent (UNSUPPORTED)
+7. SCO Unix Version 5
+8. Interactive Unix               16. ICL NX (UNSUPPORTED)
+9. LINUX 	                  17. FreeBSD
+
+0. Generic (no special code needed, or machine not listed)
+
+EOSS
+    rp="Enter machine type #:"
+    . ./.myread
+else
+    autodetected=true
+    if $debug
+    then
+	echo "${dbg_hdr}Automatically determined system type:"
+	echo "${dbg_hdr}${indent}hw_type: $hw_type"
+	echo "${dbg_hdr}${indent}subtype: $subtype"
+    fi
+    ans=$hw_type
+    hw_type=
+fi
+#
+# Loop when answer is not on printed list.
+#
+while true
+do
+    no_support=false
+#   # Translate numbers to strings here to make updating the menu easy
+    case "$ans" in
+	0)  ans=GENERIC		;;
+	1)  ans=SUN		;;
+	2)  ans=HP		;;
+	3)  ans=AIX		;;
+	4)  ans=DEC		;;
+	5)  ans=UNIXWARE	;;
+	6)  ans=SCO		;;
+	7)  ans=SCO5	unamer=5	;;
+	8)  ans=IUNIX		;;
+	9)  ans=LINUX		;;
+	10) ans=BSDI		;;
+	11) ans=DG		;;
+	12) ans=NCR		;;
+	13) ans=SGI		;;
+	14) ans=UNISYS		;;
+	15) ans=SEQUENT		;;
+	16) ans=ICL		;;
+	17) ans=FREEBSD		;;
+	*)  ans="$ans"		;;
+    esac
+    $debug && echo "${dbg_hdr}Seeking platform information for $ans"
+
+#
+#  Current SUN Architectures
+#
+#       Application       Kernel             Current Sun
+#       architecture   architecture         System Models
+#           sun3           sun3        3/50, 3/60, 3/75, 3/110,
+#                                       3/140, 3/160, 3/180,
+#                                           3/260, 3/280
+#           sun3          sun3x       3/80, 3/460, 3/470, 3/480
+#           sun4           sun4          4/110, 4/260, 4/280,
+#                                         SPARCsystem 330,
+#                                          SPARCserver 390
+#           sun4          sun4c            SPARCstation 1
+#          sun386         sun386         386i/150, 386i/250
+#
+
+
+    case "$ans" in
+
+    Q*|q*)
+	rm -f $tempfiles
+	echo " "
+	echo "**** User abort!"
+	echo " "
+	exit 1
+	break
+	;;
+
+    "?")
+	msgid=sysmenuhelp
+	. $MSG_FILE
+	continue
+	;;
+
+    SUN)
+	hw_type="SUN"
+	case `uname -r` in
+	[1234]*)
+	    os_type="BSD"
+	    netware_type="BSD"
+	    INCFILES="$INCFILES sys/stat.h"
+	    ;;
+	5.[01])
+	    os_type="SVR4"
+	    netware_type="TLI"
+	    LIBFLAG="-lnls -ltcpip"
+	    tryLIBFLAG="$LIBFLAG"
+	    mantype=V4
+	    sigmask='have'
+	    ;;
+	*)
+	    os_type="SVR4"
+	    netware_type="BSD"
+	    LIBFLAG="-lnsl -lsocket -L/usr/lib -lc -Bstatic -L/usr/ucblib -lucb"
+	    tryLIBFLAG="$LIBFLAG"
+	    INCFILES="$INCFILES"
+	    CKBSDINC=true
+	    mantype=V4
+	    sigmask='have'
+	    ;;
+	esac
+#	# Cause linking of correct newrtelnet files
+	dbgfile=debugging.vf
+	if [ $os_type = "SVR4" ]
+	then
+	    machdepfile=machdep.sol
+	else
+	    machdepfile=machdep.sun
+	fi
+#	# Check if binaries are available (and if so where they are located)
+	ARCH=`arch`
+	if [ "$ARCH" != "sun4" ]
+	then
+	    $debug && echo "${dbg_hdr}This is not a sun4, not using binaries"
+	else
+#	    # Binaries only for 4.1.3 and up in the 4s and 5.4 and up in the 5s
+	    case "$unamer" in
+		1*|2*|3*) ;;
+		4|4.0|4.0.*|4.1.1*|4.1.2*|4.1.3) ;;
+		4.1.[4-9]*) bindir="bin/$hw_type" ;;
+		4.*)   bindir="bin/$hw_type" ;;
+		5|5.0|5.0.*|5.1|5.1.*|5.2|5.2.*|5.3|5.3.*) ;;
+		5.*)
+		    if [ "$os_type" = "SYS_V" -o "$os_type" = "SVR4" ]
+		    then
+			bindir="bin/SOL2"
+		    fi
+		    ;;
+	    esac
+	fi
+	;;
+
+    ENCORE)
+	no_support=true
+	hw_type="ENCORE"
+	netware_type="BSD"
+	ans=`(uname -r) 2>/dev/null || echo bsd`
+	if [ "$ans" = "bsd" ]
+	then
+	    os_default="1"
+	else
+	    os_default="2"
+	fi
+	;;
+
+    UNISYS)
+#xxyyzz 30/50 70/80 CTIX ???
+	no_support=true
+	hw_type="UNISYS"
+	while true; do
+	    if [ -z "$system" ]; then
+		echo " "
+		echo " "
+		echo "Select the most appropriate type"
+		echo " "
+		echo " 1. UNISYS 6000 Series 30/50"
+		echo " 2. UNISYS 6000 Series 70/80 (R3.2.0)"
+		echo " 3. UNISYS S Series CTIX"
+		echo " "
+		rp="Enter hardware type #:"
+		. ./.myread
+	    else
+#		# if there is a default system variable set
+#		# then use it rather than asking the user.
+#		# then clear the variable.
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	    *TOWER|*5000/35|*5000/55)
+		hw_type="NCR_TOWER"
+		os_type="SYS_V"
+		SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+		netware_type="EXOS" 
+		mantype=none
+		LIBFLAG="-lsocket"
+		INCLUDES="-I/usr/include/NET-5000"
+		;;
+	    *ARIX|*5000/80|*5000/85|*5000/90|*5000/95)
+		hw_type="ARIX"
+		os_type="SYS_V"
+		SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+		netware_type="EXOS" nettype="EXOS"
+		mantype=V manlayout=packed manext=''
+		mansrc=/usr/catman/a_man/man1
+		LIBFLAG="-lsocket"
+		INCLUDES="-I/usr/include/NET-5000"
+		;;
+	    1|*CONVERGENT|*6000/30|*6000/50)
+		hw_type="CONVERGENT"
+		os_type="SYS_V"
+		netware_type="BSD"
+		mantype=V manlayout=packed manext=''
+		mansrc=/usr/catman/a_man/man1
+		LIBFLAG="-lsocket"
+		;;
+	    2|*SEQUENT|*6000/70|*6000/80)
+		hw_type="U6070"
+		os_type="SYS_V"
+		netware_type="TLI"
+#		Need -lseq for newrtelnet.
+		LIBFLAG="-linet -lseq -lnsl -lsocket"
+		tryLIBFLAG="$LIBFLAG"
+		INCFILES="$INCFILES sys/socket.h"
+		select="have"
+		index="need"
+		rindex="need"
+		bcopy="bcopy(a,b,c) memcpy(b,a,c)"
+		bzero="bzero(a,b) memset(a,0,b)"
+		mantype=v7 manlayout=dist manext=''
+		mansrc=/usr/man/man8
+#		# Cause linking of correct newrtelnet files
+		machdepfile=machdep.uni
+		dbgfile=debugging.vf
+		;;
+	    3|CTIX)
+		no_support=true
+		hw_type="CONVERGENT"
+		os_type="SYS_V"
+		netware_type="BSD"
+		LIBFLAG="-lsocket"
+		tryLIBFLAG="-lsocket"
+#		# Cause linking of correct newrtelnet files
+		machdepfile=machdep.ctix
+		dbgfile=debugging.vf
+		;;
+	    *TAHOE|*7000/40)
+		hw_type="TAHOE"
+#		# -a prevents structures from being longword padded
+		HWFLAG="$HWFLAG -a"
+		SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+		os_type="SYS_V"
+		netware_type="BSD"
+		mantype=V manlayout=packed manext=''
+		mansrc=/usr/catman/a_man/man1
+		LIBFLAG="-lnet -linet"
+		;;
+	    "?")
+		msgid=unisyssyshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+	didfixedconfig=true
+	echo " "
+	;;
+
+    CTIX)
+	no_support=true
+	hw_type="CONVERGENT"
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBFLAG="-lsocket"
+	tryLIBFLAG="-lsocket"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.ctix
+	dbgfile=debugging.vf
+	;;
+
+    MX*)
+# 
+# This assumes that user is running on the MX300 system and that the universe
+# command will return the shell equivalent. att is the expected value.
+#
+	no_support=true
+	universe=`universe`
+	if [ "$universe" != "att" ]; then
+	   msgid=universe_notatt
+	   . $MSG_FILE
+	   exit 2
+	fi
+	hw_type="MX300"
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBANX_C="$LIBANX_C sendrecv.c"
+	LIBANX_O="$LIBANX_O sendrecv.o"
+	if [ -f /usr/lib/libsocket.a ]; then 
+	   LIBFLAG="-lsocket"
+	   tryLIBFLAG="-lsocket"
+	else
+	   if [ -f $cwd/MX300/libsocket.a ]; then
+	       LIBFLAG="$cwd/MX300/libsocket.a"
+	       tryLIBFLAG="$cwd/MX300/libsocket.a"
+	   else
+	       echo "**** You MUST install socket libraries before running install-${box}."
+	       exit 2
+	   fi
+	fi
+cat << EOSS >> $auxdir/srcmodcmds
+	if [ -f src/rtelnet/rtelnet.smns ]
+	then
+	    $mv src/rtelnet/rtelnet.c src/rtelnet/rtelnet.old
+	    $mv src/rtelnet/rtelnet.smns src/rtelnet/rtelnet.c
+	fi
+EOSS
+	;;
+
+    NCR)
+	hw_type="NCR"
+# These are redefined in /usr/include/strings.h with a #define to
+# strchr and strrchr for ANSI.
+	index='need'
+	rindex='need'
+	sigmask='need'
+	LIBFLAG="$LIBFLAG -lsocket -lnsl "
+        INCFILES="$INCFILES sys/socket.h"
+	tryLIBFLAG="$LIBFLAG"
+	while true; do
+	    if [ -z "$system" ]; then
+		echo " "
+		echo " "
+		echo "Select the most appropriate NCR system: "
+		echo " "
+		echo " 1. NCR Tower (UNSUPPORTED)"
+		echo " 2. NCR System 3000"
+		echo " "
+		rp="Enter NCR system:"
+		. ./.myread
+	    else
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	    1)
+		no_support=true
+		netware_type="WINS"
+		HWFLAG="$HWFLAG -DWINS"
+		LIBFLAG="$LIBFLAG -lnsl_s"
+		tryLIBFLAG="$LIBFLAG"
+		sendmsg='need'
+		rcvmsg='need'
+		os_type="SYS_V"
+cat << EOSS >> $auxdir/srcmodcmds
+#		#########################################
+#		# Changes for NCR Tower ioctl.h missing #
+#		#########################################
+		if [ ! -f /usr/include/sys/ioctl.h ]; then
+		    echo "/* dummy file to keep ccp happy */" \
+		    > src/inc/sys/ioctl.h
+		fi
+#		#################################################
+#		# Change due to redeclaration of iovec in uio.h #
+#		# (NCR Tower bug)                               #
+#		# If socket.h exists then copy to src/inc/sys   #
+#		#################################################
+		if [ -f /usr/netinclude/sys/socket.h ]; then
+		    $cp /usr/netinclude/sys/socket.h src/inc/sys
+		fi
+EOSS
+		;;
+	    2)
+		os_type="SVR4"
+		SRCDIRS="$ALLSRC"
+		LIBFLAG="-L/usr/ucblib $LIBFLAG"
+		INCFILES="$INCFILES sys/stat.h"
+#		###################################
+#		# Figure what type of man page    #
+#		# organization exists on NCR 3000 #
+#		###################################
+		if [ -d /usr/catman/index ]; then
+		    mansrc="/usr/catman/index"
+		else
+		    if [ -d /usr/share/man ]; then
+			mansrc="/usr/share/man/man8"
+			if [ ! -d /usr/share/man/man1 ]; then
+			    mkdir /usr/share/man/man1
+			fi
+			if [ ! -d /usr/share/man/man5 ]; then
+			    mkdir /usr/share/man/man5
+			fi
+			if [ ! -d /usr/share/man/man8 ]; then
+			    mkdir /usr/share/man/man8
+			fi
+		    else
+			if [ -d /usr/man ]; then
+			    mansrc="/usr/man/man8"
+			else
+#			    # Give-up, on man page directory
+			    mantype=none
+			fi
+		    fi
+		fi
+		case "$unamer" in
+		    4.*)
+			case "$unamev" in
+			    1.*) ;;
+			    2.*) ;;
+			    *) bindir="bin/$hw_type" ;;
+			esac
+			;;
+		esac
+		;;
+	    "?")
+		msgid=ncrsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.ncr
+	dbgfile=debugging.vf
+	;;
+
+    PYRAMID)
+#########################
+#
+#	hw_type="PYRAMID"
+#	# -q prevents structures from being longword padded
+#	HWFLAG="$HWFLAG -q"
+#
+#########################
+	no_support=true
+	hw_type="PYRAMID"
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the most appropriate hardware type"
+		echo " "
+		echo " 1. PYRAMID OS/x"
+		echo " 2. PYRAMID DC/OSx"
+		echo " "
+		rp="Enter hardware type #:"
+		. ./.myread
+	    else
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	    1)
+		os_type="BSD"
+		netware_type="BSD"
+# -q prevents structs from being padded
+		HWFLAG="$HWFLAG -q"
+#		mantype=none
+#		LIBFLAG="-lsocket "
+		;;
+	    2)
+		os_type="SYS_V"
+		netware_type="TLI"
+#		mantype=V manlayout=packed manext=''
+#		mansrc=/usr/catman/a_man/man1
+#		OTHERINSTALL="$OTHERINSTALL install-man"
+		LIBFLAG="-lsocket -lnsl -lns "
+		INCFILES="$INCFILES sys/socket.h"
+#		# Cause linking of correct newrtelnet files
+		machdepfile=machdep.pyr
+		dbgfile=debugging.vf
+		;;
+	    "?")
+		msgid=pyramidsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+	;;
+
+    CONCURRENT)
+	no_support=true
+	hw_type="CONCURRENT"
+	cc="att cc"
+	mantype=v7 manlayout=dist manext=''
+	mansrc=/usr/man/man8
+#	OTHERINSTALL="$OTHERINSTALL install-man"
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the most appropriate RTU release" 
+		echo " "
+		echo " 1. RTU 4.1"
+		echo " 2. RTU 5.0, 5.1 (use sockets)"
+		echo " 3. RTU 6.0, 6.1, or later (use TLI)"
+		echo " "
+		rp="Enter RTU type number:"
+		. ./.myread
+	    else
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	    1|*4*)
+		os_type="SYS_V"
+		netware_type="BSD"
+#		# they have broken recvmsg/sendmsg
+		recvmsg='need'
+		sendmsg='need'
+		;;
+	    2|*5*)
+		os_type="SYS_V"
+		netware_type="BSD"
+		LIBFLAG=""
+#		# they have broken recvmsg/sendmsg
+		recvmsg='need'
+		sendmsg='need'
+		;;
+	    3|*[67]*)
+		os_type="SYS_V"
+		netware_type="TLI"
+		HWFLAG="$HWFLAG -DTLI -DTLIPOLL"
+		sockdefs='need'
+		funclist="$funclist sockdefs(0)"
+		LIBFLAG="-lnsl"
+		;;
+	    "?")
+		msgid=concurrentsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+	didfixedconfig=true
+	;;
+
+    SEQUENT)
+	system=""
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the most appropriate O/S: "
+		echo " "
+		echo "${indent}1. PTX"
+		echo "${indent}2. DYNIX"
+		echo " "
+		rp="Enter SEQUENT selection:"
+		. ./.myread
+	    else
+		ans=$system
+		system=""
+	    fi
+	    case $ans in
+	    1)
+		ans=SEQUENT_PTX
+		;;
+	    2)
+		ans=SEQUENT_DYNIX
+		;;
+	    "?")
+		msgid=sequentsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	      *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+#	# "ans" now is set to SEQUENT_DYNIX or SEQUENT_PTX.  By continuing
+#	# in the main loop we go to one of these other cases
+#	# --- AS LONG AS "hw_type" HAS NOT BEEN SET ---.
+	continue
+	;;
+
+    SEQUENT_PTX)
+	hw_type="SEQUENT_PTX"
+	os_type="SYS_V"
+	netware_type="TLI"
+# Need "-linet -lnsl" to compile with standard network functions.
+# Need "-lseq" to use pty functions with rtelnet.
+	LIBFLAG="-linet -lnsl -lseq"
+	index="need"
+	rindex="need"
+	select="have"
+	sigmask="need"
+	bcopy="bcopy(a,b,c) memcpy(b,a,c)"
+	bzero="bzero(a,b) memset(a,0,b)"
+#	###########################################
+#	# Define the man page install information #
+#	###########################################
+	$debug && echo "${dbg_hdr}Define the man page install information"
+
+	mantype=v7 manlayout=dist manext='' packed=true
+	if [ -d /usr/catman/index ]; then
+	    mansrc=/usr/catman/index
+	else
+	    mansrc=/usr/catman
+	fi
+	if $debug ; then
+	  echo "${dbg_hdr}Within PTX selection:"
+	  echo "${dbg_hdr}mantype = $mantype, manlayout = $manlayout"
+	  echo "${dbg_hdr}mansrc = $mansrc, manext = $manext"
+	fi
+#        OTHERINSTALL="$OTHERINSTALL install-man"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.seqptx
+	dbgfile=debugging.vf
+
+#       # Version 4.1 and above uses -lsocket instead of -linet
+        case `uname -v` in
+        V4.0|V4.0.*)
+            $debug && echo "${dbg_hdr}New Sequent OS -- setting NEWPTX flag."
+            HWFLAG="$HWFLAG -DNEWPTX"
+            LIBFLAG="-linet -lnsl -lseq"
+            ;;
+        V[4-9]\.*|V[1-9][0-9][0-9]*)
+            $debug && echo "${dbg_hdr}New Sequent OS -- setting NEWPTX flag."
+            HWFLAG="$HWFLAG -DNEWPTX"
+            LIBFLAG="-lsocket -lnsl -lseq"
+            ;;
+        esac
+
+	tryLIBFLAG="$LIBFLAG"
+	;;
+
+    SEQUENT_DYNIX)
+####################################################################
+# 
+# This assumes that user is running on the Dynix system and that 
+# the universe command will return the shell equivalent. BSD is 
+# the expected value.
+#
+####################################################################
+	no_support=true
+	universe=`universe`
+	if [ "$universe" != "ucb" ]; then
+	   msgid=universe_notucb
+	   . $MSG_FILE
+	   exit 2
+	fi
+	hw_type="SEQUENT"
+	os_type="BSD"
+	netware_type="BSD"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.seqdyn
+	dbgfile=debugging.vf
+	;;
+
+    AIX)
+	hw_type="AIX"
+	os_type="SYS_V"
+	netware_type="BSD"
+	case `uname -v` in
+	[4-9]*)
+	    HWFLAG="$HWFLAG -DNEWAIX -DHAS_CTRL_NOT_ACC"
+	    mantype=AIX4
+	    ;;
+	esac
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.aix
+	dbgfile=debugging.vf
+	case "$unamer" in
+	    4) bindir="bin/$hw_type" ;;
+	esac
+	;;
+
+    HP)
+	hw_type="HP"
+	os_type="SYS_V"
+	HWFLAG="$HWFLAG -DBSDSIG"
+	netware_type="BSD"
+	mantype=v7 manlayout=dist manext=''
+	mansrc=/usr/man/man1
+	system="$subtype"
+	LIBFLAG="-lndbm"
+	tryLIBFLAG="-lndbm"
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the most appropriate HP-UX revision: "
+		echo " "
+		echo "${indent}1. HP-UX 7.0 (UNSUPPORTED)"
+		echo "${indent}2. HP-UX 8.0 or greater"
+		echo " "
+		rp="Enter HP-UX selection:"
+		. ./.myread
+	    else
+		ans=$system
+		system=""
+	    fi
+	    case $ans in
+	      1)
+		no_support=true
+		hp_os="seven"
+		HWFLAG="$HWFLAG -DHPUX7"
+		bcopy="need"
+		bzero="need"
+		strcasecmp="need"
+		strncasecmp="need"
+		index="need"
+		rindex="need"
+		;;
+	      2|SUPPORTED)
+		hp_os="eight"
+		case "$unamer" in
+		    10*)
+			bindir="bin/$hw_type"
+			startup_dir=/sbin/rc2.d
+			;;
+		    9*)
+			bindir="bin/${hw_type}"
+			startup_dir=/sbin/rc2.d
+			;;
+		    8*)
+			no_support=true
+			;;
+		esac
+		;;
+	    "?")
+		msgid=hpsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	      *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.hpux
+	dbgfile=debugging.vf
+	;;
+
+    UNIXWARE)
+	hw_type="UNIXWARE"
+	os_type="SYS_V"
+	if [ -d /usr/share/man/cat1 ]
+	then
+	    mantype=AIX4
+	else
+	    mantype=none
+	fi
+	funclist="$funclist"
+	netware_type="BSD"
+	SRCDIRS="$ALLSRC"
+cat << EOSS >> $auxdir/srcmodcmds
+	if [ ! -f /usr/include/arpa/telnet.h ] ; then
+	    if [ ! -f /usr/include/netinet/telnet.h ] ; then
+		$cp src/inc/port/xtelnet.h src/inc/arpa/telnet.h
+	    else
+		$cp /usr/include/netinet/telnet.h src/inc/arpa/telnet.h
+	    fi
+	fi
+	if [ ! -f /usr/include/strings.h ] ; then
+	    if [ -f /usr/include/string.h ] ; then
+		$cp /usr/include/string.h src/inc/strings.h
+	    else
+		$touch src/inc/strings.h
+	    fi
+	fi
+EOSS
+	HWFLAG="$HWFLAG -DSVR4 -DSYS_V"
+	LIBFLAG="-lsocket -lnsl -lcrypt -lgen"
+	tryLIBFLAG="$LIBFLAG"
+	case `uname -v` in
+	    2.*) bindir="bin/$hw_type" ;;
+	esac
+	;;
+
+    DEC)
+	system=""
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the most appropriate O/S: "
+		echo " "
+		echo "${indent}1. ULTRIX (bsd)"
+		echo "${indent}2. ALPHA  (sysv)"
+		echo " "
+		rp="Enter DEC selection:"
+		. ./.myread
+	    else
+		ans=$system
+		system=""
+	    fi
+	    case $ans in
+	    1)
+		ans=ULTRIX
+		;;
+	    2)
+		ans=ALPHA
+		;;
+	    "?")
+		msgid=decsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	      *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+#	# "ans" now is set to ALPHA or ULTRIX.  By continuing in the main
+#	# loop we go to one of these other cases
+#	# --- AS LONG AS "hw_type" HAS NOT BEEN SET ---.
+	continue
+	;;
+
+    ALPHA)
+	hw_type="ALPHA"
+	os_type="SYS_V"
+	HWFLAG="$HWFLAG -DUSE_64"
+	netware_type="BSD"
+	INCFILES="$INCFILES sys/stat.h"
+	nortelnet=true
+	case `uname -r` in
+	    V4*) bindir="bin/$hw_type" ;;
+	    V3*) bindir="bin/$hw_type" ;;
+	    3*)  bindir="bin/$hw_type" ;;
+	esac
+	;;
+
+    ULTRIX)
+	hw_type="ULTRIX"
+	os_type="BSD"
+	netware_type="BSD"
+#	Cause linking of correct newrtelnet files
+	machdepfile=machdep.ultrix
+	dbgfile=debugging.vf
+#	Ultrix has *two* syslog.h files!
+	INCFILES="$INCFILES sys/syslog.h"
+	;;
+
+    MIPS)
+	no_support=true
+	hw_type="MIPS"
+	os_type="SYS_V"
+	netware_type="BSD"
+	if [ -d /usr/man ]
+	then
+	    mantype=V manlayout=dist manext=''
+	    mansrc=/usr/man/a_man
+# If there's a straight text directory for the man pages, and either
+# the man source directories are missing or if the source directories
+# are just a symbolic link to the straight text, then use catman.
+	    if [ -d /usr/man/catman ]
+	    then
+		if [ "`file /usr/man/a_man | cut -f2`" != "directory" ]
+		then
+			mansrc=/usr/man/catman/a_man
+		fi
+	    fi
+	fi
+	didfixedconfig=true
+	LIBFLAG="-lbsd"
+	tryLIBFLAG="-lbsd"
+	INCLUDES="$INCLUDES -I/usr/include/bsd"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.mips
+	dbgfile=debugging.vf
+	;;
+
+    PRIME)
+	no_support=true
+	hw_type="PRIME"
+	while true; do
+	    if [ -z "$system" ]; then
+		echo " "
+		echo " "
+		echo "Select the most appropriate OS: "
+		echo " "
+		echo " 1. UNIX V.3.x system"
+		echo " 2. UNIX V.4 system"
+		echo " 3. RISC/OS system"
+		echo " "
+		rp="Enter appropriate system number:"
+		. ./.myread
+	    else
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	    1)
+		os_type="SYS_V"
+		SRCDIRS="$ALLSRC"
+		netware_type="TLI"
+		HWFLAG="$HWFLAG -DTLI -DTLIPOLL"
+		sockdefs='need'
+		funclist="$funclist sockdefs(0)"
+		LIBFLAG="-lstcp -lnls -lnsl_s"
+		tryLIBFLAG="-lstcp -lnls -lnsl_s"
+cat << EOSS >> $auxdir/srcmodcmds
+		$cp /usr/include/time.h src/inc/sys/time.h
+		$cat /usr/include/sys/bsd_time.h >> src/inc/sys/time.h
+EOSS
+		;;
+	    2)
+		os_type="SVR4"
+		SRCDIRS="$ALLSRC"
+		netware_type="BSD"
+		;;
+	    3)
+		hw_type="MIPS"
+		os_type="SYS_V"
+		netware_type="BSD"
+		LIBFLAG="-lbsd"
+		tryLIBFLAG="-lbsd"
+		;;
+	    "?")
+		msgid=primesyshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *) 
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+	;;
+
+    SGI) 
+	hw_type="SGI"
+	os_type="SYS_V"
+	netware_type="BSD"
+	mantype="V" manlayout="dist" manext=''
+	mansrc="/usr/catman/a_man"
+	didfixedconfig=true
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.sgiv
+	dbgfile=debugging.vf
+#	# Use the following for libflag when uname -r > 5.1
+	LIBFLAG="-oldcpp -lbsd"
+	case `uname -r` in
+	[1234]*)
+	    LIBFLAG="-lbsd"
+	    ;;
+	5.[01]*)
+	    LIBFLAG="-lbsd"
+	    ;;
+	6.*)
+	    LIBFLAG="-lbsd"
+	    bindir="bin/IRIX"
+	    ;;
+	esac
+	tryLIBFLAG="$LIBFLAG"
+	;;
+
+    BULL)
+	no_support=true
+	hw_type="BULL"
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBFLAG="-linet -lnsl"
+	tryLIBFLAG="-linet -lnsl"
+	mantype="V" manlayout="dist" manext=''
+	mansrc="/usr/catman/a_man"
+	while true
+	do
+	    if [ -z "$system" ]
+	    then
+		echo " "
+		echo " "
+		echo "Select the appropriate system: "
+		echo " "
+		echo " 1. DPX/2 Model 200" 
+		echo " 2. DPX/2 Model 300"
+		echo " "
+		rp="Enter appropriate system number:"
+		. ./.myread
+	    else
+		ans=$system
+		system=
+	    fi
+	    case $ans in
+	      1)
+		hw_type="DPX200"
+		recvmsg='need'
+		sendmsg='need'
+		;;
+	      2)
+		hw_type="DPX300"
+		;;
+	      "?")
+		msgid=bullsyshelp
+		. $MSG_FILE
+		continue
+		;;
+	      *)
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	    break
+	done
+	;;
+
+    SCO|SCO5)
+	hw_type="$ans"
+	os_type="SYS_V"
+	netware_type="BSD"
+	ranlib="/bin/ar t"
+	sendmsg='need'
+	recvmsg='need'
+	sigmask='have'
+	HWFLAG="$HWFLAG -DLAI_TCP -Di386" 
+	if [ -f /usr/lib/libcrypt_d.a ]; then
+	    LIBFLAG="-lsocket -lnsl_s -lnls -lpt -lcrypt_d -lndbm"
+	    tryLIBFLAG="-lsocket -lnls -lnsl_s -lpt -lcrypt_d -lndbm"
+	elif [ -f /usr/lib/libcrypt_i.a ]; then 
+	    LIBFLAG="-lsocket -lnsl_s -lnls -lpt -lcrypt_i -lndbm"
+	    tryLIBFLAG="-lsocket -lnls -lnsl_s -lpt -lcrypt_i -lndbm"
+	else
+	    LIBFLAG="-lsocket -lnsl_s -lnls -lpt -lndbm"
+	    tryLIBFLAG="-lsocket -lnls -lnsl_s -lpt -lndbm"
+	    needcrypt=true
+	fi
+	sco3=false
+	case "$unamer" in
+	    1*) ;;
+	    2*)	;;
+	    3)	 sco3=true ;;
+	    3.0) sco3=true ;;
+	    3.1) sco3=true ;;
+	    3.1.*) sco3=true ;;
+	    3.*)   sco3=true
+#xxyyzz When sco 5 binaries are built **remove** this next line:
+		   bindir="bin/$hw_type"
+		   ;;
+	    4*) ;;
+	    5*) 
+#xxyyzz When sco 5 binaries are built **un-comment** this next line:
+		sco3=false
+		bindir="bin/$hw_type"
+		;;
+	    *)  ;;
+
+	esac
+
+#	# Note:  SCO doesn't have symbolic links.
+	$debug && echo "${dbg_hdr}If src/newrtelnet exists, then link correct versions"
+
+if $sco3
+then
+cat << "EOSS" >> $auxdir/srcmodcmds
+	if [ -f src/newrtelnet/machdep.sco ]
+	then
+	    cat src/newrtelnet/machdep.sco | sed \
+-e 's:^#[  ]*define[ 	][  ]*TCPERR[ 	][  ]*_TCPERR[  ]*$:/* #define TCPERR _TCPERR */:' \
+	    > src/newrtelnet/machdep.sco3
+	    ln src/newrtelnet/machdep.sco3 src/newrtelnet/machdep.c
+	    ln src/newrtelnet/debugging.vf src/newrtelnet/debugging.c
+	fi
+EOSS
+else
+cat << EOSS >> $auxdir/srcmodcmds
+	if [ -f src/newrtelnet/machdep.sco ]
+	then
+            cat src/newrtelnet/machdep.sco | sed \
+-e 's:^#[  ]*define[    ][  ]*TCPERR[   ][  ]*_TCPERR[  ]*$:#define TCPERR _TCPERR:' \
+            > src/newrtelnet/machdep.sco5
+	    ln src/newrtelnet/machdep.sco5 src/newrtelnet/machdep.c
+	    ln src/newrtelnet/debugging.vf src/newrtelnet/debugging.c
+	fi
+EOSS
+fi
+	;; 
+
+    SSFT)
+	no_support=true
+	hw_type="SSFT"
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBFLAG="-lbsd -lnsl"
+	tryLIBFLAG="-lnsl -lbsd"
+ 	INCLUDES="$INCLUDES -I/usr/include/bsd"
+cat << EOSS >> $auxdir/srcmodcmds
+ 	if [ -f /usr/include/sgtty.h ] ; then
+ 	    $cp /usr/include/sgtty.h src/inc
+ 	else
+ 	    echo "WARNING: Cannot find /usr/include/sgtty.h"
+ 	fi
+EOSS
+	;;
+
+    DELL)
+	no_support=true
+	hw_type="DELL"
+	os_type="SVR4"	
+	LIBFLAG="-lsocket -lnsl -lucb"
+	tryLIBFLAG="-lsocket -lnsl -lucb"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.dell
+	dbgfile=debugging.vf
+	;;
+
+    IUNIX)
+	hw_type="IUNIX"
+	os_type="SYS_V"
+	netware_type="BSD"
+	tryLIBFLAG="-lgen -linet -lnls -lnsl_s -lpt -lX11"
+	LIBFLAG="-lgen -linet -lnls -lnsl_s -lpt -lX11"
+	INCLUDES="$INCLUDES -I/usr/include/X11"
+	EINCFILES="$EINCFILES sys/stream.h net/errno.h"
+	case "$unamer" in
+	1*) ;;
+	2*) ;;
+	3.0|3.0*) ;;
+	3.1|3.1*) ;;
+	3.*) bindir="bin/$hw_type" ;;
+	*) ;;
+	esac
+
+
+# Note:  IUNIX doesn't have symbolic links.
+	$debug && echo "${dbg_hdr}If src/newrtelnet exists, then link correct versions"
+cat << EOSS >> $auxdir/srcmodcmds
+	if [ -f src/newrtelnet/machdep.iunix ]
+	then
+	    ln src/newrtelnet/machdep.iunix src/newrtelnet/machdep.c
+	    ln src/newrtelnet/debugging.vf src/newrtelnet/debugging.c
+	fi
+EOSS
+	;;
+
+    ICL)
+	hw_type="ICL"
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBFLAG="-lsocket -lnsl"
+	tryLIBFLAG="$LIBFLAG"
+# Avoid problems caused by BSD versions of the tools.
+	ar="/bin/ar"
+	cc="/bin/cc"
+	ranlib="echo done with library"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.icl
+	dbgfile=debugging.vf
+	;;
+
+    DG)
+	hw_type="DGUX"
+	os_type="SYS_V"
+	netware_type="TLI"
+	mantype=V
+	sockdefs='need'
+	funclist="$funclist sockdefs(0)"
+	LIBFLAG="-lnsl"
+	tryLIBFLAG="$LIBFLAG"
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.dgux
+	dbgfile=debugging.vf
+#	# Check to see if pre-compiled binaries are available
+#	# Built on 5.4R3.10
+	case "$unamer" in
+	    [1-4]*) ;;
+	    5.[123]*) ;;
+	    5.4*)
+		case "`echo $unamer | sed -e 's:^.*[a-zA-Z]::'`" in
+		    [12]*) ;;
+		    3.[0-9]) ;;
+		    *) bindir="bin/$hw_type" ;;
+		esac
+		;;
+	    5.*)  bindir="bin/$hw_type" ;;
+	    *) ;;
+	esac
+	;;
+
+    MOTOROLA|88K)
+	no_support=true
+        rel=`uname -v | cut -c1-3`  2>/dev/null
+        if [ "$rel" = "R40" ]
+        then
+                hw_type="MOTO_88K_V4"
+                echo " "
+                echo "Building for System V Release 4 O/S."
+                os_type="SVR4"
+                netware_type="TLI"
+                LIBFLAG="-lsocket -lnsl -lnls -lns -ledtp"
+                tryLIBFLAG="$LIBFLAG"
+                cc="/usr/ccs/bin/cc"
+                index="index strchr"
+                rindex="rindex strrchr"
+cat << EOSS >> $auxdir/srcmodcmds
+                $cp /usr/ucbinclude/strings.h src/inc/strings.h
+EOSS
+                INCFILES="$INCFILES sys/socket.h sys/stat.h"
+#		# Cause linking of correct newrtelnet files
+		machdepfile=machdep.dgux
+		dbgfile=debugging.vf
+        else
+	hw_type="MOTO_88K"
+                echo " "
+                echo "Building for System V Release 3 O/S."
+	os_type="SYS_V"
+	netware_type="BSD"
+	LIBFLAG="-lbsd"
+	tryLIBFLAG="-lbsd"
+        fi
+	;;
+
+    AUX)
+	no_support=true
+  	hw_type="AUX"
+  	os_type="SYS_V"
+  	HWFLAG="$HWFLAG -DBSDSIG"
+  	netware_type="BSD"
+ 	mantype=V manlayout=packed manext=''
+ 	mansrc=/usr/catman/a_man/man1
+#	# Cause linking of correct newrtelnet files
+	machdepfile=machdep.aux
+	dbgfile=debugging.vf
+ 	;;
+
+    LINUX)
+	hw_type="LINUX"
+	os_type="BSD"
+	netware_type="BSD"
+	HWFLAG="$HWFLAG -DUSE_FLOCK -traditional -m486 -O2"
+	INCFILES="$INCFILES sys/file.h"
+	mantype=v7 manlayout=dist manext=''
+	mansrc=/usr/man/man8
+#	# -ldb needed for erpcd database stuff
+	LIBFLAG="-static -ldb"
+	startup_dir=/etc/rc.d
+cat << EOSS >> $auxdir/srcmodcmds
+	echo "" > src/inc/search.h
+# Dunno what this is ...
+	grep -v ioctl /usr/include/bsd/sgtty.h > src/inc/sgtty.h
+EOSS
+	case "$unamer" in
+	    2.*)
+		LIBFLAG="-ldb"
+		HWFLAG="$HWFLAG -DHAS_CTRL_NOT_ACC"
+		bindir="bin/$hw_type"
+		;;
+	    .*|0*|1.0*|1.1|1.1.*)
+		ARFLAGS="pvu"
+		sendmsg='need'
+		recvmsg='need'
+		;;
+	    1.2|1.2.0|1.2.1|1.2.2)
+		sendmsg='need'
+		recvmsg='need'
+		;;
+	    *)
+		;;
+	esac
+	;;
+
+    GENERIC)
+	no_support=true
+	hw_type="GENERIC"
+	;;
+
+    TAHOE)
+	no_support=true
+	hw_type="TAHOE"
+	HWFLAG="$HWFLAG -a"
+#	# -a prevents structures from being longword padded
+	;;
+
+    CONVERGENT)
+	no_support=true
+	hw_type="CONVERGENT"
+	os_type="SYS_V"
+	netware_type="BSD"
+	;;
+
+    N[eE]XT)
+	no_support=true
+	hw_type="NEXT"
+	os_type="BSD"
+	netware_type="BSD"
+	SRCDIRS="$ALLSRC"
+	INCLUDES="-bsd $INCLUDES"
+	;;
+
+    PC)
+#	# "small" model
+	no_support=true
+	hw_type="PC"
+	HWFLAG="$HWFLAG -Ml"
+	;;
+
+    BSDI)
+	os_type="BSD"
+	hw_type=BSDI
+	[ -z "$netware_type" ] && netware_type="BSD"
+	[ -z "$mantype" ] && mantype=v7
+	LIBFLAG="-lipc"
+	SRCDIRS="$ALLSRC"
+	HWFLAG="$HWFLAG -DHAS_CTRL_NOT_ACC -DUSE_FLOCK"
+cat << EOSS >> $auxdir/srcmodcmds
+	echo "" > src/inc/search.h
+EOSS
+	case "$unamer" in
+	    2.0) ;;
+	    2.0.0) ;;
+	    2.*) bindir="bin/$hw_type" ;;
+	esac
+	;;
+
+    FREEBSD)
+	install_freebsdi=true
+	os_type="BSD"
+	hw_type=FREEBSD
+	[ -z "$netware_type" ] && netware_type="BSD"
+	mantype=v7 
+	manlayout=dist 
+	manext='' 
+	freebsdman="share"
+	mansrc=/usr/share/man/man1
+
+	LIBFLAG="-lcrypt"
+	SRCDIRS="$ALLSRC"
+	HWFLAG="$HWFLAG -DHAS_CTRL_NOT_ACC -DUSE_FLOCK"
+cat << EOSS >> $auxdir/srcmodcmds
+	echo "" > src/inc/search.h
+EOSS
+	;;
+
+
+    *) 
+	msgid=validnumprompt
+	. $MSG_FILE
+	rp="Enter Machine Type #:"
+	. ./.myread
+	continue
+	;;
+    esac
+
+#   # The case statement has been handled.  The code that handled each case
+#   # did one of two things:
+#   #     1) Set up for the build or install of the selected platform
+#   #     2) Called "continue" (to cause another loop through the platform
+#   #        case code).
+#   # We only get here in case #1. Since we have the info we need we break
+#   # out of the loop.  In case #2 we asked another question, got the answer
+#   # and jumped to the top of the loop again to process the new answer.
+
+    break
+
+done
+
+# Let the user know what the platform is and log it too.
+
+tmp="$hw_type"
+case "$hw_type" in
+    SUN)
+	case "$os_type" in 
+	    SVR4) tmp="SUN Solaris" ;;
+	esac
+	;;
+esac
+if $autodetected
+then
+    echo " "
+    echo     "The platform has been determined to be $tmp"
+fi
+echo "#" "The platform is $tmp" >> errors/shell
+echo "$tmp" > errors/platform
+
+case $subtype in
+UNSUPPORTED)
+	cat << EOSS
+ERROR: The $tmp platform is not supported in this S/W Release.
+       Aborting installation
+EOSS
+	exit 2
+	;;
+esac
+
+if $no_support
+then
+ 	msgid=nosupport
+ 	. $MSG_FILE
+fi
+
+###############################################################################
+# End: Get type of system
+###############################################################################
+
+
+
+
+############
+#
+# Call both osinstall and nwinstall to confirm that the
+# correct parameters/flags are set for the values
+#
+############
+
+
+#****************************************************************
+# Start: of osinstall
+#****************************************************************
+
+################################################################
+#
+# osinstall
+#
+# purpose   :   called to configure OS type for undetermined system types.
+#
+# Edited 3/23/92 for Concurrent changes
+#
+################################################################
+
+$debug && echo "${dbg_hdr}In os-install section of code"
+if [ -z "$os_type" ]
+then
+    echo " "
+    echo " "
+    echo "Select the most appropriate OS"
+    echo " "
+    echo " 1. 4.[23]BSD Unix (& UMAX BSD)"
+    echo " 2. System V Unix (& UMAX V)"
+    echo " 3. XENIX System V"
+    echo " 4. MACH"
+    echo " 5. SVR4 "
+    echo " "
+    if [ -z "$os_default" ]
+    then
+	rp="Enter OS number:"
+	dfltans=bad_answer
+    else
+	rp="Enter OS number [$os_default]:"
+	dfltans="$os_default"
+    fi
+    . ./.myread
+    [ -z "$ans" ] && ans="$dfltans"
+else
+    ans=$os_type
+fi
+
+while true
+do
+    $debug && echo "${dbg_hdr}OS Response: $ans"
+    case $ans in
+    "?")
+	msgid=genericsyshelp
+	. $MSG_FILE
+	continue
+	;;
+    1|BSD)
+	os_type="BSD"
+	[ -z "$netware_type" ] && netware_type="BSD"
+	[ -z "$mantype" ] && mantype=v7
+	case $hw_type in
+	ENCORE)
+#	    # Cause linking of correct newrtelnet files
+	    machdepfile=machdep.umax
+	    dbgfile=debugging.vf
+	    SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+	    ;;
+	SUN)
+	    SRCDIRS="$ANXSRC $SUPSRC $NEWRSRC $SOCSRC"
+	    ;;
+	*)
+	    SRCDIRS="$ALLSRC"
+	    ;;
+	esac
+	;;
+    2|SYS_V)
+	os_type="SYS_V"
+	[ -z "$mantype" ] && mantype=V
+	HWFLAG="$HWFLAG -DSYS_V"
+	SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+	CKBSDINC=true
+	case $hw_type in
+	ENCORE)
+#	    # We will now allow aprint for UMAXV
+	    SRCDIRS="$ANXSRC $SUPSRC $SOCSRC"
+	    if [ -d /dev/inet ]
+	    then
+		HWFLAG="$HWFLAG -DUMAX_V -DENCORE -q ext=pcc"
+	    else
+		HWFLAG="$HWFLAG -DUMAX_V"
+cat << EOSS >> $auxdir/srcmodcmds
+		$cat /usr/include/sys/h/socket.h > src/inc/sys/socket.h
+		$cat /usr/include/sys/netinet/in.h > src/inc/netinet/in.h
+		$cat /usr/include/signal.h > src/inc/signal.h
+EOSS
+		INCLUDES="$INCLUDES -I/usr/include/sys/aux"
+		LIBFLAG="-laux"
+	    fi
+#	    # Cause linking of correct newrtelnet files
+	    machdepfile=machdep.umaxv
+	    dbgfile=debugging.vf
+	    ;;
+	CONVERGENT)
+	    if [ -f /usr/include/sys/in.h ]; then
+cat << EOSS >> $auxdir/srcmodcmds
+		$cat /usr/include/sys/in.h > src/inc/netinet/in.h
+EOSS
+	    fi
+	    ;;
+	HP)
+	    if [ "$hp_os" = "seven" ]; then
+		sendmsg='need'
+		recvmsg='need'
+	    fi
+	    if [ ! -f /usr/include/arpa/telnet.h ] ; then
+		if [ ! -f /usr/include/netinet/telnet.h ] ; then
+cat << EOSS >> $auxdir/srcmodcmds
+		    $cp src/inc/port/xtelnet.h src/inc/arpa/telnet.h
+EOSS
+		else
+cat << EOSS >> $auxdir/srcmodcmds
+		    $cp /usr/include/netinet/telnet.h src/inc/arpa/telnet.h
+EOSS
+		fi
+#		INCLUDES="$INCLUDES -I../inc/arpa"
+	    fi
+	    ;;
+	MOTO_88K)
+	    recvmsg='need'
+	    sendmsg='need'
+	    ;;
+	MIPS)
+	    if [ -f /usr/include/sgtty.h ] ; then
+cat << EOSS >> $auxdir/srcmodcmds
+		$cp /usr/include/sgtty.h src/inc/sgtty.h
+EOSS
+	    else
+		echo "WARNING: Can not find /usr/include/sgtty.h"
+	    fi
+	    ;;
+	esac
+	;;
+    3|XENIX)
+	os_type="XENIX"
+	if [ "$hw_type" = "ENCORE" ]; then
+	  echo "WARNING!!  Encore system running XENIX not supported."
+	fi
+#	# don't trust xenix
+	index='need'
+	rindex='need'
+cat << EOSS >> $auxdir/srcmodcmds
+	$cat /usr/include/string.h > src/inc/strings.h
+	$cat src/inc/port/xuio.h > src/inc/sys/uio.h
+	echo " " > src/inc/sys/wait.h
+EOSS
+	SRCDIRS="$ANXSRC $SUPSRC"
+	HWFLAG="$HWFLAG -F 3000 -DSYS_V -DSYS_V_2 -DXENIX"
+	;;
+    4|MACH)
+	os_type="MACH"
+	netware_type="BSD"
+	SRCDIRS="$ALLSRC"
+	HWFLAG="$HWFLAG -DMACH"
+	INCLUDES="-I/usr/cs/include $INCLUDES"
+	;;
+    5|SVR4)
+	os_type="SYS_V"
+	[ -z "$mantype" ] && mantype=V
+	[ -z "$netware_type" ] && netware_type="TLI"
+	if [ $hw_type = "SUN" ]
+	then
+	    SRCDIRS="$ANXSRC $SUPSRC $NEWRSRC $SOCSRC"
+	else
+	    SRCDIRS="$ALLSRC"
+	fi
+	if [ ! -f /usr/include/arpa/telnet.h ] ; then
+	    if [ ! -f /usr/include/netinet/telnet.h ] ; then
+cat << EOSS >> $auxdir/srcmodcmds
+		$cp src/inc/port/xtelnet.h src/inc/arpa/telnet.h
+EOSS
+	    else
+cat << EOSS >> $auxdir/srcmodcmds
+		$cp /usr/include/netinet/telnet.h src/inc/arpa/telnet.h
+EOSS
+	    fi
+	fi
+	if [ ! -f /usr/include/strings.h ] ; then
+	    if [ -f /usr/include/string.h ] ; then
+cat << EOSS >> $auxdir/srcmodcmds
+		$cp /usr/include/string.h src/inc/strings.h
+EOSS
+	    fi
+	fi
+	HWFLAG="$HWFLAG -DSVR4 -DSYS_V"
+	;;
+    *) 
+	msgid=validnumprompt
+	. $MSG_FILE
+	rp="Enter OS number:"
+	. ./.myread
+	continue
+	;;
+    esac
+    break
+done
+
+$debug && echo "${dbg_hdr}OS Type = $os_type"
+
+#****************************************************************
+# End: of osinstall
+#****************************************************************
+
+
+
+#****************************************************************
+# Start: of nwinstall
+#****************************************************************
+# 
+# This must follow the osinstall section of code because that may set
+# netware_type.
+# 
+# In the following section of code we ask a question and set a flag.
+# We do this to allow the question to be asked just about anytime.
+# The actions that would be performed depend on the src directory
+# being available and that may not be the case for awhile.  Later
+# the flag is checked and source modified as needed.
+# 
+
+$debug && echo "${dbg_hdr}In nw-install section of code"
+
+if [ -z "$netware_type" ]
+then
+    ask_q=true
+else
+    ask_q=false
+fi
+
+# Start: "What kind of network software does your OS have?"
+while true
+do
+    if $ask_q
+    then
+cat << EOSS
+
+What kind of network software does your OS have?
+${indent}1. 4.[234]BSD or compatible
+${indent}2. Excelan EXOS package
+${indent}3. CMC package
+${indent}4. Wollongong WINS package
+${indent}5. None.  Use user-level SLIP (SysV / XENIX only)
+${indent}6. TLI.  (Transport Layer Interface)
+
+EOSS
+	rp="Enter network software type number:"
+	. ./.myread
+    else
+	ans=$netware_type
+    fi
+
+    $debug && echo "${dbg_hdr}Option response: $ans"
+
+    case $ans in
+    1|BSD)
+	tmp_net_type="BSD"
+	break
+	;;
+    2|EXOS)
+	tmp_net_type="EXOS"
+	break
+	;;
+    3|CMC)
+	tmp_net_type="CMC"
+	break
+	;;
+    4|WINS)
+	tmp_net_type="WINS"
+	break
+	;;
+    5|SLIP)
+	tmp_net_type="SLIP"
+	break
+	;;
+    6|TLI)
+	tmp_net_type="TLI"
+	break
+	;;
+    "?")
+	msgid=netsyshelp
+	. $MSG_FILE
+	ask_q=true
+	continue
+	;;
+    *) 
+	if $ask_q
+	then
+	    msgid=validnumprompt
+	    . $MSG_FILE
+	else
+	    ask_q=true
+	fi
+	continue
+	;;
+    esac
+done
+# End: "What kind of network software does your OS have?"
+
+
+#
+###############################################################################
+#
+
+# Check the amount of space needed for the host binaries.
+# If there are no pre-compiled versions available we will use this
+# estimate of how much space the compiled versions will take.
+
+kb_needed=1024
+
+# If non-null bindir then we should have pre-compiled binaries.
+# Check if they are in the distribution.
+if [ -n "$bindir" ]
+then
+    binary_avail=true
+    tmp=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE $bindir KB`
+    if [ "$tmp" -ge 0 ]
+    then
+#	# Directory with binaries found, use the indicated size
+	kb_needed=$tmp
+    else
+#	# Directory with binaries not found in distribution.  This may
+#	# be a first time build, an inhouse distribution or a test situation.
+	binary_avail=false
+	bindir=""
+    fi
+fi
+
+# Add enough space for erpcd.new and acp passwd files
+kb_needed=`expr $kb_needed + 500`
+#
+###############################################################################
+#
+
+# Determine where utilities go.
+# Sometimes we have a non-null instdir name and other times it is null.
+# We supply "blurfl/dyick" to the instdir so we always have a non-null name
+# making coding simpler (except we need a special "blurfl/dyick" case below).
+
+if [ -z "$instdir" ]
+then
+    if $binary_avail
+    then
+	dflt="/usr/annex"
+    else
+	dflt=$cwd
+    fi
+    instdir='blurfl/dyick'
+else
+    dflt="$instdir"
+fi
+
+# I don't think we want to do this anymore.
+# $didfixedconfig && test -d "$dflt" && instdir=$dflt
+
+# Note that we currently compile these paths right into the binaries,
+# so we have to mess with this feature.  Yuck.
+msgid=execdirintro
+$brief || . $MSG_FILE
+while [ ! -d "$instdir" ]
+do
+    case "$instdir" in
+    blurfl*)
+	;;
+
+    *)
+	echo " "
+	echo "$instdir does not appear to exist."
+	echo " "
+	;;
+    esac
+
+    tmp=true
+    while $tmp
+    do
+	tmp=false
+	rp="Utility directory [$dflt]:"
+	. ./.myread
+
+	case "$ans" in
+	    "")
+		ans=$dflt
+		reqdiracp=false
+		;;
+	    $dflt)
+		reqdiracp=false
+		;;
+	    "?")
+		msgid=execdirhelp
+		. $MSG_FILE
+		tmp=true
+		continue
+		;;
+	esac
+
+	ans=`./.filexp "$ans"`
+
+#	# if directory exists then issue warning
+	if [ -d "$ans" ]
+	then
+	    msgid=execdirexists
+	    . $MSG_FILE
+	fi
+
+	if ./.mkpath $ans
+	then
+	    instdir="$ans"
+	    break
+	else
+	    msgid=nonexistdir
+	    . $MSG_FILE
+	    continue
+	fi
+
+#	# Stub:
+#	# Replace this dumb code with something that can actually determine
+#	# how much space is really available in the specified directory.
+#	# We really need a consistent version of "df" to get this value.
+	kb_avail=$kb_avail
+#	if [ "$kb_needed" -gt "$kb_avail" ]
+#	then
+#	    # We want to give a message to the user and have an OK
+#	    : ask for continuation
+#	fi
+	break
+    done
+done
+
+
+#########################################################################
+# 
+# Possible Enhancement:
+# Enquire about the security directory (for ACP data files) or use
+# the same directory as the executables use.
+# Right now, the acp data files are expected in the same directory
+# that erpcd is going to be installed in.  In the future, to get
+# this code to ask the question, uncomment the code below.
+
+acpdir="$instdir"
+
+## if [ -z "$acpdir" ]
+## then
+##     if $binary_avail
+##     then
+## #	# In the precompiled binaries we have the security directory hardcoded.
+## 	msgid=usesoption
+## 	. $MSG_FILE
+##     fi
+## 
+##     kb_needed=100
+##     msgid=acpdirintro
+##     . $MSG_FILE
+## 
+##     $brief || echo ""
+##     $brief || echo "Select a directory for the ACP security files."
+##     dflt="$instdir"
+##     while true
+##     do
+## 	rp="ACP directory [$dflt]:"
+## 	. ./.myread
+## 	if [ -z "$ans" ]
+## 	then
+## 	    ans="$dflt"
+## 	fi
+## 	case "$ans" in
+## 	    "?")
+## 		msg=acpdirhelp
+## 		. $MSG_FILE
+## 		continue
+## 		;;
+## 	*)
+## 		ans=`./.filexp $ans`
+## 		if ./.mkpath $ans
+## 		then
+## 		    acpdir="$ans"
+## 		    break
+## 		else
+## 		    msgid=nonexistdir
+## 		    . $MSG_FILE
+## 		fi
+## 		continue
+## 		;;
+## 	esac
+##     done
+## fi
+$debug && echo "${dbg_hdr}Using $acpdir for acp data files."
+
+$brief && echo $n ".$c"
+
+
+#########################################################################
+#
+# This add will allow users to install the oper*, config.annex etc. files
+# in any directory they wish.
+# Note that we currently compile these paths right into the binaries,
+# so we have to disable this feature.  Yuck.
+
+# Check the amount of space needed for the operational images
+kb_needed=3
+tmp=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE bfs KB`
+if [ "$tmp" -ge 0 ]
+then
+    kb_needed=$tmp
+fi
+
+if [ -z "$USER_BFS" ]
+then
+    USER_BFS=brfl
+    dflt="$ERPCD/bfs"
+else
+    dflt="$USER_BFS"
+fi
+
+msgid=bfsdirintro
+$brief || . $MSG_FILE
+while true
+do
+    rp="BFS directory [$dflt]:"
+    . ./.myread
+
+    case "$ans" in
+	"")
+		ans=$dflt
+		reqdirbfs=false
+		;;
+	$dflt)
+		reqdirbfs=false
+		;;
+	"?")
+		msgid=bfsdirhelp
+		. $MSG_FILE
+		continue
+		;;
+	esac
+
+    ans=`./.filexp "$ans"`
+
+#   # Stub:
+#   # Replace this dumb code with something that can actually determine
+#   # how much space is really available in the specified directory.
+#   # We really need a consistent version of "df" to get this value.
+    kb_avail=$kb_avail
+#   if [ "$kb_needed" -gt "$kb_avail" ]
+#   then
+#	# We want to give a message to the user and have an OK
+#	: ask for continuation
+#    fi
+
+#   # if directory exists then issue warning
+    if [ -d "$ans" ]
+    then
+	msgid=bfsdirexists
+	. $MSG_FILE
+    fi
+
+    if ./.mkpath $ans
+    then
+	USER_BFS="$ans"
+	break
+    else
+	msgid=nonexistdir
+	. $MSG_FILE
+	continue
+    fi
+done
+$debug && echo "${dbg_hdr}Using $USER_BFS for images and boot files."
+
+
+
+###############################################################################
+#
+# Start: man page querys
+#
+###############################################################################
+#
+# Setup variables for man page install 
+#
+$debug && echo "${dbg_hdr}Start of man page querys"
+
+#############################################
+#
+# generic manual page handling
+#
+#
+# determine what type of manual page scheme should be used
+#
+BSDMAN='/usr/man/man1 /usr/man/manl /usr/catman'
+VMAN='/usr/man/u_man/man1 /usr/catman/u_man/man1 /usr/catman/index'
+AIX4MAN='/usr/share/man/cat1'
+MANSEARCH="$BSDMAN $VMAN $AIX4MAN"
+
+#
+# NotFirstPass = false <==> FirstPass = True
+#
+notfirstpass=false
+
+if $debug ; then
+    echo "${dbg_hdr}If didfixedconfig = true then skip setting mansrc"
+    echo "${dbg_hdr}Else"
+    echo "${dbg_hdr}    set mansrc to the directories that exist on this system."
+    echo "${dbg_hdr}Fixed config : $didfixedconfig"
+fi
+
+$didfixedconfig || 
+    case "$mansrc" in
+    '')
+	$debug && echo "${dbg_hdr}mansrc was null, setting it"
+	mansrc=`./.loc . '' $MANSEARCH`
+	;;
+    esac
+    $debug && echo "${dbg_hdr}Determine mantype from mansrc: $mansrc"
+    case "$mansrc" in
+    /usr/man/manl)
+	dfltmantype=1
+	dfltinst=y
+	manlayout=onedir
+	tdflt=1
+	;;
+    /usr/man/man[0-9]|/usr/share/man/man[0-9]|/usr/catman|/usr/man/catman/*)
+	dfltmantype=1
+	dfltinst=y
+	manlayout=dist
+	tdflt=2
+	;;
+    /usr/man/u_man*|/usr/catman/[aup]_man*)
+	dfltmantype=2
+	dfltinst=y
+	;;
+    /usr/catman/index)
+	dfltmantype=3
+	dfltinst=n
+	tdflt=1
+	;;
+    /usr/share/man/cat1)
+	if [ "$mantype" = "AIX4" ]
+	then
+	    $debug && echo "${dbg_hdr}mantype = AIX4"
+	fi
+	;;
+#   #
+#   # if none of the standard directories were found then
+#   # set variables so that man pages don't get installed as
+#   # the default option.
+#   #
+    *)
+	$notfirstpass || {
+	    mantype=none 
+	    mansrc='' 
+	    dfltmantype=0
+	    dfltinst=n
+	    notfirstpass=true
+	}
+	;;
+    esac
+#
+# if this is the first pass then set mantype = none, notfirstpass=true
+#
+#    $notfirstpass || {
+#    mantype=none
+#    notfirstpass=true
+#    }
+if $debug ; then
+	echo "${dbg_hdr}NotFirstPass : $notfirstpass"
+	echo "${dbg_hdr}Default Man type: $dfltmantype"
+	echo "${dbg_hdr}Man Type        : $mantype"
+	echo "${dbg_hdr}Man Layout      : $manlayout"
+	echo "${dbg_hdr}Man Source Dir  : $mansrc"
+	echo "${dbg_hdr}Check for which type of man install is desired/required"
+fi
+
+# Possible Enhancement:
+# If the man page question were replaced with this menu then it would
+# be possible to have the script just install man pages (if you are
+# careful in having certain sections below done and others not).
+# 
+# Do you wish to install manual pages at this time?
+#    1. Install man pages (as part of a regular installation)
+#    2. Install man pages only
+#    3. Do not install man pages
+
+echo " "
+while true
+do
+    rp="Do you wish to install manual pages at this time? [$dfltinst]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltinst
+    fi
+    case "$ans" in
+      n*|N*)
+	mantype="none"
+	break
+	;;
+      y*|Y*)
+	wantmanpages=true
+	break
+	;;
+      "?")
+	msgid=man_installhelp
+	. $MSG_FILE
+	continue
+	;;
+      *)
+	msgid=ynonly
+	. $MSG_FILE
+	continue
+	;;
+    esac
+done
+
+#
+# If mantype isn't set then prompt user for man-page-layout.
+#
+if [ -z "$mantype" ]
+then
+    echo " "
+    echo "What kind of on-line manual page layout do you have?"
+    echo "Select the most appropriate on-line manual page layout:"
+    echo " "
+    echo " 0. None (don't install on-line manual pages automatically)"
+    echo " 1. v7/BSD (/usr/man/man? /usr/catman/man?)"
+    echo " 2. SystemV (/usr/{catman,man}/[apu]_man/man?)"
+    echo " 3. SystemV.4 (/usr/catman/{ANNEX,index})"
+    echo " "
+    while true
+    do
+	rp="Enter on-line manual page type # [$dfltmantype]:"
+	. ./.myread
+
+#	# set ans to dfltmantype if <return> was entered
+	[ "$ans" = "" ] && ans=$dfltmantype
+
+#	# determine what mantype to use and directory struct.
+	case "$ans" in
+	0)
+	    mantype=none
+	    break
+	    ;;
+	1)
+	    mantype=v7
+	    MANSEARCH="$BSDMAN"
+	    break
+	    ;;
+	2)
+	    mantype=V
+	    MANSEARCH="$VMAN"
+	    break
+	    ;;
+	3)
+	    mantype=V4
+	    MANSEARCH="$VMAN"
+	    break
+	    ;;
+	"?")
+	    msgid=man_layouthelp
+	    . $MSG_FILE
+	    continue
+	    ;;
+	*)
+	    msgid=validnumprompt
+	    . $MSG_FILE
+	    continue
+	    ;;
+	esac
+    done
+#
+# the option chosen does not equal the default option
+# so clear any preset variables.
+#
+    if [ "$ans" != "$dfltmantype" ]
+    then
+	$debug && echo "${dbg_hdr}Clear mansrc, manlayout, manext, tdflt."
+	mansrc=''
+	manlayout=''
+	manext=''
+	tdflt=''
+    fi
+fi
+if $debug
+then
+    echo "${dbg_hdr}mansrc is set to : $mansrc"
+    echo "${dbg_hdr}mantype is set to: $mantype"
+fi
+
+
+#
+###############################################################################
+#
+
+
+case $mantype in
+
+#
+# AIX version 4 man install
+#
+AIX4)
+;;
+
+#
+# BSD style Man install
+#
+v7)
+    $debug && echo "${dbg_hdr}BSD Style man install"
+    xmansrc='blurfl/dyick'
+#   #
+#   ### While xmansrc isn't a directory do
+#   #
+    while [ ! -d "$xmansrc" ]
+    do
+	dflt="$mansrc"
+	case "$xmansrc" in
+	"") break ;;
+	blurfl*)
+	    ;;
+	*)
+	    echo "$xmansrc does not appear to exist."
+	    ;;
+	esac
+#######################################
+# If mandist hasn't been set then ask.
+#######################################
+
+	xdist='under /usr/man in man1,man5,man8'
+
+	if [ -z "$manlayout" ]
+	then
+	    xonedir='all in /usr/man/manl'
+
+#	    # Start: Get number of directories to install man pages to
+	    while true
+	    do
+		echo " "
+		echo "How should the on-line manual pages be installed?"
+		echo " "
+		echo " 0. Abort; don't install manual pages"
+		echo " 1. One directory (i.e., $xonedir)"
+		echo " 2. Multiple directories (i.e., $xdist)"
+		echo " "
+		if [ -z "$tdflt" ]
+		then
+		    rp="Enter manual page layout type:"
+		    dfltans=bad_answer
+		else
+		    rp="Enter manual page layout type [$tdflt]:"
+		    dfltans=$tdflt
+		fi
+		. ./.myread
+		if [ -z "$ans" ]
+		then
+		    ans="$dfltans"
+		fi
+		case "$ans" in
+		    q|Q)
+#			# Treat as abort
+			ans=0
+			break
+			;;
+		    0|1|2)
+#			# Valid answers
+			break
+			;;
+		    "?")
+			msgid=man_numdirhelp
+			. $MSG_FILE
+			continue
+			;;
+		    *)
+			msgid=validnumprompt
+			. $MSG_FILE
+			continue
+			;;
+		esac
+	    done
+#	    # End: Get number of directories to install man pages to
+
+	    case "$ans" in
+	    0)
+		mantype="none"
+		;;
+	    1)
+		manlayout=onedir
+		base=''
+		;;
+	    2)
+		manlayout=dist
+		[ "" != "$dflt" ] && dflt=`$expr $dflt : '\(.*\)/.*' '|' $dflt`
+		base=' base'
+		;;
+	    *)
+		continue
+		;;
+	    esac
+	    [ "$mantype" = "none" ] && break
+	fi
+
+	if [ "$freebsdman" = share ]
+	then
+        	dflt_dir=$xdist
+	elif [ "$manlayout" = dist ]
+	then
+		if [ -d /usr/share/man ]
+ 		then
+		    dflt_dir='under /usr/share/man in man1,man5,man8'
+		else
+		    dflt_dir='under /usr/man in man1,man5,man8'
+		    fi
+	else
+        	dflt_dir=$dflt
+	fi
+
+#	# Start: "What directory should be used?"
+	while true
+	do
+	    echo " "
+	    rp="What$base directory should be used? (q=quit) [$dflt_dir]:"
+	    . ./.myread
+	    case "$ans" in
+		"") ans="$dflt_dir" ;;
+	    esac
+	    case "$ans" in
+		"under /usr/man in man1,man5,man8")
+		    ans=/usr/man
+		    xmansrc=/usr/man
+		    ;;
+		"under /usr/share/man in man1,man5,man8")
+		    ans=/usr/share/man
+		    xmansrc=/usr/share/man
+		    ;;
+		"?")
+		    msgid=man_basedirhelp
+		    . $MSG_FILE
+		    continue
+		    ;;
+		Q|q)
+		    ans=q
+		    mantype="none"
+		    mansrc=""
+		    xmansrc=""
+		    manlayout=""
+		    break
+		    ;;
+		"")
+		    xmansrc="$dflt"
+		    ;;
+		*)
+		    xmansrc=`./.filexp "$ans"`
+		    ;;
+	    esac
+	    break
+	done
+#	# End: "What directory should be used?"
+
+	baddir1="That does not appear to be a manual page directory,"
+	baddir2="but if you insist on it, you can use it."
+	baddir3="but I'll let you use it, since you insisted."
+	case "$manlayout" in
+	onedir)
+	    case "$xmansrc" in
+	    *man?|*cat?)
+		;;
+	    "$lastxmansrc")
+		echo " "
+		echo $baddir1 ; echo $baddir3
+		;;
+	    *)
+		echo " "
+		echo $baddir1 ; echo $baddir2
+		lastxmansrc="$xmansrc"
+		xmansrc='blurfl/dyick'
+		;;
+	    esac
+	    ;;
+	dist)
+	    case "$xmansrc" in
+	    *man1)
+		;;
+	    *man?|*cat?)
+		echo " "
+		echo $baddir1 ; echo $baddir2
+		lastxmansrc="$xmansrc"
+		xmansrc='blurfl/dyick'
+		;;
+	    "$lastxmansrc")
+		echo " "
+		echo $baddir1 ; echo $baddir3
+		;;
+	    *)
+		xmansrc="$xmansrc/man1"
+		;;
+	    esac
+	    ;;
+	esac
+    done
+    mansrc="$xmansrc"
+    case "$mansrc" in
+    *cat*)
+	echo " "
+	echo "Looks like I'll be putting pre-formatted manual pages there."
+	;;
+    esac
+#   # figure out extension
+    case "$manlayout" in
+    onedir)
+	while true
+	do
+	    dflt=`$expr "$mansrc" : '.*\(.\)' '|' X`
+	    echo " "
+	    echo "How are manual page extensions handled in $mansrc?"
+	    echo " "
+	    echo " 0. Abort; don't install manual pages"
+	    echo " 1. They use a fixed extension like \".$dflt\""
+	    echo " 2. They use the extension of the manual page"
+	    echo "    (i.e., \".1\", \".5\", \".8\" - note that this is not typical)"
+	    echo " "
+	    dfltans=1
+	    rp="Enter manual page extension type [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+
+	    case "$ans" in
+	    "?")
+		msgid=man_pageexthelp
+		. $MSG_HELP
+		continue
+		;;
+	    0)
+		mantype="none"
+		break
+		;;
+	    2)
+		manext=''
+		break
+		;;
+	    1)
+		while true
+		do
+		    echo " "
+		    rp="What is the extension used? [$dflt]:"
+		    . ./.myread
+		    if [ -z "$ans" ]
+		    then
+			ans=$dflt
+		    fi
+		    if [ "$ans" != "?" ]
+		    then
+#			# Gave real answer
+			manext="$ans"
+			[ "$manext" = "" ] && manext=$dflt
+			break
+		    else
+#			# Wants help
+			msgid=man_exthelp
+			. $MSG_FILE
+			continue
+		    fi
+		    break
+		done
+		break
+		;;
+	    *)
+		msgid=validnumprompt
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	done
+	;;
+    dist)
+	manext=''
+	;;
+    esac
+    ;;
+
+#
+# System V man install
+#
+V*)
+    if $debug ; then
+	echo "${dbg_hdr}SysV type man install"
+	echo "${dbg_hdr}mansrc set to : $mansrc"
+    fi    
+    xmansrc='blurfl/dyick'
+    if [ -z "$mansrc" ]
+    then
+	dflt=
+    else
+#	dflt=`$expr $mansrc : '\(.*\)/.*' '|' $mansrc`
+	dflt=`$expr $mansrc : '\(/.*/.*\)/.*' '|' $mansrc`
+    fi
+    while [ ! -d "$xmansrc" ]
+    do
+	case "$xmansrc" in
+	blurfl*)
+	    ;;
+	*)
+	    echo "$xmansrc does not appear to exist."
+	    ;;
+	esac
+	echo " "
+	if [ $mantype = "V4" ]
+	then
+	    manlayout=packed
+	    msgid=man_index
+	    . $MSG_FILE
+	else
+	    msgid=man_catman
+	    . $MSG_FILE
+	fi
+	echo " "
+	rp="What is the manual page base directory? (q=quit) [$dflt]:"
+	. ./.myread
+	case "$ans" in
+	    "?")
+		msgid=man_pagebasedirhelp
+		. $MSG_FILE
+		continue
+		;;
+	    q|Q)
+		mantype="none"
+		break
+		;;
+	    "")
+		ans=$dflt
+		;;
+	esac
+	xmansrc=`./.filexp "$ans"`
+    done
+    if [ "$mantype" != "none" ]
+    then
+	if [ "$mantype" = "V4" ]
+	then
+	    mansrc="$xmansrc/ANNEX"
+	else
+	    if [ -d $xmansrc/u_man/man1 ]
+	    then
+		mansrc="$xmansrc/u_man/man1"
+	    else
+		mansrc="$xmansrc/u_man/cat1"
+		MAN="cat"
+	    fi
+	fi
+	case "$mansrc" in
+	*cat*)
+	    echo " "
+	    echo "Looks like I'll be putting pre-formatted manual pages there."
+	    ;;
+	esac
+#	# everyone has "cat.1", right?
+	case "$mansrc"/cat.1*.z in
+	*.z)
+	    manlayout=packed
+	    echo " "
+	    echo "Manual pages there will be packed after being installed."
+	    ;;
+	esac
+    fi
+    ;;
+#
+# Don't install man pages.
+#
+*)
+    mantype="none"
+    ;;
+esac
+
+if [ "$mantype" != "none" ]
+then
+    OTHERINSTALL="$OTHERINSTALL install-man"
+    $debug && echo "${dbg_hdr}Man pages requested -- install will be $OTHERINSTALL"
+fi
+
+$debug && echo "${dbg_hdr}Done with man page querys"
+
+###############################################################################
+#
+# End: man page querys
+#
+###############################################################################
+
+
+
+
+###############################################################################
+#
+# Start: Get files from distribution
+#
+###############################################################################
+
+
+# If no compiler was found then give the installer a chance to enter
+# the path to the compiler.  If we could do a binary install then we
+# do not ask this though.
+
+if [ $compiler_avail = false -a $binary_avail = false ]
+then
+
+    msgid=enterccname
+    . $MSG_FILE
+
+    while true
+    do
+	dfltans="none"
+	rp="Enter the full path name to your compiler [$dfltans]:"
+	. ./.myread
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case "$ans" in
+	    [Nn][Oo][Nn][Ee])
+		break
+		;;
+	    "?")
+		msgid=helpccname
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		ans=`./.filexp $ans`
+		if [ -f $ans ]
+		then
+		    cc=$ans
+		    compiler_avail=true
+		    break
+		else
+		    echo " "
+		    echo "**** File not found: $ans"
+		    echo " "
+		    continue
+		fi
+	esac
+    done
+fi
+
+
+# The following sourced in code needs to have the variables
+# "binary_avail" and "compiler_avail" set to "true" or "false".
+# It will set variables "usebinaries", "getsrcs" and "docomp".
+
+. ${SCRIPT_DIR}/.install_part2
+
+if $usebinaries
+then
+    case "${reqdiracp}${reqdirbfs}" in
+	truetrue)
+	    msgid=binwarnboth
+	    . $MSG_FILE
+	    ;;
+	truefalse)
+	    msgid=binwarnacp
+	    . $MSG_FILE
+	    ;;
+	falsetrue)
+	    msgid=binwarnbfs
+	    . $MSG_FILE
+	    ;;
+    esac
+fi
+
+
+if $docomp
+then
+    tobuild=y
+else
+    tobuild=n
+    toinstall=n
+fi
+$debug && echo "${dbg_hdr}docomp=$docomp set tobuild=$tobuild"
+
+
+
+# Create a directory name for things that are prior to this release
+# Note: PRE_DIR is also used when creating "installer"
+if [ -n "$vers" ]
+then
+    PRE_DIR=`echo "PRE-$vers" | sed -e "s:[/ 	]::g"`
+else
+    PRE_DIR=`date '+PRE-%y%m%d'`
+fi
+
+
+
+
+# Right now we know if we need source files, binary files, and man pages.
+# We also know if we are installing from tarfile, tape floppies etc.
+# So this is the place to install the other directories from the distribution.
+#
+
+############################################################################
+#
+# Get the desired files out of the tarfile on the distribution medium.
+# We extract differently depending on the distribution medium.
+#
+
+# Note: If the user requested man pages then we will always extract them.
+# They might not actually be installed into /usr/man though (perhaps because
+# later the user answered "quit" to a man page question or perhaps because
+# some error prevented the mantype variable from being set right).  At least
+# by doing the extraction the man pages are available on hard disk for a
+# manual install without the user having to dig up the tape again.  To
+# implement this, the new variable "wantmanpages" was created.  Once things
+# are fixed up better, the use of this can be removed.  The "$mantype" = "none"
+# check was older code.  It really does nothing here now but should remain
+# if the "wantmanpages" variable is ever removed.
+if [ "$mantype" = "none" ]
+then
+    getmanpages=false
+fi
+if $wantmanpages
+then
+    getmanpages=true
+fi
+
+if $tar_needed
+then
+
+    # Create the list of directories to extract (currently we always do bfs 
+    # and bsac)
+    extract_these="bfs bsac"
+
+    if $getmanpages
+    then
+	extract_these="$extract_these man"
+#	# On some machines the tar command does not create directories
+	./.mkpath man/src
+	./.mkpath man/cat
+    fi
+
+    if $usebinaries
+    then
+	extract_these="$extract_these $bindir"
+    fi
+
+    src_backup="${PRE_DIR}-src"
+    ask_q=false
+
+    if [ ! -d "src" ]
+    then
+	: The "src" directory does not exist.
+	: We can extract it from the distribution.
+    else
+#	# The "src" directory already exists.  We attempt to rename it
+#	# but if that was already done we will have to ask for help.
+
+	if [ ! -d "$src_backup" ]
+	then
+#	    # There has been no prior backup of the "src" directory.
+#	    # We attempt to backup (rename) the "src" directory now.
+    	    mv src $src_backup 2> /dev/null
+    	    if [ -d "$src_backup" ]
+    	    then
+
+    		# Print a message saying it was backed up.
+		echo "NOTICE: Renamed existing \"src\" directory to \"$src_backup\"."
+
+		# Flag an extraction of "src" from the distribution.
+		do_config=true
+
+	    else
+#		# The backup/rename did not work.
+#		# Do **NOT** print any messages about the rename failing.
+#		# Ask the user what to do.
+		ask_q=true
+	    fi
+
+	else
+#	    # A backup of the "src" directory already exists.  Print a message.
+
+	    msgid=oldsrcavail
+	    . $MSG_FILE
+	    echo "NOTICE: Directory $src_backup already exists."
+	    echo
+
+#	    # Ask the user what to do.
+	    ask_q=true
+
+	fi
+    fi
+
+
+#   # do_config will be set true only if we are getting all sources
+    do_config=false
+    if $getsrcs
+    then
+	do_config=true
+	if $ask_q
+	then
+	    do_config=false
+	    msgid=oldsrcavail
+	    . $MSG_FILE
+	    while true
+	    do
+		echo " "
+		echo "Which action should be taken:"
+		echo "${indent}1) Continue installation without overwriting the \"src\" directory"
+		echo "${indent}2) Overwrite the \"src\" directory"
+		echo "${indent}3) Quit the installation now"
+		echo " "
+		dfltans=1
+		rp="Enter your response [$dfltans]:"
+		. ./.myread
+		if [ -z "$ans" ]
+		then
+		    ans=$dfltans
+		fi
+		case $ans in
+		    1)
+#			# Skip extracting "src" directory
+			do_config=false
+			minimum_src=""
+			break
+			;;
+		    2)
+#			# Overwrite "src" directory
+			do_config=true
+			break
+			;;
+		    3|Q*|q*)
+#			# Quit
+	                msgid=abort_quit
+        	        . $MSG_FILE
+                	break
+			;;
+		    "?")
+			msgid=oldsrcavailhelp
+			. $MSG_FILE
+			continue
+			;;
+		    *)
+			msgid=validnumprompt
+			. $MSG_FILE
+			continue
+			;;
+		esac
+	    done
+	fi
+    fi
+
+#   # We also almost always include some of the src files that have examples.
+#   # However, we do not look for these files/directories seperately if the
+#   # src directory is being extracted. Nor do we get them if the user said
+#   # he did not want to overwrite the source directory.
+
+    if $do_config
+    then
+	extract_these="$extract_these src"
+    else
+#	# The entire "src" directory is not being extracted
+#	# but get the minimum required directories from src
+	extract_these="$extract_these $minimum_src"
+    fi
+
+
+#   # Stub:
+#   # Replace this dumb code with something that can actually determine
+#   # how much space is really available in the specified directory.
+#   # We really need a consistent version of "df" to get this value.
+    mb_avail=$mb_avail
+
+#   # Add up the space needed by these directories and compare it with
+#   # what is available.  Ask for a continuation if there is not enough space.
+
+    if [ "$medium" != "nowhere" ]
+    then
+	kb=0
+	for tmp in $extract_these
+	do
+#	    # On some machines the tar command does not create directories
+	    ./.mkpath $tmp
+	    tmp2=`sh ${SCRIPT_DIR}/.util_size $FILEDATAFILE $tmp KB`
+	    if [ "$tmp2" -ge 0 ]
+	    then
+		kb=`expr $kb + $tmp2`
+	    fi
+	done
+	mb_needed=`sh ${SCRIPT_DIR}/.util_size "convert_kb" $kb MB`
+# Stub:
+#	if [ "$mb_needed" -gt "$mb_avail" ]
+#	then
+#	    : ask for continuation
+#	fi
+    fi
+
+#   Call on another script to actually extract the files
+    sh ${SCRIPT_DIR}/.media_read "$medium" "$tarfile" $extract_these
+
+#   Check for an abort or user request to quit (exit values 2 or 3)
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+fi
+
+# Check for a nasty condition that should not occur,
+# a binary installation with no binaries (at least not the important one)
+if $usebinaries
+then
+    if [ ! -f $bindir/erpcd ]
+    then
+	msgid=binsmissing
+	. $MSG_FILE
+	rm -f $tempfiles
+	exit 1
+    fi
+fi
+###############################################################################
+#
+# End: Get files from distribution
+#
+###############################################################################
+
+
+
+
+###############################################################################
+#
+# Start: Create man page install scripts
+#
+###############################################################################
+
+$debug && echo "${dbg_hdr}Start of creating man page install scripts"
+
+# Remove any older man page installation code
+rm -f $auxdir/instman.mk $auxdir/instman.sh
+
+case "$mantype" in
+#
+# BSD style Man install
+#
+v7)
+    case "$manlayout" in
+    dist)
+	if [ -z "$mansrc" ]
+	then
+	    manbase=
+	else
+	    manbase=`$expr $mansrc : '\(.*\)/.*' '|' $mansrc`
+	fi
+	manrepl='man$$ext/$$page'
+	manrepl_sh='man$ext/$page'
+	;;    
+    onedir)
+	manbase="$mansrc"
+	if [ -z "$manext" ]
+	then
+	    manrepl='$$page'
+	    manrepl_sh='$page'
+	else
+	    manrepl='`basename $$page .$$ext`.\$(MANMAP)'
+	    manrepl_sh='`basename $page .$ext`.\${MANMAP}'
+	fi
+	;;
+    esac
+    
+    case "$mansrc" in
+    *cat*)
+	usedir=../man/cat
+	;;
+    *)
+	usedir=../man/src
+	;;
+    esac
+    cat > $auxdir/instman.mk <<EOSS
+
+# MANTYPE = V7
+MANDIR = $usedir
+MANEXTS = 1 5 8
+MANBASE = $manbase
+MANMAP = $manext
+PACKABLE = $packed
+
+install-man:
+	@$echo "*** Installing manual pages ***" > /dev/tty
+	@sh -c 'cd \$(MANDIR) ; for ext in \$(MANEXTS) ; do \\
+	for page in *.\$\$ext ; do \\
+		dstname=\$(MANBASE)/$manrepl ; \\
+		$rm -f \$\$dstname* ; \\
+		$cp \$\$page \$\$dstname ; \\
+		\$(PACKABLE) && $pack -f \$\$dstname ; \\
+		$chmod 444 \$\$dstname* ; \\
+	done ; \\
+	done'
+EOSS
+
+    cat > $auxdir/instman.sh <<EOSS
+#!/bin/sh
+# MANTYPE=V7
+MANDIR=$usedir
+MANEXTS="1 5 8"
+MANBASE=$manbase
+MANMAP=$manext
+PACKABLE=$packed
+
+echo "*** Installing manual pages ***" > /dev/tty
+cd \${MANDIR}
+for ext in \${MANEXTS}
+do
+	for page in *.\$ext
+	do
+		dstname=\${MANBASE}/$manrepl_sh
+		$rm -f \${dstname}*
+		$cp \$page \$dstname
+		\${PACKABLE} && $pack -f \$dstname
+		$chmod 444 \${dstname}*
+	done
+done
+EOSS
+    ;;
+
+
+AIX4)
+    usedir=../man/cat
+    manbase=/usr/share/man
+    packed=false
+cat > $auxdir/instman.sh <<EOSS
+#!/bin/sh
+MANTYPE=AIX4
+MANDIR=$usedir
+MANEXTS="1 5 8"
+MANBASE=$manbase
+PACKABLE=$packed
+
+echo "*** Installing manual pages ***" > /dev/tty
+cd \${MANDIR}
+for ext in \${MANEXTS}
+do
+	$mkdir -p \${MANBASE}/cat\${ext} 2> /dev/null
+	for page in *.\$ext
+	do
+		dstname=\${MANBASE}/cat\${ext}/\$page
+		$rm -f \${dstname}
+		$cp \$page \${dstname}
+echo '		\${PACKABLE} && $pack -f \${dstname}	' > /dev/null
+		$chmod 444 \${dstname}
+	done
+done
+EOSS
+
+cat > $auxdir/instman.mk <<EOSS
+
+MANTYPE=AIX4
+MANDIR=$usedir
+MANEXTS=1 5 8
+MANBASE=$manbase
+PACKABLE=$packed
+
+install-man:
+	@$echo "*** Installing manual pages ***" > /dev/tty
+	@sh -c 'cd \$(MANDIR) ; for ext in \$(MANEXTS) ; do \\
+		$mkdir -p \$(MANBASE)/cat\$\$ext 2> /dev/null ; \\
+		for page in *.\$\$ext ; do \\
+			dstname=\$(MANBASE)/cat\$\$ext/\$\$page ; \\
+			$rm -f \$\$dstname ; \\
+			$cp \$\$page \$\$dstname ; \\
+			$chmod 444 \$\$dstname ; \\
+		done ; \\
+	done'
+
+EOSS
+;;
+
+
+V)
+    manbase=`$expr $mansrc : '\(.*\)/.*/.*' '|' $mansrc`
+    packed=false
+    case "$manlayout" in
+      packed)
+# for 14-char filename limits 
+	packed=test' `expr $$dstname : \.\*` -le 12'
+	;;
+    esac
+    
+    case "$mansrc" in
+      *cat*)
+	usedir=../man/cat
+	echo "" > man/prefix
+	;;
+      *)
+	usedir=../man/src
+	echo ".ds sy V" > man/prefix
+	;;
+
+    esac
+
+#   # Make sure the directories we need are there
+    ./.mkpath $manbase/p_man/${MAN}4
+    ./.mkpath $manbase/a_man/${MAN}1
+
+    cat > $auxdir/instman.mk <<EOSS
+
+# MANTYPE = V
+MANDIR = $usedir
+MANEXTS = 5 8
+MANBASE = $manbase
+MANMAP = p_man/${MAN}4 4 a_man/${MAN}1 1m
+PACKABLE = $packed
+
+install-man:
+	@$echo "*** Installing manual pages ***" > /dev/tty
+	@sh -c 'set \$(MANMAP) ; cd \$(MANDIR) ; for ext in \$(MANEXTS) ; do \\
+	subdir=\$\$1 subext=\$\$2 ; \\
+	for page in *.\$\$ext ; do \\
+		dstname=\$(MANBASE)/\$\$subdir/\`basename \$\$page .\$\$ext\`.\$\$subext ; \\
+		$rm -f \$\$dstname* ; \\
+		$cat ../prefix \$\$page > \$\$dstname ; \\
+		\$(PACKABLE) && $pack -f \$\$dstname ; \\
+		$chmod 444 \$\$dstname* ; \\
+	done ; \\
+	shift ; shift ; \\
+	done'
+EOSS
+
+    cat > $auxdir/instman.sh <<EOSS
+#!/bin/sh
+MANDIR=$usedir
+MANEXTS="5 8"
+MANBASE=$manbase
+MANMAP="p_man/${MAN}4 4 a_man/${MAN}1 1m"
+PACKABLE=$packed
+
+echo "*** Installing manual pages ***" > /dev/tty
+
+set \${MANMAP}
+cd \${MANDIR}
+for ext in \${MANEXTS}
+do
+	subdir=\$1 subext=\$2
+	for page in *.\$ext
+	do
+		dstname=\${MANBASE}/\$subdir/\`basename \$page .\$ext\`.\$subext
+		$rm -f \${dstname}*
+		$cat ../prefix \$page > \$dstname
+		\${PACKABLE} && $pack -f \$dstname
+		$chmod 444 \${dstname}*
+	done
+	shift
+	shift
+done
+EOSS
+    ;;
+V4)
+    manbase=`$expr $mansrc : '\(.*\)/.*' '|' $mansrc`
+    packed=false
+    case "$manlayout" in
+      packed)
+# for 14-char filename limits 
+	packed=test' `expr $$fname : \.\*` -le 12'
+	;;
+    esac
+    
+    case "$mansrc" in
+      *cat*)
+	usedir=../man/cat
+	echo "" > man/prefix
+	;;
+      *)
+	usedir=../man/src
+	echo ".ds sy V" > man/prefix
+	;;
+    esac
+
+#do something special for solaris
+  if [ "$hw_type" = "SUN" ]
+  then
+    cat >src/${manprod}.awk <<EOSS
+	\$\$0 ~ /MANSECTS=/ && \$\$0 !~ /$manprod/ \\
+			{ \\
+			printf("%s,$manprod\n", \$\$0) ; \\
+			continue ; \\
+			} \\
+
+	{\\
+	print \$\$0 ;\\
+	}
+EOSS
+    cat > $auxdir/instman.mk <<EOSS
+
+# MANTYPE = V4 (solaris)
+MANDIR = $usedir
+MANBASE = $manbase
+PACKABLE = $packed
+
+install-man:
+	@$echo "*** Installing manual pages ***" > /dev/tty
+	@sh -c ' \\
+	$cat \$(MANBASE)/man.cf | \\
+		$awk -f ${manprod}.awk > \$(MANBASE)/man.cf.$manprod; \\
+	$cp \$(MANBASE)/man.cf.$manprod \$(MANBASE)/man.cf; \\
+	$rm \$(MANBASE)/man.cf.$manprod; \\
+	cd \$(MANDIR) ; \\
+        if [ ! -d \$(MANBASE)/man$manprod ] ; \\
+	then \\
+		$mkdir \$(MANBASE)/man$manprod ; \\
+	else \\
+		$rm -f \$(MANBASE)/man$manprod/* ; \\
+	fi ; \\
+	for page in * ; \\
+	do \\
+		if fname=\`$expr \$\$page : "\\(.*\\)\\..*"\` ; \\
+		then \\
+			dstname=\$(MANBASE)/man$manprod/\$\$fname ; \\
+			$rm -f \$\$dstname* ; \\
+			$cat ../prefix \$\$page > \$\$dstname ; \\
+			$chmod 444 \$\$dstname* ; \\
+		else \\
+			$echo "Cannot install \$\$fname" ; \\
+		fi ; \\
+	done;'
+EOSS
+
+    cat > $auxdir/instman.sh <<EOSS
+#!/bin/sh
+# MANTYPE=V4 (solaris)
+MANDIR=$usedir
+MANBASE=$manbase
+PACKABLE=$packed
+
+echo "*** Installing manual pages ***" > /dev/tty
+$cat \${MANBASE}/man.cf | \\
+	$awk -f ${manprod}.awk > \${MANBASE}/man.cf.$manprod
+$cp \${MANBASE}/man.cf.$manprod \${MANBASE}/man.cf
+$rm \${MANBASE}/man.cf.$manprod
+cd \${MANDIR}
+if [ ! -d \${MANBASE}/man$manprod} ]
+then
+	$mkdir \${MANBASE}/man$manprod
+else
+	$rm -f \${MANBASE}/man$manprod/*
+fi
+for page in *
+do
+	if fname=\`$expr \$page : "\\(.*\\)\\..*"\`
+	then
+		dstname=\${MANBASE}/man$manprod/\$fname
+		$rm -f \${dstname}*
+		$cat ../prefix \$page > \$dstname
+		$chmod 444 \${dstname}*
+	else
+		$echo "Cannot install \$fname"
+	fi
+done
+EOSS
+
+  else
+
+#non solaris 
+    cat > $auxdir/instman.mk <<EOSS
+
+# MANTYPE = V4 (non-solaris)
+MANDIR = $usedir
+MANBASE = $manbase
+PACKABLE = $packed
+
+install-man:
+	@$echo "*** Installing manual pages ***" > /dev/tty
+	@sh -c 'cd \$(MANDIR) ; \\
+        if [ ! -d \$(MANBASE)/$MANPROD ] ; \\
+	then \\
+		$mkdir \$(MANBASE)/$MANPROD ; \\
+	else \\
+		$rm -f \$(MANBASE)/$MANPROD/* ; \\
+	fi ; \\
+        if [ -f \$(MANBASE)/index/$manprod ] ; \\
+	then \\
+		$rm -f \$(MANBASE)/index/$manprod ; \\
+	fi ; \\
+	for page in * ; \\
+	do \\
+		if fname=\`$expr \$\$page : "\\(.*\\)\\..*"\` ; \\
+		then \\
+			dstname=\$(MANBASE)/$MANPROD/\$\$fname ; \\
+			$rm -f \$\$dstname* ; \\
+			$cat ../prefix \$\$page > \$\$dstname ; \\
+			if \$(PACKABLE) ; \\
+			then \\
+				$pack -f \$\$dstname ; \\
+				$echo \$\${dstname}.z >> \$(MANBASE)/index/$manprod ; \\
+			else \\
+				$echo \$\$dstname >> \$(MANBASE)/index/$manprod ; \\
+			fi ; \\
+			$chmod 444 \$\$dstname* ; \\
+		else \\
+			$echo "Cannot install \$\$fname" ; \\
+		fi ; \\
+	done;'
+EOSS
+
+    cat > $auxdir/instman.sh <<EOSS
+#!/bin/sh
+# MANTYPE = V4 (non-solaris)
+MANDIR=$usedir
+MANBASE=$manbase
+PACKABLE=$packed
+
+echo "*** Installing manual pages ***" > /dev/tty
+cd \${MANDIR}
+if [ ! -d \${MANBASE}/$MANPROD ]
+then
+	$mkdir \${MANBASE}/$MANPROD
+else
+	$rm -f \${MANBASE}/$MANPROD/*
+fi
+if [ -f \${MANBASE}/index/$manprod ]
+then
+	$rm -f \${MANBASE}/index/$manprod
+fi
+for page in *
+do
+	if fname=\`$expr \$page : "\\(.*\\)\\..*"\`
+	then
+		dstname=\${MANBASE}/$MANPROD/\$fname
+		$rm -f \${dstname}*
+		$cat ../prefix \$page > \$dstname
+		if \${PACKABLE}
+		then
+			$pack -f \$dstname
+			$echo \${dstname}.z >> \${MANBASE}/index/$manprod
+		else
+			$echo \$dstname >> \${MANBASE}/index/$manprod
+		fi
+		$chmod 444 \${dstname}*
+	else
+		$echo "Cannot install \$fname"
+	fi
+done
+EOSS
+
+  fi
+    ;;
+esac
+
+$debug && echo "${dbg_hdr}End of creating man page install scripts in $auxdir"
+
+###############################################################################
+#
+# End: Create man page install scripts
+#
+###############################################################################
+
+
+
+$debug && echo "${dbg_hdr}Binary installation = $usebinaries"
+# If building our own erpcd then we do not require the -f and -s options
+# on the command line.  But if using pre-compiled erpcd then we might need
+# these options if the directories specified by the user are different
+# than what was built into the pre-compiled erpcd.
+$usebinaries || reqdiracp=false
+$usebinaries || reqdirbfs=false
+
+
+
+#############################################################################
+#
+# Start: Backup of operational images (and possible installation)
+#
+#############################################################################
+#
+# We make backup copies of the operational images that would be overwritten.
+# A compilation installation never made backups but it overwrote these
+# files when a "make install" was done.  Here we make a backup no matter
+# if a compilation installation or a binary installation is being done.
+# 
+# NOTE: If a binary installation is being done then this section of code
+# will actually also install the operational images and (other bfs files).
+#
+# This section can be tested seperately if the following variables are set:
+# ERPCD USER_BFS OPERS debug dbg_hdr usebinaries MSG_FILE mv cp chmod vers
+# Then run tests with usebinaries=false and usebinaries=true and varying
+# combinations of files in directories $USER_BFS and bfs
+
+# Create a directory name for things that are prior to this release
+
+backup=$USER_BFS/$PRE_DIR
+
+if $debug
+then
+    echo "${dbg_hdr}Backing up $package images"
+    echo "${dbg_hdr}Files being replaced are backed-up to $backup"
+fi
+
+if $usebinaries
+then
+    $debug && echo "${dbg_hdr}Also installing $package images"
+    echo "*** Installing $package images ***"
+fi
+
+# Ensure that all directories we need are there
+[ ! -d $ERPCD ] && ./.mkpath $ERPCD
+[ ! -d $USER_BFS ] && ./.mkpath $USER_BFS
+
+
+
+# "$tmp" will hold the list of backed up files.
+tmp=""
+
+
+# Back up (and install) files
+for i in  `ls bfs $USER_BFS | sort | uniq` 
+do
+    i=$i
+    new=false
+    old=false
+    [ -f "bfs/$i" ] && new=true
+    [ -f "$USER_BFS/$i" ] && old=true
+
+    case "${new}${old}" in
+
+	truetrue)
+#	    # Both versions of the file exist - Backup needed
+	    [ -d $backup ] || ./.mkpath $backup
+	    tmp="$tmp $i"
+#		# Do an install in addition to a backup
+
+#		# Do backup using a MOVE (only backup once)
+		[ -f "$backup/$i" ] || $mv -f "$USER_BFS/$i" "$backup/$i"
+		$cp "bfs/$i" "$USER_BFS/$i"
+
+#		# Do installation
+		case "$i" in
+		    modems.annex)
+			msgid=modemsavewarning
+			. $MSG_FILE
+			;;
+		    config.annex)
+#			# Move the original back and make the backup via copy
+			$mv -f "$backup/$i" "$USER_BFS/$i" 
+			$cp "$USER_BFS/$i" "$backup/$i"
+			[ -f $USER_BFS/config.example ] && \
+				$chmod u+w $USER_BFS/config.example
+			$cp "bfs/$i" $USER_BFS/config.example
+			$chmod u-w $USER_BFS/config.example
+			;;
+		    motd)
+			;;
+		    *)
+			$chmod 444 "$USER_BFS/$i"
+			;;
+		esac
+	    ;;
+
+	truefalse)
+#	    # New exists, old does not - No backup needed
+#		# Need to do an installation
+		$cp "bfs/$i" "$USER_BFS/$i"
+		case "$i" in
+		    oper.*.enet) $chmod 444 "$USER_BFS/$i" ;;
+		    pri_*) $chmod 444 "$USER_BFS/$i" ;;
+		    mod_mic-*) $chmod 444 "$USER_BFS/$i" ;;
+		esac
+	    ;;
+
+	falsetrue)
+#	    # New does not exist, old exists - Let things be
+	    ;;
+
+	falsefalse)
+#	    # You cannot get here - the loop variable is a list of both
+#	    # the old and new directories.  Files that do not exist in either
+#	    # are not on the list.
+# 	    #
+# 	    ;;
+    esac
+done
+
+if [ ! -f "$USER_BFS/motd" ]
+then
+	$debug && echo "${dbg_hdr}Create dummy motd"
+	: >> "$USER_BFS/motd"
+
+fi
+
+# The following message uses variable $tmp (also $indent and $USER_BFS)
+if [ -n "$tmp" ]
+then
+    msgid=bfssavewarning
+    . $MSG_FILE
+    tmp=""
+fi
+#############################################################################
+#
+# End: Backup of operational images (and possible installation)
+#
+#############################################################################
+
+
+
+
+###############################################################################
+#
+# Start: Binary installations
+#
+###############################################################################
+# We make backup copies of the binaries that would be overwritten.
+# 
+# This section can be tested seperately if the following variables are set:
+#     bindir hw_type instdir acpdir notinstalled dbg_hdr debug mv cp chmod
+#     mkdir usebinaries PRE_DIR
+# Then run tests with varying combinations of files in directories $instdir
+# and $bindir
+
+
+backup=$instdir/$PRE_DIR
+
+if $usebinaries
+then
+    if $debug ; then
+	echo "${dbg_hdr}Installing pre-compiled binaries for $hw_type"
+	echo "${dbg_hdr}Using binaries in $bindir"
+	echo "${dbg_hdr}Files being replaced are backed-up to $backup"
+    fi
+
+#   # Ensure that all directories we need are there
+    [ ! -d $instdir ] && ./.mkpath $instdir
+    [ ! -d $acpdir ] && ./.mkpath $acpdir
+
+    tmp=`(cd $bindir; ls [a-z]* 2> /dev/null)`
+    for i in $tmp
+    do
+	new=$bindir/$i
+	old=$instdir/$i
+
+#	# If we need a backup then ensure the backup directory exists
+	file_exists=false
+	if [ -f $old ]
+	then
+	    file_exists=true
+	    [ -d $backup ] || $mkdir $backup
+	fi
+
+#	# Do the installation of the file and its backup (if needed)
+	case $i in
+	    erpcd)
+#		# Backup with a COPY (but just backup once)
+#		# (Do not overwrite, remove or rename erpcd, it may be running)
+		if $file_exists
+		then
+		    [ -f $backup/$i ] || $cp $instdir/$i $backup/$i
+		    old=$instdir/erpcd.new
+		fi
+		;;
+	    *)
+#		# Backup with a MOVE (but just backup once)
+		if $file_exists
+		then
+		    [ -f $backup/$i ] || $mv $instdir/$i $backup/$i
+		fi
+		;;
+	esac
+	$cp $new $old
+	if [ $? -ne 0 ]
+	then
+	    notinstalled=true
+	else
+	    notinstalled=false
+	fi
+    done
+
+#   # Change permission on ch_passwd if we would have replaced it
+    [ -f $bindir/ch_passwd ] && $chmod 4111 $instdir/ch_passwd
+
+#   # If a copy is not done here then .update_files creates the eservices file
+    if [ ! -f ${acpdir}/eservices ]
+    then
+	$debug && echo "${dbg_hdr}Copy eservices to $acpdir"
+	[ -f ./src/erpcd/eservices ] && $cp ./src/erpcd/eservices $acpdir
+    fi
+fi
+###############################################################################
+#
+# End: Binary installations
+#
+###############################################################################
+
+
+
+
+###############################################################################
+#
+# Start: Shell man page installations
+#
+###############################################################################
+#
+# NOTE: The script must be run by root for this to work.
+
+if $usebinaries
+then
+
+#   # Install the man pages for the simple binary installs.
+#   # We use a temporary script created earlier to do this.
+
+    if [ "$mantype" != "none" ]
+    then
+	if [ ! -d man ]
+	then
+	    mantype="none"
+	    echo "**** Man pages were to be installed"         > errors/instman
+	    echo "**** but the "man" directory was not found" >> errors/instman
+cat << EOSS
+
+**** Man pages were to be installed but the "man" directory was not found
+
+EOSS
+	fi
+    fi
+
+    if [ "$mantype" != "none" ]
+    then
+	if $debug
+	then
+	    echo "${dbg_hdr}Man pages should be installed"
+	    echo "${dbg_hdr}Trying to use $auxdir/instman.sh"
+	fi
+	echo "Installing man pages: Start" > errors/instman
+	if [ -f $auxdir/instman.sh ]
+	then
+	    $debug && echo "${dbg_hdr}Attempting to install man pages"
+	    echo "Executing file $auxdir/instman.sh to install man pages" \
+		>> errors/instman
+	    (cd man ; sh -x $auxdir/instman.sh) >> errors/instman 2>&1
+	else
+	    $debug && echo "${dbg_hdr}Error installing man pages"
+	    echo "Did not find file $auxdir/instman.sh to install man pages" \
+		>> errors/instman
+	fi
+	echo "Installing man pages: End" >> errors/instman
+    fi
+fi
+
+###############################################################################
+#
+# End: Shell man page installations
+#
+###############################################################################
+
+
+
+
+#############################################################################
+#
+# Start: Remove unneeded binary directories
+#
+#############################################################################
+#
+# This is done for both binary and compilation installations (unless there
+# was an error in a binary installation).
+
+# Set up to remove unneeded binary directories.
+# Variable "tmp" holds the msgid of the message to print.
+ask_q=true
+tmp=rmbindircomp
+
+# If using just one of the binaries the message will change.
+# Also, if the binaries were not installed then do not remove them.
+if $usebinaries
+then
+    tmp=rmbindirbin
+    $notinstalled && ask_q=false
+fi
+
+if $ask_q
+then
+    ans=`echo bin/[A-Z]* 2>/dev/null`
+    if [ "$ans" = 'bin/[A-Z]*' ]
+    then
+	$debug && echo "${dbg_hdr}Binary directories not found"
+    else
+	echo " "
+	echo "Executing \"du -s bin/[A-Z]*\""
+	du -s bin/[A-Z]* | $sed -e "s/^/${indent}/"
+	msgid=$tmp
+	. $MSG_FILE
+	while true
+	do
+	    dfltans=n
+	    rp="Remove these directories (y/n) [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    case "$ans" in
+	    n*|N*)
+#		# Do not remove directories
+		break
+		;;
+	    Y*|y*)
+#		# Remove directories
+		rm -rf bin/[A-Z]*
+		break
+		;;
+	    "?")
+		msgid=${tmp}help
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	    esac
+	done
+    fi
+fi
+#############################################################################
+#
+# End: Remove unneeded binary directories
+#
+#############################################################################
+
+
+
+
+#############################################################################
+#
+# Start: Query for deleting any oper.##.enet files that will not be used
+#
+#############################################################################
+#
+# NOTE: This section has been disabled with a "if false" statement.
+#       The reason is not known.  It is being left as is though in the
+#	case that OEMs want to make easy changes themselves.
+
+
+##########################################################################
+# Start: of commented-out block.
+#
+# We're not sure yet ... comment out this block until we *are* sure.
+#
+if false
+then
+
+while true
+do
+ echo " "
+ echo "Would you like to remove the unused oper.##.enet images? "
+ echo "Note: This will save significant disk space on your host."
+ echo "The \"?\" answer to the prompt is not implemented here."
+ rp="y/n [n]:"
+ . ./.myread
+ case $ans in
+   "?") continue ;;
+    Y*|y*)
+	echo "What type(s) of $Box do you have ?"
+	echo "$Box II/IIe ?"
+	rp="y/n [y]:"
+	. ./.myread
+	case $ans in
+	    y*)
+		;;
+	    n*)
+		if $debug ; then
+		    echo "${dbg_hdr}Removing oper.16.enet"
+		fi
+		rm -irf bfs/oper.16.enet
+		;;
+#	    "?") echo "Unimplemented help message" ;;
+	    *) 
+		;;
+	esac
+	echo "$Box III ?"
+	rp="y/n [y]:"
+	. ./.myread
+	case $ans in
+	    y*)
+		;;
+	    n*)
+		if $debug ; then
+		    echo "${dbg_hdr}Removing oper.42.enet"
+		fi
+		rm -irf bfs/oper.42.enet
+		;;
+#	    "?") echo "Unimplemented help message" ;;
+	    *) 
+		;;
+	esac
+	echo "Micro-XL ?"
+	rp="y/n [y]:"
+	. ./.myread
+	case $ans in
+	    Y*|y*)
+		;;
+	    N*|n*)
+		if $debug ; then
+		    echo "${dbg_hdr}Removing oper.52.enet"
+		fi
+		rm -irf bfs/oper.52.enet
+		;;
+#	    "?") echo "Unimplemented help message" ;;
+	    *) 
+		;;
+	esac
+	echo "Micro-ELS ?"
+	rp="y/n [y]:"
+	. ./.myread
+	case $ans in
+	    Y*|y*)
+		;;
+	    N*|n*)
+		if $debug ; then
+		    echo "${dbg_hdr}Removing oper.55.enet"
+		fi
+		rm -irf bfs/oper.55.enet
+		;;
+#	    "?") echo "Unimplemented help message" ;;
+	    *) 
+		;;
+	esac
+	;;
+    N*|n*)
+	;;
+    esac
+    break
+done
+
+fi
+#
+# End: of commented-out block.
+##########################################################################
+
+#############################################################################
+#
+# End: Query for deleting any oper.##.enet files that will not be used
+#
+#############################################################################
+
+
+
+
+#############################################################################
+#
+# Start: Modify source files
+#
+#############################################################################
+#
+# This will only happen if we have tarred off all the src directory.
+# If we indicated that every thing was already on the hard disk then
+# we assume that the configuration has already occurred.
+
+$debug && echo "${dbg_hdr}Start configuration of source files"
+
+# Variable "tmp" holds the name of the directory we check for.
+# "$tmp" is used in the messages file.
+tmp=src/inc
+
+if $do_config
+then
+    if [ -d $tmp ]
+    then
+	if [ $compiler_avail = "false" ]
+	then
+	    msgid=nocompconfig
+	    . $MSG_FILE
+	    do_config=false
+	fi
+    else
+	msgid=nosrcdir
+	. $MSG_FILE
+	do_config=false
+    fi
+fi
+
+if $do_config
+then
+    $debug && echo "${dbg_hdr}Beginning configuration of source files"
+
+    echo " "
+    echo "Beginning modification of \"src\" directory."
+
+#   # Clean up for repeated execution
+    $rm -f .needsome .ckincs.h
+    (
+	$rm -f src/newrtelnet/machdep.c
+	$rm -f src/newrtelnet/debugging.c
+	cd src/inc
+	$rm -f config.h netdb.h signal.h strings.h sgtty.h unistd.h vers.h
+	$rm -f port/install_dir.h
+	$rm -rf netinet sys arpa net
+	$mkdir netinet sys arpa net
+    ) >errors/cleanup 2>&1
+
+#############################################################################
+# 
+# Previously, when the type of system was determined, files were linked
+# and others modified or copied.  That cannot be done in that section
+# anymore because the source code may not be available at that time.
+# Instead, variables are set to indicate what linking should be done and
+# other commands are written to a temporary file. It is now time to do the
+# linking and execute the commands in the temporary file.
+# 
+
+#   # Name of the file that contains certain commands needed to configure
+#   # directories for a specific platform
+
+    tmpfile=$auxdir/srcmodcmds
+
+#   # Create soft links for machine dependent files (hard links and other
+#   # commands are done by executing $tmpfile)
+
+    if [ -d src/newrtelnet ]
+    then
+	if [ -n "$machdepfile" ]
+	then
+	    $debug && echo \
+		"${dbg_hdr}ln -s $machdepfile src/newrtelnet/machdep.c"
+	    ln -s $machdepfile src/newrtelnet/machdep.c
+	fi
+	if [ -n "$dbgfile" ]
+	then
+	    $debug && echo \
+		"${dbg_hdr}ln -s $dbgfile src/newrtelnet/debugging.c"
+	    ln -s $dbgfile src/newrtelnet/debugging.c
+	fi
+    fi
+    if [ -f $tmpfile ]
+    then
+	if $debug
+	then
+	    echo "${dbg_hdr}Commands in file $tmpfile being executed"
+	    cat $tmpfile | sed -e "s/^/${dbg_hdr}/g"
+	fi
+	. $tmpfile
+	rm -f $tmpfile
+    else
+	$debug && echo "${dbg_hdr}Was no need to create $tmpfile"
+    fi
+
+
+#############################################################################
+#
+# A large section of the previous installation code was moved into a
+# seperate file to make code reading easier.  That code dealt with
+# modifying the source code (mainly header files) to get compiles to work
+# for various platforms.  For the most part that code remains unchanged.
+# 
+# Possible Enhancement: There could be a change so that the files are given
+# write permission prior to being written to so non-root installs will work.
+#
+    . ${SCRIPT_DIR}/.install_part3
+
+
+
+#############################################################################
+# 
+# Indicate that more configuration is being done
+
+    echo $n "${indent}Creating configuration files...$c"
+
+# Create the version text file.
+echo "#define VERSION "'"'$HST_REL'"' > src/inc/vers.h
+echo "#define RELDATE "'"'$HST_REL_DATE'"' >> src/inc/vers.h
+
+###############################################################################
+#
+# Check for rtelnet version being used.  Platforms which do not yet have
+# a newrtelnet/machdep.* file will not link machdep.c so that we compile
+# the old rtelnet.  (I'd like to do the link here, but there are still
+# some damaged systems out there that don't know about symlinks.  Sigh.)
+
+    RTELDIR="newrtelnet"
+    if [ ! -d src/newrtelnet ]
+    then
+	RTELDIR="rtelnet"
+    else
+	if [ ! -f src/newrtelnet/machdep.c ]
+	then
+	    RTELDIR="rtelnet"
+	fi
+    fi
+    $nortelnet && RTELDIR=""
+
+
+###############################################################################
+#
+# Before we go any farther, skip any SRCDIRS that aren't there
+
+    NEWSRC=''
+    for srcdir in $SRCDIRS $RTELDIR
+    do
+	if [ -d src/$srcdir ]
+	then
+	    NEWSRC="$NEWSRC $srcdir"
+	fi
+    done
+    SRCDIRS="$NEWSRC"
+
+
+#*****************************************************************************
+# Start: temporary indent shift
+# (because there are so many "cat" here document statements below)
+#*****************************************************************************
+
+###############################################################################
+#
+# Create a "common" BSD/SYSV install script
+#
+install=$cwd/src/installer
+rm -f $install
+cat > $install << EOSS
+#!/bin/sh
+predir=$PRE_DIR
+case \$1 in
+read*|data|*exec)
+    type=\$1 ; shift ;;
+precious-*)
+    precious=true
+    type=\`$expr \$1 : 'precious-\\(.*\\)' \\| \$1\` ; shift ;;
+execsuid)
+    type=execsuid ; shift;;
+*)
+    type=exec ;;
+esac
+dir=\$1
+shift
+# If file is erpcd we do not want to overwrite because
+# there may be an active erpcd daemon running
+for file
+do
+    case \$file in
+	erpcd)
+	    if [ ! -f \$dir/\$file ]; then
+#		# Destination does not exist, just copy 
+		$cp \$file \$dir
+	    else
+#		# Destination exists, first backup with a COPY
+#		# (unless backup already exists)
+		if [ ! -f \$dir/\$predir/\$file ]; then
+		    [ -d \$dir/\$predir ] || $mkdir \$dir/\$predir
+		    $cp \$dir/\$file \$dir/\$predir/\$file
+		fi
+
+#		# Install the new version of the file
+#		# (but do not overwrite erpcd, it may be running)
+		$cp \$file \$dir/\$file.new
+
+# Print warning message
+echo " "
+echo " "
+echo "WARNING: If you have called \"make install\" yourself, then in directory"
+echo "       :     \$dir"
+echo "       : you will have to copy file \"\$file.new\" to \"\$file\"."
+echo "       : Make sure the \$file daemon is not running when that is done."
+echo "       : If the installation script called \"make install\" then the"
+echo "       : copy will be done for you."
+echo " "
+echo " "
+
+#		# Change the name of file so the chmod commands below
+#		# work on the correct file (do this after warning message)
+		file=\$file.new
+	    fi
+	    ;;
+	*)
+#	    # If destination exists then backup with a MOVE
+#	    # (unless the backup already exists)
+	    if [ -f \$dir/\$file ]; then
+		if \${precious-false}; then
+		    echo \$dir/\$file exists, skipping install...
+		    continue
+		fi
+		if [ ! -f \$dir/\$predir/\$file ]; then
+		    [ -d \$dir/\$predir ] || $mkdir \$dir/\$predir
+		    $mv -f \$dir/\$file \$dir/\$predir/\$file
+		fi
+	    fi
+#	    # Install the new file
+	    $cp \$file \$dir
+	    ;;
+    esac
+    case \$type in
+    read*)
+        $chmod 444 \$dir/\$file
+        ;;
+    data)
+        $chmod 644 \$dir/\$file
+        ;;
+    sysexec)
+        $chmod 544 \$dir/\$file
+        ;;
+    exec)
+        $chmod 755 \$dir/\$file
+        $strip \$dir/\$file
+        ;;
+    execsuid)
+        $strip \$dir/\$file
+        $chmod 4111 \$dir/\$file
+        ;;
+
+    esac
+    $chown root \$dir/\$file
+done
+EOSS
+chmod 555 $install
+
+echo $n ".$c"
+
+###############################################################################
+#
+# Create the configuration file that contains definitions and is read
+# by all the src/*/Makefiles prior to doing a "make all"
+
+cat > src/make.config <<EOSS
+#
+# $package src/make.config `$date`
+# This file created by $0
+#
+
+AR    = $ar
+CC    = $cc
+RANLIB  = $ranlib
+RM    = $rm
+SHELL    = /bin/sh
+
+
+# The script that is used to install the host tools and bfs/oper.*.inet files
+INSTALL    = $install
+
+# The directory where annex-initd is installed:
+INSTALL_INITD = $INSTALL_INITD
+
+# Where erpcd expects the ACP files to be:
+ACP_DIR = $acpdir
+
+# The directory where the host tools are to be installed:
+INSTALL_DIR = $instdir
+
+USER_INSTALL = -DINSTALL_DIR=\\"\$(ACP_DIR)\\"
+USER_BFS = -DBFS=\\"$USER_BFS\\"
+
+CH_PASSWD = $CH_PASSWD
+
+# These are used in the building of code:
+ARFLAGS = $ARFLAGS
+# The -g here is for Beta-test only and should be removed from
+# install-annex prior to general release.
+CFLAGS = -g $HWFLAG $INCLUDES
+LIBFLAG = $LIBFLAG
+LIBANX_C = $LIBANX_C
+LIBANX_O = $LIBANX_O
+
+EOSS
+
+# Add in build variables for erpcd.
+
+# Here document does **not** do variable substitution here
+
+cat << "EOSS" >> src/make.config
+
+#############################################################################
+# The following sets variables used during the compilation of the erpcd
+# directory:
+#
+# The following are regimes that get built into erpcd. There is a compiler
+# option to enable each.
+#
+#     Regime      Option
+#     ------      ------
+#     acp         -DACPPASSWD
+#     native      -DNATIVEPASSWD
+#     safeword    -DENIGMA_SAFEWORD
+#     securid     -DSECURID_CARD
+#     kerberos    -DKERBEROS
+#
+# The installation normally wants to have the acp, native, safeword, securid
+# and kerebos secutity regimes enabled. It does this in three different ways.
+#
+# ACP:
+# The ACP regime will always be built by default because ACPPASSWD is
+# defined in acp_policy.h.  If the acp regime is not wanted then edit
+# acp_policy.h or do not use the acp regime in the acp_regime file.
+#
+# NATIVE:
+# The native regime also gets built by default by statements in the
+# acp_policy.h file.  Because there are systems that cannot build erpcd
+# with the native regime we can suppress this building by adding
+# "-DNO_NATIVE" to CFG_REGIMES
+#
+# ENIGMA, KERBEROS, SECURID:
+# These regimes need to be added to CFG_REGIMES to be built. For example:
+#     CFG_REGIMES = -DENIGMA_SAFEWORD -DSECURID_CARD -DKERBEROS
+#
+# If the ENIGMA, KERBEROS and SECURID regimes are to be built 
+# see the file "src/erpcd/Makefile".
+#
+#
+# EXAMPLES:
+#
+# EXAMPLE 1:
+# Build all regimes and build the ENIGMA, KERBEROS and SECURID regimes using
+# stub (non-operational) code:
+# 
+# CFG_REGIMES = -DENIGMA_SAFEWORD -DSECURID_CARD -DKERBEROS
+#
+# CFG_STUBCFILES =	stub_sw.c	stub_sid.c	stub_krb.c
+# CFG_STUBOFILES =	stub_sw.o	stub_sid.o	stub_krb.o
+# CFG_STUBLFILES =	libstubs.a
+# CFG_STUBCOMPILING = ${CFG_REGIMES} -DSTUB_SW -DSTUB_SID -DSTUB_KRB -I../stub 
+#	-DACE1_2
+# CFG_STUBLINKING = -L. -lstubs
+# 
+# EXAMPLE 2:
+# If the host system cannot build with the native regime enabled then the
+# values will look more like this example:
+# 
+# CFG_REGIMES = -DNO_NATIVE
+# 
+# CFG_STUBCFILES =
+# CFG_STUBOFILES =
+# CFG_STUBLFILES =
+# CFG_STUBCOMPILING = ${CFG_REGIMES}
+# CFG_STUBLINKING =
+# 
+
+
+# The values that will be used for building security regimes into erpcd:
+
+EOSS
+
+
+if $native_allowed
+then
+    native=""
+else
+    native="-DNO_NATIVE"
+fi
+if $dynamic_allowed
+then
+
+# Here document does variable substitution here
+cat << EOSS >> src/make.config
+CFG_REGIMES = $native -DENIGMA_SAFEWORD -DSECURID_CARD -DKERBEROS
+EOSS
+
+# Here document does **not** do variable substitution here
+cat << "EOSS" >> src/make.config
+CFG_STUBCFILES =	stub_sw.c	stub_sid.c	stub_krb.c
+CFG_STUBOFILES =	stub_sw.o	stub_sid.o	stub_krb.o
+CFG_STUBLFILES =	libstubs.a
+CFG_STUBCOMPILING = ${CFG_REGIMES} -DSTUB_SW -DSTUB_SID -DSTUB_KRB -I../stub \
+	-DACE1_2
+CFG_STUBLINKING = -L. -lstubs
+EOSS
+
+else
+
+# Dynamic linking not allowed
+
+# Here document does variable substitution here
+cat << EOSS >> src/make.config
+CFG_REGIMES = $native -DENIGMA_SAFEWORD -DSECURID_CARD -DKERBEROS
+EOSS
+
+# Here document does **not** do variable substitution here
+cat << "EOSS" >> src/make.config
+
+CFG_STUBCFILES =	stub_sw.c	stub_sid.c	stub_krb.c
+CFG_STUBOFILES =	stub_sw.o	stub_sid.o	stub_krb.o
+CFG_STUBLFILES =	libstubs.a
+CFG_STUBCOMPILING = ${CFG_REGIMES} -DSTUB_SW -DSTUB_SID -DSTUB_KRB -I../stub \
+	-DACE1_2
+CFG_STUBLINKING = -L. -lstubs
+EOSS
+
+fi
+
+echo $n ".$c"
+
+
+###############################################################################
+#
+# Create the header file that indicates where the ACP directory is
+
+cat > src/inc/port/install_dir.h <<EOSS
+/*
+ * $package src/inc/port/install_dir.h `$date`
+ */
+#ifndef INSTALL_DIR
+$DEF INSTALL_DIR "$acpdir"
+#endif
+EOSS
+
+echo $n ".$c"
+
+
+###############################################################################
+#
+# Create the Makefile in the src directory that will be called
+# to build the host tools.
+
+if $install_freebsdi 
+then
+cat >src/Makefile <<EOSS
+#
+# $package src/Makefile `$date`
+#
+
+SHELL    = /bin/sh
+PARALLEL = 1
+SRCDIRS = $SRCDIRS
+BFS    = $USER_BFS
+
+all:    \$(SRCDIRS)
+
+install: install-src $OTHERINSTALL
+
+build: install-src
+
+install-src:
+	-@sh -c 'for srcdir in \$(SRCDIRS) ; \\
+	do \\
+	$echo "*** Installing \$\$srcdir ***" > /dev/tty ; \\
+	cd \$\$srcdir ; \\
+	make -f ../make.config -f Makefile install ; \\
+	cd .. ; \\
+	done'
+
+install-bfs:
+	@$echo "*** Installing $package images ***" > /dev/tty
+	-@sh -c '\\
+	    if [ ! -d \$(BFS) ] ; \\
+	    then \\
+		$mkdir \$(BFS) ; \\
+	    fi ; \\
+	    cd ../bfs ; \\
+	    $install readonly \$(BFS) oper.*.enet ; \\
+	    cd \$(BFS) ; \\
+	    touch config.annex ; \\
+	    touch motd'
+
+clean:
+	-@sh -c 'for srcdir in \$(SRCDIRS) ; \\
+	do \\
+	cd \$\$srcdir ; \\
+	make -f ../make.config -f Makefile clean ; \\
+	cd .. ; \\
+	done'
+EOSS
+
+else
+
+cat >src/Makefile <<EOSS
+#
+# $package src/Makefile `$date`
+#
+
+SHELL    = /bin/sh
+PARALLEL = 1
+SRCDIRS = $SRCDIRS
+BFS    = $USER_BFS
+
+all:    \$(SRCDIRS)
+
+install: install-src $OTHERINSTALL
+
+build: install-src
+
+install-src:
+	-@sh -c 'for srcdir in \$(SRCDIRS) ; \\
+	do \\
+	$echo "*** Installing \$\$srcdir ***" > /dev/tty ; \\
+	cd \$\$srcdir ; \\
+	make -f ../make.config -f Makefile install ; \\
+	cd .. ; \\
+	done'
+
+install-bfs:
+	@$echo "*** Installing $package images ***" > /dev/tty
+	-@sh -c '\\
+	    if [ ! -d \$(BFS) ] ; \\
+	    then \\
+		$mkdir \$(BFS) ; \\
+	    fi ; \\
+	    cd ../bfs ; \\
+	    $install readonly \$(BFS) oper.*.enet ; \\
+	    cd \$(BFS) ; \\
+	    >> config.annex ; \\
+	    >> motd'
+
+clean:
+	-@sh -c 'for srcdir in \$(SRCDIRS) ; \\
+	do \\
+	cd \$\$srcdir ; \\
+	make -f ../make.config -f Makefile clean ; \\
+	cd .. ; \\
+	done'
+EOSS
+fi
+
+echo $n ".$c"
+
+
+###############################################################################
+#
+# Add the target and rules to actually build in each source directory
+
+for i in $SRCDIRS ; do
+cat >>src/Makefile <<EOSS
+
+$i:    $i.local
+
+$i.local:
+	@$echo "*** Building $i ***" > /dev/tty
+	cd $i ; make -f ../make.config -f Makefile 
+EOSS
+done
+
+echo $n ".$c"
+
+
+#*****************************************************************************
+# End: temporary indent shift
+#*****************************************************************************
+
+###############################################################################
+#
+# Add Makefile targets, dependencies and rules for a
+# "make install-man" man page installation 
+
+    if [ "$mantype" != "none" ]
+    then
+	if [ -f $auxdir/instman.mk ]
+	then
+	    cat $auxdir/instman.mk >> src/Makefile
+	    rm -f $auxdir/instman.mk
+	fi
+    fi
+
+
+#   # Indicate that the configuring of files is done
+    echo "complete."
+    echo "Completed modification of \"src\" directory."
+    echo " "
+else
+    $debug && echo "${dbg_hdr}Skipping configuration of source files"
+    usemake=false
+    tobuild=n
+    toinstall=n
+fi
+
+$debug && echo "${dbg_hdr}End configuration of source files"
+
+
+#############################################################################
+#
+# End: Modify source files
+#
+#############################################################################
+
+
+
+#############################################################################
+#
+# Note: The string below is modified by the annex/kits/build_host_tools
+#       script.  Do not change it without changing build_host_tools too.
+#
+# Start: of using "make" to build and install
+#
+#############################################################################
+    
+$debug && echo "${dbg_hdr}usemake=$usemake"
+
+# If usemake is false then we will neither build nor install
+
+makeprob=false    
+if $usemake
+then
+#   # Use the "make" command to do the builds and installations.
+    
+    $debug && echo "${dbg_hdr}May use the "make" command for builds/installations."
+    
+#   #
+#   # The "tobuild" variable has been set to "Y" or "N" depending on if this
+#   # is a binary install. Also, it should have been set to "N" if there is
+#   # no compiler on the system.
+#   #
+    while true
+    do
+	if [ -z "$tobuild" ]
+	then
+	    echo " "
+	    rp="Shall I compile the tools for you? (y/n) [y]:"
+	    . ./.myread
+	else
+	    ans=$tobuild
+	fi
+	if [ -z "$ans" ]
+	then
+	    ans=Y
+	fi
+	case "$ans" in
+	    n*|N*)
+		break
+		;;
+	    Y*|y*)
+		compile=true
+		echo " "
+		echo "Compilations will be done with compiler: $cc"
+		echo " "
+		echo "Compiling the tools; output being saved in \"Build.out\""
+		echo " "
+		cd src
+		make > ../Build.out 2>&1 && notbuilt=false
+		cd ..
+		if $notbuilt
+		then
+		    makeprob=true
+		    toinstall="no"
+		    cp Build.out errors
+		    msgid=failedcompile
+		    . $MSG_FILE
+		fi
+		break
+		;;
+	    "?")
+		msgid=comptoolshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+
+#   # If the compile failed then toinstall="no" and the question
+#   # below will be answered automatically so the install is not done.
+
+    while true
+    do
+	if [ -z "$toinstall" ]
+	then
+	    msgid=installasroot
+	    . $MSG_FILE
+	    rp="Shall I install the tools for you? (y/n) [y]"
+	    . ./.myread
+	else
+	    ans=$toinstall
+	fi
+
+	if [ -z "$ans" ]
+	then
+	    ans=Y
+	fi
+	case "$ans" in
+	    n*|N*)
+		break
+		;;
+	    Y*|y*)
+		msgid=installingtools
+		. $MSG_FILE
+		cd src
+		rm -f ../Install.out
+
+		srcnotnstalled=true
+		if [ "$hw_type" = "MX300" ]
+		then
+		    ucb make install-src >> ../Install.out 2>&1 && srcnotinstalled=false
+		else
+		    make install-src >> ../Install.out 2>&1 && srcnotinstalled=false
+		fi
+		if $srcnotinstalled
+		then
+		    notinstalled=true
+		    echo " "
+		    echo "**** Utilities not installed"
+		    echo "**** Operational images not installed"
+		    echo "**** Manual pages not installed"
+		else
+		    echo " "
+		    echo "Utilities installed"
+	    	    notinstalled=false
+		    if [ "$mantype" != "none" ]
+		    then
+		        mannotinstalled=true
+		        if [ "$hw_type" = "MX300" ]
+		        then
+		    	    ucb make install-man >> ../Install.out 2>&1 && mannotinstalled=false
+		        else
+		    	    make install-man >> ../Install.out 2>&1 && mannotinstalled=false
+		        fi
+		        if $mannotinstalled
+		        then
+		    	    echo " "
+		    	    echo "WARNING: Manual pages not installed"
+		    	    echo " "
+		    	    cp Install.out errors
+		            else
+		    	    echo " "
+		    	    echo "Manual pages installed"
+		        fi
+		   fi
+	        fi
+		cd ..
+		if $notinstalled
+		then
+		    makeprob=true
+		    rm -f errors/Install.out
+		    cp Install.out errors/Install.out
+		    msgid=failedinstall
+		    . $MSG_FILE
+		fi
+		break
+		;;
+	    "?")
+		msgid=insttoolshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+fi
+
+# If the "make all" or the "make install" did not go well we could still
+# continue but let's ask for permission.
+
+if $makeprob
+then
+    msgid=makeprobmsg
+    . $MSG_FILE
+    while true
+    do
+	dfltans=n
+	rp="Continue installation? (y/n) [$dfltans]:"
+	. ./.myread
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case "$ans" in
+	    y*|Y*)
+		break
+		;;
+	    n*|N*|q*|Q*)
+		msgid=abort_quit
+        	. $MSG_FILE
+		break
+		;;
+	    "?")
+		msgid=makeprobmsghelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynq
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+fi
+echo " "
+
+
+#############################################################################
+#
+# End: of using "make" to build and install
+#
+#############################################################################
+
+
+
+#############################################################################
+#
+# Start: edit /etc/services and other files
+#
+#############################################################################
+
+$debug && echo "${dbg_hdr}At edit portion of script"
+if $do_edits
+then
+
+    $debug && echo "${dbg_hdr}Doing system files edits"
+
+#   # Write to /etc/services, /etc/rc.local and other files.
+#   # Call a script to do this.
+#   # Note: There is a seventh argument that could be supplied.  If it is "y"
+#   # the acp service will be enabled.  If it is "n" then the acp service will not
+#   # be enabled unless it already is.  If the seventh argument is missing then
+#   # a question will be asked about whether the acp service is wanted.
+#   # The value can be determined earlier in this script and a value passed
+#   # to prevent the question from being asked.
+
+    sh ${SCRIPT_DIR}/.update_files $instdir $acpdir $USER_BFS \
+				$startup_dir $reqdiracp $reqdirbfs
+    tmp=$?
+
+
+#   Check for an abort or user request to quit (exit values 2 or 3)
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+
+else
+    $debug && echo "${dbg_hdr}Skipping system file edits"
+fi
+
+#############################################################################
+#
+# End: edit /etc/services and other files
+#
+#############################################################################
+
+
+
+#############################################################################
+#
+# Start: erpcd daemon shutdown and startup
+#
+#############################################################################
+
+# If the eservices file is missing then erpcd should not be started
+
+if [ ! -f ${acpdir}/eservices ]
+then
+    do_daemon=false
+    msgid=noeservices
+    . $MSG_FILE
+fi
+
+if $do_daemon
+then
+    tmp=""
+
+    if $reqdiracp
+    then
+	diracpopt="-s "
+    else
+	diracpopt=""
+    fi
+
+    if $reqdirbfs
+    then
+	dirbfsopt="-f "
+    else
+	dirbfsopt=""
+    fi
+
+    sh ${SCRIPT_DIR}/.daemon \
+	$instdir "${diracpopt}$acpdir" "${dirbfsopt}$USER_BFS" $notinstalled
+    tmp=$?
+
+#   Check for an abort or user request to quit (exit values 2 or 3)
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+else
+    $debug && echo "${dbg_hdr}Skipping daemon shutdown and startup"
+fi
+
+#############################################################################
+#
+# End: erpcd daemon shutdown and startup
+#
+#############################################################################
+
+
+
+
+#############################################################################
+#
+# Start: Print the termination message
+#
+#############################################################################
+
+if $brief
+then
+    msgid=shorttermmsg
+    . $MSG_FILE
+else
+    msgid=longtermmsg
+    . $MSG_FILE
+fi
+
+#############################################################################
+#
+# End: Print the termination message
+#
+#############################################################################
+
+
+
+# Perform cleanup
+
+rm -f $tempfiles
+
+exit 0
+

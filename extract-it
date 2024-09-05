@@ -1,0 +1,1 @@
+mkdir `tar tvf $1 | fgrep ' 0 ' | sed 's/^.* \([^ ]*\)$/\1/'` ; tar xvf $1

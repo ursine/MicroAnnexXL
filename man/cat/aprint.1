@@ -1,0 +1,132 @@
+
+
+
+     AAAAPPPPRRRRIIIINNNNTTTT((((1111MMMM))))                    AAAANNNNNNNNEEEEXXXX                    AAAAPPPPRRRRIIIINNNNTTTT((((1111MMMM))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          aprint - Annex remote print command
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          aaaapppprrrriiiinnnntttt ----AAAA_a_n_n_e_x [ ----LLLL_l_i_n_e ] | [ ----pppp_p_o_r_t ] [ ----ffffDDDD ] [ ----FFFF_s_t_r_i_n_g ]
+          [ _f_i_l_e_s...  ]
+          aaaapppprrrriiiinnnntttt [ ----PPPP_p_r_i_n_t_e_r ] [ ----ffff ] [ ----FFFF_s_t_r_i_n_g ] [ _f_i_l_e_s...  ]
+
+     AAAARRRRGGGGUUUUMMMMEEEENNNNTTTTSSSS
+          ----AAAA _a_n_n_e_x     The host name string or Internet address (in
+                      standard Internet dot-separated notation) of the
+                      Annex on which to print.
+
+          ----LLLL _l_i_n_e      The serial port line number to use for printing
+                      on the Annex specified by ----AAAA.  If neither this
+                      option nor the ----pppp option are specified, or if a
+                      value of 0 is given as the line number, then the
+                      parallel port is used.  A value greater than
+                      zero specifies a serial port.  This option
+                      cannot be used at the same time as the ----pppp
+                      option.
+
+          ----pppp _p_o_r_t      The parallel port line number to use for
+                      printing on the Annex specified by ----AAAA.  This
+                      option cannot be used with the ----LLLL option.
+
+          ----ffff           Prevent _a_p_r_i_n_t from supplying extra form-feeds.
+
+          ----DDDD           Specifies that debug output should be sent to
+                      standard output. This option may be repeated for
+                      more detailed information. Level 1: Connect
+                      acknowledge and per file messages. Level 2:
+                      Connect setup details.
+
+          ----FFFF _s_t_r_i_n_g    Use _s_t_r_i_n_g to produce a form-feed instead of
+                      the default string of a single ^^^^LLLL.  This will
+                      override an ffffffff==== capability read from
+                      /_e_t_c/_p_r_i_n_t_c_a_p.  No form-feeds are produced if
+                      the ----ffff flag has been given.
+
+          ffffiiiilllleeeessss...    The file(s) to print; if none are specified,
+                      then the standard input is used.
+
+          ----PPPP _p_r_i_n_t_e_r   Use _p_r_i_n_t_e_r as the printer name to look up in
+                      /_e_t_c/_p_r_i_n_t_c_a_p.  (OBSOLETE)
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          The _a_p_r_i_n_t utility is intended for sites that either do not
+          have or cannot modify the Berkeley printer spooler.  It
+          sends files directly to a printer attached to an Annex,
+          without the use of a spooling mechanism.  _A_p_r_i_n_t supports
+          printers connected to either a parallel port or any of an
+
+
+
+     Page 1                                         (printed 10/13/98)
+
+
+
+
+
+
+     AAAAPPPPRRRRIIIINNNNTTTT((((1111MMMM))))                    AAAANNNNNNNNEEEEXXXX                    AAAAPPPPRRRRIIIINNNNTTTT((((1111MMMM))))
+
+
+
+          Annex's serial ports.  The name of the Annex and port to be
+          printed on are specified by the ----AAAA and ----LLLL arguments,
+          respectively.  To be backward-compatible with old versions
+          of _a_p_r_i_n_t, it also supports a ----PPPP argument specifying a
+          printer name to be looked up in the /_e_t_c/_p_r_i_n_t_c_a_p file.  The
+          ----AAAA and ----PPPP arguments are mutually exclusive.  If neither is
+          given, _a_p_r_i_n_t will look up in /_e_t_c/_p_r_i_n_t_c_a_p the printer
+          named by either the value of the PRINTER environment
+          variable or, if that is not set, the default printer named
+          _l_p.
+
+          By default, _a_p_r_i_n_t will print a form-feed at the start of
+          every file and at the end of all specified files.  Versions
+          of the Annex operational code previous to R3.0 produced
+          these form-feeds without a means of disabling them.  Since
+          this function should now be produced by host resident
+          software, _a_p_r_i_n_t will provide them for backward
+          compatibility.  The ----ffff flag will prevent _a_p_r_i_n_t from
+          generating these form-feeds.
+
+     FFFFIIIILLLLEEEESSSS
+          /etc/printcap  printer capabilities data-base
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e
+
+     DDDDIIIIAAAAGGGGNNNNOOOOSSSSTTTTIIIICCCCSSSS
+          Most messages are self-explanatory, if not overly verbose.
+
+     RRRREEEESSSSTTTTRRRRIIIICCCCTTTTIIIIOOOONNNNSSSS
+          Some ports of the Berkeley networking software to System V
+          systems do not support out-of-band data (MSG_OOB) on
+          sockets.  Since OOB is used in the close handshake of the
+          Annex LPD protocol, this handshake will not be used on such
+          hosts.  The implication of this is that with two back-to-
+          back invocations of _a_p_r_i_n_t , the second can fail because the
+          Annex port will still be busy from the first print job.
+          This should not be a problem if _a_p_r_i_n_t is invoked from
+          within a spooling system (such as System V lp or Berkeley
+          LPD).
+
+          Revision R7.0 and later of _a_p_r_i_n_t cannot be used with Annex
+          operational code before revision R3.0, because the later
+          Annex operational code revisions use a more elaborate Annex
+          LPD protocol that provides for acknowledgements from the
+          Annex to the host (indicating that the Annex is ready to
+          receive data) and from the host to the Annex (marking EOF,
+          among other things).  This makes it possible for _a_p_r_i_n_t to
+          determine that the Annex has opened the requested serial or
+          parallel line sucessfully.
+
+
+
+
+
+     Page 2                                         (printed 10/13/98)
+
+
+
