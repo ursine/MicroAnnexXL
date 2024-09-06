@@ -1,0 +1,1217 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1989, Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use.
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Description::
+ *
+ * 	Documentation file.  Writing your own security policy for the Annex.
+ *
+ * Original Author: Dave Harris		Created on: July 1987
+ *
+ * Module Reviewers:
+ *
+ *	harris
+ *
+ * Revision Control Information:
+ *
+ * $Header: /annex/common/src/./erpcd/RCS/policy.doc,v 1.13 1994/09/14 16:53:52 reeve Exp $
+ *
+ * This file created by RCS from:
+ *
+ * $Source: /annex/common/src/./erpcd/RCS/policy.doc,v $
+ *
+ * Revision History:
+ *
+ * $Log: policy.doc,v $
+ * Revision 1.14  1995/08/25  12:15:26  defina
+ * SPR 5139 - Added hmask argument in port_to_annex_authorize doc.
+ *
+ * Revision 1.13  1994/09/14  16:53:52  reeve
+ * Bigbird merge to common.
+ *
+ * Revision 1.10.2.3  1994/08/25  16:27:57  reeve
+ * Merge from Common tree.
+ *
+ * Revision 1.10.2.2  1994/05/10  11:10:49  reeve
+ * Added documentation for RPC, user_index() and straightened out service numbers
+ * and strings.
+ *
+ * Revision 1.10.2.1  1994/05/04  19:39:16  couto
+ * Updated for new arap, sync ppp, and sync dialup service names.
+ *
+ * Revision 1.12  1994/03/10  14:39:51  carlson
+ * SPR 2113 -- Added descriptions of hook-callback routines and usage.
+ *
+ * Revision 1.11  1994/01/21  10:02:36  carlson
+ * Updated with several new and renamed services, events and masks.
+ *
+ * Revision 1.10  1993/02/23  11:29:07  reeve
+ * Additions for Dynamic Dialing.
+ *
+ * Revision 1.9  93/01/21  11:43:54  carlson
+ * Updated with missing functions and parameters.
+ * 
+ * Revision 1.8  92/02/28  14:35:11  barnes
+ * add logging for LAT connect
+ * 
+ * Revision 1.7  92/01/07  16:48:57  carlson
+ * Details of changes to parameters, #defines, and meanings.
+ * 
+ * Revision 1.6  91/12/08  16:20:14  reeve
+ * Oops, port_to_annex header explained twice.
+ * 
+ * Revision 1.5  91/11/22  13:24:44  reeve
+ * Added documentation on PPP Security and Dialup Address requests.
+ * 
+ * Revision 1.4  91/09/04  15:22:29  sasson
+ * Added parameter (tcp_port) to annex_to_net(). Users may choose to restrict
+ * access to some tcp ports by rewriting annex_to_net() and available().
+ * 
+ * Revision 1.3  89/04/05  16:41:00  loverso
+ * /usr/annex, not /usr/encore
+ * 
+ * Revision 1.2  89/04/05  12:21:22  loverso
+ * Changed copyright notice
+ * 
+ * Revision 1.1  88/08/09  16:38:38  harris
+ * Initial revision
+ *
+ * This file is currently under revision by:
+ *
+ * $Locker:  $
+ */
+
+OVERVIEW:
+
+The Annex uses remote procedure calls to the host-resident security server
+application which contains the authentication algorithms.  The Annex requests
+security clearance at six basic checkpoints.
+
+	1)	Access to the CLI, or "port to Annex".
+
+	2)	Access to a Host from the Annex CLI (rlogin, telnet, call),
+		or "Annex to network" access.
+
+	3)	Access to an Annex port via port server, i.e. telnet'ing
+		to the Annex and selecting a port/rotary, "network to port".
+
+	4)	Access to an Annex PPP or SLIP port.
+
+	5)	Dialup addresses access.	
+
+	6)	Access to a LAT service.
+
+The Annex also uses the security mechanism to log a message after it is booted
+identifying the Annex image booted, and when it was booted.  The following
+discussion is about the 6 security checkpoints listed above, which are logical
+candidates for user customization.
+
+The module src/erpcd/acp_policy.c contains the remote procedures of the ACP
+program (Access Control Protocol) which may be customized.
+
+You should be familiar with the material in the Annex Network Administrator's
+Guide Chapter on Security.
+
+
+void global_init(Acp, logid, inet, Message, to)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Initial log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+char		*Message;	/* Image name or "(restart)" for */
+				/* admin or na "reset annex security" */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+port_to_annex(Acp, logid, inet, port, service, port_type)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+int		port,		/* Virtual port number */
+		service,	/* Service, SERVICE_CLI{,_HOOK} are expected */
+		port_type;	/* Port type - virtual or physical */
+
+
+void port_to_annex_logout(Acp, logid, inet, port, service, Username, to)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+int		port,		/* Virtual port number */
+		service;	/* Service, SERVICE_CLI is expected */
+char		*Username;	/* User associated with port */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void annex_to_net(Acp, logid, linet, port, service, rinet, Username, to, tcp_port_req)
+
+ACP		*Acp;		/* Handle to be passed to library calls */
+unsigned long	logid,		/* Log sequence number */
+		linet,		/* Annex Internet address */
+		rinet;		/* Internet address of connectee */
+int		port,		/* Virtual port number */
+		service,	/* Service, SERVICE_{CALL,RLOGIN,TELNET} */
+		tcp_port_req;	/* TCP port number we are trying to connect to*/
+char		*Username;	/* Username, derived from port_to_annex */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void annex_to_net_logout(Acp, logid, linet, port, service, rinet, Username, to)
+
+ACP		*Acp;		/* Handle to be passed to library calls */
+unsigned long	logid,		/* Log sequence number */
+		linet,		/* Annex Internet address */
+		rinet;		/* Internet address of connectee */
+int		port,		/* Virtual port number */
+		service;	/* Service, SERVICE_{CALL,RLOGIN,TELNET} */
+char		*Username;	/* Username */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void net_to_port(Acp, logid, linet, port, service, rinet, to)
+
+ACP		*Acp;		/* Handle to be passed to library functions */
+unsigned long	logid,		/* Unique log sequence number */
+		linet,		/* Local (Annex) Internet address */
+		rinet;		/* Remote Internet address (Annex or Host) */
+int		port,		/* Port number selected */
+		service;	/* Service, expected to be SERVICE_PORTS */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void net_to_port_logout(Acp, logid, linet, port, service, rinet, Username, to)
+
+ACP		*Acp;		/* Handle to be passed to library functions */
+unsigned long	logid,		/* Unique log sequence number */
+		linet,		/* Local (Annex) Internet address */
+		rinet;		/* Remote Internet address (Annex or Host) */
+int		port,		/* Port number selected */
+		service;	/* Service, expected to be SERVICE_PORTS */
+char		*Usertname;	/* User associated with port */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void ppp_security(Acp, logid, inet, port, service, direction, Name, Pass, to)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+int		port,		/* Virtual port number */
+		service;	/* Service, SERVICE_{PPP,SLIP,SLIP_DYNDIAL,PPP_DYNDIAL,
+						ARAP,SYNC_PPP} is expected */
+		service;	/* Service, SERVICE_{PPP,SLIP,SLIP_DYNDIAL,PPP_DYNDIAL} is expected */
+short		direction;	/* Direction of service */
+ACP_STRING	Name;		/* Username */
+ACP_STRING	Pass;		/* Password */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+ppp_slip_logout(Acp, logid, inet, port, service, Username, to)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+int		port,		/* Virtual port number */
+		service;	/* Service, SERVICE_{PPP,SLIP,SLIP_DYNDIAL,PPP_DYNDIAL,
+                                 ARAP,SYNC_PPP} is expected */
+char		*Username;	/* Username */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void dialup_address(Acp, logid, inet, port, sf, sr, Name, loc, rem, node,
+                    get_filters, get_routes)
+ 
+ACP             *Acp;           /* Handle to pass to library functions */
+UINT32          logid,                          /* Log sequence number */
+                inet;                        /* Annex Internet address */
+int             port,                  /* physical/virtual port number */
+                sf,                     /* protocol service user is on */
+                sr;                           /* Expect SERVICE_DIALUP */
+ACP_STRING      Name;                                      /* Username */
+UINT32          loc,rem;                 /* local and remote addresses */
+char *node;
+int get_filters, get_routes;
+
+void user_index(Acp, logid, inet, port, service, Name, to)
+
+ACP		*Acp;		/* Handle to be used with all library calls */
+unsigned long	logid,		/* Log sequence number for log file */
+		inet;		/* Internet address of the Annex */
+int		port,		/* Virtual port number */
+		service;	/* Service, SERVICE_DYNDIALPASS is expected */
+ACP_STRING	Name;		/* Username */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void annex_to_lat(Acp, logid, linet, port, service, Username, Service_name, to)
+
+ACP             *Acp;           /* Handle to pass to library calls */
+unsigned long   logid,          /* log file sequence number */
+		linet;          /* Internet address of the Annex */
+int             port,           /* physical or virtual port number */
+		service;        /* SERVICE_CONNECT */
+char            *Username,      /* Username associated with CLI */
+		*Service_name;  /* LAT service name */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+
+void annex_to_lat_logout(Acp, logid, linet, port, service, Username, Service_name, to)
+
+ACP             *Acp;           /* Handle to pass to library calls */
+unsigned long   logid,          /* log file sequence number */
+		linet;          /* Internet address of the Annex */
+int             port,           /* physical or virtual port number */
+		service;        /* SERVICE_CONNECT */
+char            *Username,      /* Username associated with CLI */
+		*Service_name;	/* LAT service name */
+struct sockaddr_in *to;		/* who sent the msg we will respond to */
+
+hook_callback(Acp, logid, code, cmnd)
+ACP             *Acp;           /* Handle to pass to library calls */
+int		logid;          /* log file sequence number */
+int             code;           /* Indicates callback reason; HCB_* */
+char            *cmnd;          /* Command from user (if any) */
+
+
+These procedures, as shipped, contain a default security policy, which may be a
+useful model for writing your own security policy.  These procedures are called
+before the Annex capability in question may be used.  For each procedure there
+is a corresponding logout procedure.  The logout procedures, as shipped, log
+messages to the log file, and do not require any further discussion.
+
+The security policies supplied may be replaced with a policy of your own.  The
+12 C functions listed above may be simply rewritten, using the library calls
+documented in the next section, and any library calls available on your system.
+A particular sequence must be observed, however.
+
+1.	Check for obvious errors in the supplied parameters, such as illegal
+	port number, invalid service, etc.  This must be a quick check, since
+	the Annex is expecting a return message to the remote procedure call
+	just made (i.e.:  don't read any disk files).  If there were errors,
+	use the return_<<checkpoint>> library call with a *return_code* set
+	to REQ_INVALID, and now go to the LAST step.
+
+2.	Most security policies require some disk file checking, and possibly
+	user prompting.  Therefore, the next step is usually to make a library
+	call to return_<<checkpoint>> with a *return_code* of REQ_PENDING,
+	which tells the Annex to expect more remote procedure calls, such as
+	promptstring, and ultimately a <<checkpoint>>_authorize call.
+	If the decision can me made in a fraction of a second, for example
+	you might wish to authorize all CLI access, but return a CLI mask
+	to disable a few commands, then the return_<<checkpoint>> call may
+	be made immediately, with an *return_code* set as required to either
+	REQ_GRANTED or REQ_DENIED.  In this case, proceed to the LAST step.
+
+3.	Now the host may make any security checks it may deem necessary.  It
+	may read files containing lists of Internet addresses, port numbers,
+	or whatever the imagination can yield.  The default policies contain
+	routines to check passwords from standard password files, and check
+	accessible Internet address lists.  These routines may be modified
+	to suit a similar authentication scheme.  The other important facility
+	is the library routines available to perform I/O, via the Annex, at
+	the user terminal.  This terminal may be attached to an Annex port
+	configured for the CLI, or it may attached to another host, which has
+	established a connection to the Annex over the network.  Using telnet
+	to connect to an Annex port via the port server is an example of the
+	latter.  In either case, the functions inputstring, outputstring, and
+	promptstring perform reads and writes to the actual terminal via some
+	Annex magic.  These functions are documented in a following section.
+
+4.	By now, a determination ought to have been made, one way or another.
+	At this point, a <<checkpoint>>_authorize call should be done.  The
+	*return_code* should be set to REQ_GRANTED, REQ_DENIED, or possibly
+	even REQ_INVALID.  The "port to Annex" and "network to port" check-
+	points should also return the *Username*, which will be passed back
+	in subsequent calls.  This is useful if you wish to adopt a policy
+	where the user's name is needed to determine whether "Annex to network"
+	access should be granted, and you don't want to prompt for the name
+	a second time.  The port_to_annex_authorize requires a CLI command
+	mask argument.  Each bit set will disable one of the CLI commands.
+	A default mask, and individual definitions, are in "acp_policy.h",
+	and are also given in the last section of this document.
+
+LAST.	Now that the decision is made, the user has been granted or denied
+	the Annex resource in question.  The only thing left to do is log
+	a message (optional) and terminate (strongly advised).  The library
+	routines log_message and terminate_session are described in one of
+	the following sections, "GENERAL PURPOSE LIBRARY CALLS".
+
+REMOTE PROCEDURE CALL RETURN MESSAGES:
+
+
+#include "acp_policy.h"
+
+return_port_to_annex(Acp, return_code, cli_cmd_mask, Username, to)
+
+ACP		*Acp;
+unsigned long	return_code;		/*  grant, deny, delay, or reject  */
+unsigned long	cli_cmd_mask;		/*  bits set to disable cli cmds   */
+char		*Username;		/*  user name or token   	   */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize/reject "port to Annex" security request, or notify Annex
+	that security clearance will be decided by another procedure call.
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.  *Cli_cmd_mask* is the bit mask
+	used to disable CLI commands, and *Username* is a token to be passed
+	back by any security requests associated with the current CLI session,
+	and is usually the name of the user entered to obtain clearance.
+
+	This function is the return message to the remote procedure call that
+	invoked the "port to Annex" policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, i.e.
+	prompt for passwords and examine data files; and then issue a remote
+	procedure call to grant or deny permission.
+}
+
+
+#include "acp_policy.h"
+
+return_annex_to_net(Acp, return_code, to)
+
+ACP		*Acp;
+unsigned long	return_code;		/*  grant, deny, delay, or reject  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize/reject "Annex to network" security request, or notify Annex
+	that security clearance will be decided by another procedure call.
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.
+
+	This function is the return message to the remote procedure call that
+	invoked the "Annex to network" policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, i.e.
+	prompt for passwords and examine data files; and then issue a remote
+	procedure call to grant or deny permission.
+}
+
+#include "acp_policy.h"
+
+return_net_to_port(Acp, return_code, to)
+
+ACP		*Acp;
+unsigned long	return_code;		/*  grant, deny, delay, or reject  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize/reject "network to port" security request, or notify Annex
+	that security clearance will be decided by another procedure call.
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.
+
+	This function is the return message to the remote procedure call that
+	invoked the "network to port" policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, i.e.
+	prompt for passwords and examine data files; and then issue a remote
+	procedure call to grant or deny permission.  Note that the user name
+	cannot be set by the return, only by the remote procedure call.
+}
+
+#include "acp_policy.h"
+
+return_ppp_security(Acp, return_code, to)
+
+ACP		*Acp;
+unsigned long	return_code;		/*  grant, deny, delay, or reject  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize/reject ppp security request, or notify Annex
+	that ppp security clearance will be decided by another procedure call.
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.
+
+	This function is the return message to the remote procedure call that
+	invoked the ppp security policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, 
+	i.e., examine data files, and then issue a remote procedure call to 
+	grant or deny permission.  
+	
+	
+}
+
+#include "acp_policy.h"
+return_dialup_address(Acp, return_code, net_type, loc, rem, node, filters,
+                      routes)
+ 
+ACP        *Acp;
+UINT32        return_code;        /*  grant or deny  */
+int net_type;
+UINT32        loc,rem;        /*  local and remote slip addresses */
+u_char *node;
+STR_LIST *filters, routes;
+{
+	Authorize/reject dialup address security request, or notify Annex
+	that security clearance will be decided by another procedure call.
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.  The parameters, *loc* and 
+	*rem* are the addresses read out of the acp_dialup file, which
+	only have meaningful information if *return_code* is REQ_GRANTED.
+
+	This function is the return message to the remote procedure call that
+	invoked the dialup address policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, i.e.
+	examine data files; and then issue a remote procedure call to grant 
+	or deny permission.
+}
+
+#include "acp_policy.h"
+return_user_index(Acp, return_code, index, to)
+
+ACP		*Acp;
+unsigned long	return_code;		/*  grant, deny, delay, or reject  */
+char		*index			/*  password */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Provide a password keyed by a username which is stored in the 
+	User Profile database.
+
+	*Acp* is the handle received by the policy routine, *return_code* is
+	REQ_GRANTED (permission granted), REQ_DENIED (permission denied),
+	REQ_PENDING (permission pending security check), or REQ_INVALID if
+	an exception condition was detected.  The parameter, *index* is
+	the password obtained from the acp_userinfo file, which
+	only has meaningful information if *return_code* is REQ_GRANTED.
+
+	This function is the return message to the remote procedure call that
+	invoked the user index policy function.  Unless the policy can
+	make an immediate decision from the arguments it is invoked with,
+	it should return a REQ_PENDING, proceed with the authorization, i.e.
+	examine data files; and then issue a remote procedure call to grant 
+	or deny permission.
+}
+#include "acp_policy.h"
+return_hook_callback(Acp, return_code, cmnd)
+ACP		*Acp;
+int		return_code;		/* pend, return, terminate */
+char            *cmnd;                  /* command for CLI or NULL */
+{
+	This function must be called once by hook_callback().  The return_code
+	can be one of HCB_PENDING, HCB_RETURN or HCB_TERMINATE.  If the code is
+	HCB_PENDING, then hook_callback may then call inputstring(),
+	outputstring() and promptstring() as necessary, and must finally return
+	control to the Annex CLI by calling hook_callback_string() (see below).
+	If the code is HCB_RETURN, then the string passed to the CLI in "cmnd"
+	(if any) is executed as a CLI command.  If the code is HCB_TERMINATE,
+	then the string passed back (if any) is executed as above, but the ACP
+	session is terminated at the Annex end and the host must then call the
+	terminate() function.
+}
+
+#include "acp_policy.h"
+
+acp_acknowledge(Acp, to)
+
+ACP		*Acp;
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Return a simple acknowledgement.  This is a generic ACK, which can
+	answer any remote procedure call expecting an ACK as the return,
+	such as the boot message or logout messages.
+
+	Calling this function sends a return message to a remote procedure.
+}
+
+REMOTE PROCEDURE CALLS TO THE ANNEX:
+
+
+#include "acp_policy.h"
+
+port_to_annex_authorize(Acp, grant, cli_cmd_mask, Username, hmask)
+
+ACP		*Acp;			/*  points to ACP state  */
+unsigned long	grant;			/*  grant, deny, error   */
+unsigned long	cli_cmd_mask;		/*  CLI command disable  */
+char		*Username;		/*  user name or token    */
+UINT32          hmask;                        /*  Codes for cli hook cmds */
+{
+	Authorize or deny a security request for a "port to Annex"
+	connection.  *Acp* is a handle which was passed to the policy
+	routine.  *Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+	*Cli_cmd_mask* is usually CLI_MASK from "acp_policy.h", or may
+	be assembled from the bits defined therein.  Each bit disables
+	one of the CLI commands (if set). *Username* is the name of the
+	user, or any other useful token.  This will be passed back to
+	the security policy in any subsequent security messages for this
+	CLI session, such as the logout, or any future "Annex to network"
+	requests. (When rlogin, telnet, or call command is invoked/exited).
+	The name is also displayed by the Annex CLI who command (and fingerd).
+	There is a 31 character limit to strings, not including the NULL.
+	Hmask is a bit-mask used in conjunction with the optional cli hook
+	feature. See acp.h under auth_hook.
+
+	This function should only be called after a return_port_to_annex
+	function is called with a *grant* argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+
+#include "acp_policy.h"
+
+annex_to_net_authorize(Acp, grant, to)
+
+ACP		*Acp;			/*  points to ACP state  */
+unsigned long	grant;			/*  grant, deny, error   */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize or deny a security request for an "Annex to network"
+	connection.  *Acp* is a handle which was passed to the policy
+	routine.  *Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+
+	This function should only be called after a return_annex_to_net
+	function is called with a *grant* argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+#include "acp_policy.h"
+
+net_to_port_authorize(Acp, grant, Username, to)
+
+ACP		*Acp;			/*  points to ACP state  */
+unsigned long	grant;			/*  grant, deny, error   */
+char		*Username;		/*  user name  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize or deny a security request for a "network to port"
+	connection.  *Acp* is a handle which was passed to the policy
+	routine.  *Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+	*Username* is the name of the user, or any other meaningful token.
+	This will be passed back to the security policy when the port server
+	session terminates.  Its purpose is primarily for inclusion in the log
+	file, however it is also be used to identify the user of an Annex port
+	by the Annex CLI "who" command.  There is a 31 character limit to ACP
+	strings, not including the NULL.
+
+	This function should only be called after a return_net_to_port
+	function is called with a *grant* argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+
+#include "acp_policy.h"
+
+ppp_security_authorize(Acp, grant, to)
+
+ACP		*Acp;			/*  points to ACP state  */
+unsigned long	grant;			/*  grant, deny, error   */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+
+	Authorize or deny a security request for ppp security. 
+	*Acp* is a handle which was passed to the policy routine.
+	*Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+
+	This function should only be called after a return_ppp_security
+	function is called with a *grant* argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+#include "acp_policy.h"
+
+dialup_address_authorize(Acp, grant, net_type, loc, rem, node, filters, routes)
+ 
+ACP        *Acp;            /*  points to ACP state  */
+UINT32        grant;            /*  grant, deny, error   */
+int net_type;
+UINT32        loc, rem;        /*  local and remote addrs   */
+u_char *node;
+STR_LIST *filters, *routes;
+{
+	Authorize or deny a security request for dialup addresses.
+	*Acp* is a handle which was passed to the policy routine.
+	*Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+	*loc* and *rem* are the local and remote addresses, 
+	respectively, which the caller will use as its dialup
+	addresses.
+
+	This function should only be called after a 
+	return_dialup_address function is called with a *grant* 
+	argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+
+
+#include "acp_policy.h"
+
+user_index_authorize(Acp, grant, index, to)
+
+ACP		*Acp;			/*  points to ACP state  */
+unsigned long	grant;			/*  grant, deny, error   */
+char		*index;			/*  password  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Authorize or deny a security request for user index.
+	*Acp* is a handle which was passed to the policy routine.
+	*Grant* is one of REQ_GRANTED (permission is granted),
+	REQ_DENIED (permission is denied), or REQ_INVALID (error).
+	*index* is the password obtained from acp_userinfo.
+
+	This function should only be called after a 
+	return_user_index function is called with a *grant* 
+	argument of REQ_PENDING.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+
+#include "acp_policy.h"
+hook_callback_string(Acp, return_code, cmnd)
+ACP		*Acp;
+int		return_code;		/* return or terminate */
+char            *cmnd;                  /* command for CLI or NULL */
+{
+	This function must be called once by hook_callback() if
+	return_hook_callback() was called with a return code of HCB_PENDING.
+	The return_code for this function may be either HCB_RETURN or
+	HCB_TERMINATE with the same meanings as those for return_hook_callback.
+}
+
+#include "acp_policy.h"
+
+inputstring(Acp, String, echo, timeout, to)
+
+ACP		*Acp;		/*  Acp session state structure  */
+char		*String;	/*  Place to put return string  */
+int		echo,		/*  Boolean - echo input?  */
+		timeout;	/*  How long should I wait?  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Input a string at the remote user's terminal, via the Annex.
+	*Acp* is the handle passed to the policy routine.  *String* is
+	a pointer to a 32 character array, in which a null terminated
+	string (the user input) is placed.  A null string signifies a
+	timeout.  *Echo* must be non-zero if the intention is to echo
+	input.  It is good practice to set this to zero when passwords
+	are to be entered.  *Timeout* is an interval, in seconds, after
+	which input must be returned.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+outputstring(Acp, String, to)
+
+ACP		*Acp;		/*  Acp session state structure  */
+char		*String;	/*  String to be put out  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	Send a string to the user's terminal, via the Annex.  *Acp* is
+	the handle passed to the policy routine.  *String* is a null
+	terminated string, a maximum of 32 characters including the null,
+	which is to be displayed on the user's terminal.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+
+#include "acp_policy.h"
+
+promptstring(Acp, Inpstr, Outstr, echo, timeout, to)
+
+ACP		*Acp;		/*  Acp session state structure  */
+char		*Inpstr,	/*  Place to put return string  */
+		*Outstr;	/*  String to be put out  */
+int		echo,		/*  Boolean - echo input?  */
+		timeout;	/*  How long should I wait?  */
+struct sockaddr_in	*to;	/* who sent the msg we will respond to */
+{
+	This function sends a string to the user's terminal, and waits
+	for input.  *Acp* is the handle passed to the policy routine.
+	*Inpstr* is a 32 character array to receive the null-terminated
+	string entered by the user.  *Outstr* is a null terminated string
+	to be displayed on the user's terminal, and is also limited to 32
+	characters, including the null.  *Echo* must be non-zero for input
+	to be echoed to the user.  *Timeout* is the interval, in seconds,
+	within which the input must arrive, or a null string is returned.
+	If no input is given (i.e., just a RETURN), the prompt is displayed
+	until a non-blank line is entered, or the timeout interval elapses.
+	A default value, INPUT_TIMEOUT, is customarily used.
+
+	This function makes a remote procedure call to the Annex.
+}
+
+GENERAL PURPOSE LIBRARY CALLS:
+
+
+#include "acp_policy.h"
+
+void log_message(inet, logid, port, service, type, Message)
+
+unsigned long	inet,		/*  Annex Internet address  */
+		logid;		/*  Annex log sequence #  */
+int		port,		/*  Virtual port number  */
+		service,	/*  Subsystem in question  */
+		type;		/*  Event taking place  */
+char		*Message;	/*  Additional fields  */
+{
+	This function logs a message to the log file (ACP_LOGFILE).  *Inet*
+	is the Internet address of the Annex in question, *logid* is the
+	sequence number contained in the security request being logged,
+	*port* is the virtual port number (1-32 except for port_multiplexed
+	and virtual CLI ports), *service* is the Annex capability for which
+	clearance was requested, *type* identifies the event (boot, login, 
+	logout, reject, or timeout), and *Message* is a policy dependent string
+	which supplies additional fields, such as the Internet address of the
+	Host with which an Annex requested to be connected.
+
+	The format of the log file is defined by LOG_FORMAT.  In addition to
+	the information mentioned in the preceding paragraph, a date-time
+	stamp is inserted.  Refer to Chapter 8, Security, of the Annex Network
+	Administrator's Guide for an example of the log file.
+
+	Normally, ACP_LOGFILE is defined as "/usr/annex/acp_logfile".  This
+	may be changed (src/erpcd/acp_policy.h) to any suitable path name,
+	including "/dev/null", "/dev/console", etc.  The log file is opened,
+	a line is appended, and the file is closed, each time this function
+	is invoked.
+
+	The services and event types are defined as follows:
+
+char    *service_name[NSERVICES] =
+    {
+        "security",		/* SERVICE_SECURITY */
+        "cli",			/* SERVICE_CLI */
+        "call",			/* SERVICE_CALL */
+        "rlogin",		/* SERVICE_RLOGIN */
+        "telnet",		/* SERVICE_TELNET */
+        "pserv" ,		/* SERVICE_PORTS */
+        "dialup address",	/* SERVICE_DIALUP */
+        "slip",			/* SERVICE_SLIP */
+        "ppp",			/* SERVICE_PPP */
+        "connect",		/* SERVICE_CONNECT */
+        "slip dyn-dial",	/* SERVICE_SLIP_DYNDIAL */
+        "ppp dyn-dial",		/* SERVICE_PPP_DYNDIAL */
+        "dialback",		/* SERVICE_DIALBACK */
+        "arap",			/* SERVICE_ARAP */
+        "ftp daemon",		/* SERVICE_FTP */
+        "cli hook",		/* SERVICE_CLI_HOOK */
+        "ipx",			/* SERVICE_IPX */
+        "ipx dialback",		/* SERVICE_IPX_DIALBACK */
+        "rcf",			/* SERVICE_RCF */
+        "ppp timeout",		/* SERVICE_PPP_TMOUT */
+        "ppp dyn-dial timeout",	/* SERVICE_PPP_DYNDIAL_TMOUT */
+        "slip timeout",		/* SERVICE_SLIP_TMOUT */
+        "slip dyn-dial timeout",/* SERVICE_SLIP_DYNDIAL_TMOUT */
+        "vms",			/* SERVICE_VMS */
+        "sync ppp",		/* SERVICE_SYNC_PPP */
+        "sync dialup",		/* SERVICE_SYNC_DIALUP */
+        "user index",		/* SERVICE_DYNDIALPASS */
+        "chap secret",		/* SERVICE_SECRET */
+        "chap",			/* SERVICE_CH_GOOD */
+        "chap",			/* SERVICE_CH_BAD */
+        "chap",			/* SERVICE_CH_OPT_REF */
+        "ipx dialup address",	/* SERVICE_DIALUP_IPX */
+        "output",		/* SERVICE_OUTPUTSTRING */
+        "prompt",		/* SERVICE_PROMPTSTRING */
+        "appletalk profile",	/* SERVICE_AT_PROFILE */
+        "none",			/* SERVICE_NONE */
+        "audit log",		/* SERVICE_AUDITLOG */
+        "shell",		/* SERVICE_SHELL */
+        "filters/routes",	/* SERVICE_FILTERS */
+	"PRI manager",		/* SERVICE_PRIMGR */
+	"chap",			/* SERVICE_CHAP */
+	"Multi-Link PPP",	/* SERVICE_MP */
+	"modem",		/* SERVICE_MODEM */
+	"max logon",		/* SERVICE_MAX_LOGON */
+    };
+
+char    *event_name[NEVENTS] =
+    {
+        "boot",			/* EVENT_BOOT */
+        "login",		/* EVENT_LOGIN */
+        "reject",		/* EVENT_REJECT */
+        "logout",		/* EVENT_LOGOUT */
+        "timeout",		/* EVENT_TIMEOUT */
+        "provide",		/* EVENT_PROVIDE */
+        "no provide",		/* EVENT_NOPROVIDE */
+        "dial",			/* EVENT_DIAL */
+        "bad response",		/* EVENT_BADRESP */
+        "option refused",	/* EVENT_OPT_REF */
+        "acct",			/* EVENT_ACCT */
+        "parse error",		/* EVENT_PARSE */
+        "BLACKLISTED",		/* EVENT_BLACKLIST */
+        "call accept",		/* EVENT_SPB_ACCEPT_CALL */
+	"call reject",		/* EVENT_REJECT_CALL */
+	"call disconnect",	/* EVENT_DISC_CALL */
+    };
+
+void inet_number(Dot_string, long_inet)
+
+char		Dot_string[];		/*  Return string in dot notation  */
+unsigned long	long_inet;		/*  Internet address, in 32 bits   */
+{
+	Return the Internet address in "dot" notation in the character array
+	*Dot_string*, from the machine representation, *long_inet*.
+}
+
+
+inet_name(Host_name, long_inet)
+
+char		Host_name[];		/*  Return name from /etc/hosts  */
+unsigned long	long_inet;		/*  Internet address, in 32 bits */
+{
+	Return the host name from the hosts database in the character array
+	*Host_name*, from the machine representation, *long_inet*.
+}
+
+
+UINT32
+inet_address(Host_string)
+
+char	Host_string[];		/*  Dot notation or hostname  */
+{
+	Given a string which is either an Internet address in numeric form,
+	i.e. "dot" notation, or a Host name, or alias, return its machine
+	representation.  *Host_string* contains the string in question.
+}
+
+
+void terminate_session()
+{
+	Terminate a security session.  This exits the remote program, and
+	should be the last call made by any security policy.  If the policy
+	returns without terminating, the remote program will time out, but
+	this may prevent other copies of the security program from being
+	started, since there is a limit to the number of remote procedure
+	threads that may be active at one time.
+}
+
+
+DEFINITIONS (from ./acp_policy.h):
+
+/*
+ *	INSTALL_DIR is defined in the file src/inc/port/install_dir.h.
+ *	The name was originally placed there during product installation.
+ *	The value indicates the directory where the ACP files are kept.
+ *	The name can be re-assigned by editing the install_dir.h file or
+ *	by editing the src/make.config file to redefine the ACP_DIR
+ *	defintion and then adding $(USER_INSTALL) to the CFLAGS definition.
+ *	In either case you should then do a "make clean", "make all" and
+ *	"make install" while in the src directory.
+ */
+
+/*	select user name/password validation		*/
+
+#define	USER_VALIDATION	1
+
+/*	define pathname of domain password file		*/
+
+#define ACP_PASSWD	INSTALL_DIR/acp_passwd
+#define ACP_PTMP	INSTALL_DIR/acp_ptmp
+#define ACP_SHADOW	INSTALL_DIR/acp_shadow
+#define ACP_STMP	INSTALL_DIR/acp_stmp
+
+/*	define pathname of accounting file		*/
+
+#define ACP_LOGFILE	INSTALL_DIR/acp_logfile"
+
+/*	define pathname for restrictions file		*/
+
+#define ACP_RESTRICT	INSTALL_DIR/acp_restrict"
+
+/*	define pathname for annex acp_keys file 	*/
+
+#define	ACP_KEYS	INSTALL_DIR/acp_keys"
+
+/*	define pathname for annex acp_dialup file 	*/
+
+#define	ACP_DIALUP	INSTALL_DIR/acp_dialup"
+
+/* 	define pathname for acp_regime file		*/
+
+#define ACP_REGIME	INSTALL_DIR/acp_regime
+
+/* 	define pathname for eservices file 		*/
+
+#define	ACP_ESERVICES	INSTALL_DIR/eservices		
+
+/*	define sizes of internal encryption tables	*/
+
+#define MAX_WILD	32	/* maximum # wildcard entries in acp_keys */
+#define	MAX_TAME	96	/* maximum # Annexes specified by acp_keys */
+#define MAX_KEYS	128	/* maximum # unique keys specifiable */
+
+/*	define messages used by default application	*/
+
+#define ACP_USERPROMPT	"Annex username: "
+#define ACP_PASSPROMPT	"Annex password: "
+#define ACP_PERMGRANTD	"\nPermission granted\n"
+#define ACP_PERMDENIED	"\007\nPermission denied\n"
+#define ACP_INCORRECT	"\nUsername/Password Incorrect\n"
+#define BOTH_INCORRECT	"\nUsername/Password/PASSCODE Incorrect\n"
+#define BOTH_PERMGRANTD "\nPassword and PASSCODE accepted\n"
+#define SID_USERPROMPT	"Username: "
+#define SID_PASSPROMPT	"Enter PASSCODE: "
+#define SID_PERMGRANTD	"\nPASSCODE accepted\n"
+#define SID_PERMDENIED	"\007\nAccess Denied\n"
+#define SID_INCORRECT	"\nUsername/PASSCODE Incorrect\n"
+#define SID_LOGNEWPIN_1 "\nWait for the code on your card to change,\n"
+#define SID_LOGNEWPIN_2 "then enter PASSCODE including the new PIN.\n"
+#define EAS_USERPROMPT	"ID: "
+#define EAS_CHALLENGE   "\nChallenge: %s\n"
+#define EAS_DYNPASS	    "Dynamic PassWord: "
+#define EAS_RESTDYNPASS "Enter Rest of Dynamic PassWord: "
+#define EAS_FIXPASS	    "Fixed PassWord: "
+#define EAS_OLDFIXPASS	"Old Fixed PassWord: "
+#define EAS_NEWFIXPASS	"New Fixed PassWord: "
+#define EAS_REPFIXPASS	"Repeat New Fixed PassWord: "
+#define EAS_PERMGRANTD	"\nPermission granted\n"
+#define EAS_PERMDENIED	"\007\nAccess Denied\n"
+#define EAS_INCORRECT	  "\nLogin Incorrect\n"
+#define EAS_CHANGEPIN   "Do you want to change your PIN? (Y/N): "
+#define EAS_ENTERESC    "\n(Enter [Esc] if you wish to change your password)\n"
+#define EAS_MUSTDIFF    "\nYour new password must be different from your old one\n"
+#define EAS_PASSMIN     "\nFixed passwords must have %d or more characters\n"
+#define EAS_VERIFYERR   "\nVerify error\n"
+#define EAS_PINCHANGED  "\nPIN changed\n"
+#define EAS_NOTCHANGED  "\nPIN not changed\n"
+#define EAS_FIXNOCHANGE "\nGiving up trying to change fixed password\n"
+#define EAS_HIDEBAD     "\nSafeWord: Your password will expire in 1 day(s)\n"
+
+#define ACP_TIMEDOUT	"\007\nLogin Timed Out\n"
+#define ACP_WARNING	"\007\nYour password will expire in %ld days unless changed.\n"
+#define ACP_WARNINGM	"\007\nYour password expires after tomorrow unless changed.\n"
+#define ACP_WARNINGT	"\007\nYour password expires after today unless changed.\n"
+#define ACP_AWARNING	"\007\nYour account will expire in %ld days.\n"
+#define ACP_AWARNINGM	"\007\nYour account expires after tomorrow.\n"
+#define ACP_AWARNINGT	"\007\nYour account expires after today.\n"
+#define ACP_EXPIRED	"Your password has expired.\n"
+#define ACP_NEWPASS	"Enter a new password:  "
+#define ACP_NEWPASS2	"Re-enter new password:  "
+#define ACP_PASSMATCH	"Entered passwords do not match.  Try again.\n"
+#define ACP_MATCH_FOUND "You cannot use a recently used password--try again.\n"
+#define ACP_PASS_UNCHANGED "Password not changed.\n"
+#define ACP_ACCESSCODEPROMPT	"Access Code: "
+#define ACP_PHONEPROMPT		"Telephone Number: "
+#define ACP_DIALBACKGRANTD	"\nRequest accepted, dialback in progress...\n"
+#define ACP_CLINODIALBACK	"\nPermission granted, no dialback\n"
+#define ERPCD_RANGE "Warning: option %s ignored because out of range (%s)\n"
+
+/* 	define messages used by Securid Card application	*/
+
+#define SID_NEXTCODEPROMPT      "Enter next card code: "
+#define SID_PINCHAR     "characters"
+#define SID_PINDIGIT    "digits"
+#define SID_PINSIZE     "%d"
+#define SID_PINSZRANGE  "%d to %d"
+#define SID_NEWPINPROMPT        "Enter your new PIN containing %s %s,\n"
+#define SID_OR          "\t\tor\n"
+#define SID_NEWPIN_2    "Press <Return> to generate new PIN and display it\n"
+#define SID_NEWPIN_3    "      <Ctrl d> <Return> to leave your card in New-PIN mode.\n"
+#define SID_SYSGENPIN   "\t\t%s\n"
+#define SID_PINREENTRY  "Please re-enter PIN: "
+
+/* only used if PORT_PASSWORD set and a port password exists in acp_passwd */
+#define ACP_PORTPROMPT	"Port password: "
+
+
+/*	miscellaneous defines for default application	*/
+
+#define INPUT_TIMEOUT	60
+#define INPUT_POLL_TIMEOUT 3
+#define RETRIES_MAX	3
+
+
+
+/*	define bit to disable each maskable CLI command	*/
+
+#define MASK_BG		0x00000001
+#define MASK_CALL	0x00000002
+#define MASK_FG		0x00000004
+#define MASK_HANGUP	0x00000008
+#define MASK_HELP	0x00000010
+#define MASK_HOSTS	0x00000020
+#define MASK_JOBS	0x00000040
+#define MASK_KILL	0x00000080
+#define MASK_NETSTAT	0x00000100
+#define MASK_RLOGIN	0x00000200
+#define MASK_STATS	0x00000400
+#define MASK_STTY	0x00000800
+#define MASK_TELNET	0x00001000
+#define MASK_WHO	0x00002000
+#define MASK_LOCK	0x00004000
+#define MASK_SU		0x00008000
+#define MASK_SLIP	0x00010000
+#define MASK_CONNECT	0x00020000
+#define MASK_SERVICES	0x00040000
+#define MASK_PPP	0x00080000
+#define MASK_ARAP	0x00100000
+#define MASK_IPX        0x00200000
+#define MASK_NONE       0x80000000
+
+/*	define cli command mask		*/
+
+#define CLI_MASK	(UINT32)0
+
+/*	define service types		*/
+
+#define NSERVICES		40
+
+#define SERVICE_SECURITY		0
+#define SERVICE_CLI			1
+#define SERVICE_CALL			2
+#define SERVICE_RLOGIN			3
+#define SERVICE_TELNET			4
+#define SERVICE_PORTS			5
+#define SERVICE_DIALUP			6
+#define SERVICE_SLIP			7
+#define SERVICE_PPP			8
+#define	SERVICE_CONNECT			9
+#define	SERVICE_SLIP_DYNDIAL		10
+#define	SERVICE_PPP_DYNDIAL		11
+#define	SERVICE_DIALBACK		12
+#define	SERVICE_ARAP			13
+#define SERVICE_FTP			14
+#define SERVICE_CLI_HOOK		15
+#define SERVICE_IPX             	16
+#define SERVICE_IPX_DIALBACK    	17
+#define SERVICE_RCF	    		18
+#define SERVICE_PPP_TMOUT               19
+#define SERVICE_PPP_DYNDIAL_TMOUT       20
+#define SERVICE_SLIP_TMOUT              21
+#define SERVICE_SLIP_DYNDIAL_TMOUT      22
+#define SERVICE_VMS			23
+#define SERVICE_SYNC_PPP    		24
+#define SERVICE_SYNC_DIALUP 		25
+#define SERVICE_DYNDIALPASS		26
+#define SERVICE_SECRET			27
+#define SERVICE_CH_GOOD			28
+#define SERVICE_CH_BAD			29
+#define SERVICE_CH_OPT_REF		30
+#define SERVICE_DIALUP_IPX              31
+#define SERVICE_OUTPUTSTRING            32
+#define SERVICE_PROMPTSTRING            33
+#define SERVICE_AT_PROFILE              34
+#define SERVICE_NONE                    35
+#define SERVICE_AUDITLOG                36
+#define SERVICE_SHELL                   37
+#define SERVICE_FILTERS                 38
+
+/* Port type defines for dialup addressing */
+#define PORT_ASYNC  0
+#define PORT_SYNC   1
+
+/*	define event logging (accounting) parameters	*/
+
+#define NEVENTS		14   /*changed to build orig. val. = 10 . 6/13/95*/
+#define EVENT_BOOT	0
+#define EVENT_LOGIN	1
+#define EVENT_REJECT	2
+#define EVENT_LOGOUT	3
+#define EVENT_TIMEOUT	4
+#define EVENT_PROVIDE	5
+#define EVENT_NOPROVIDE	6
+#define EVENT_DIAL	7
+#define EVENT_BADRESP   8
+#define EVENT_OPT_REF   9
+#define EVENT_ACCT      10
+#define EVENT_PARSE     11
+#define EVENT_BLACKLIST 12
+
+#define ACP_LOG_MASK	0640	/*  umask when creating ACP_LOGFILE  */
+
+#define IPX_CHARGE_BACK_TOK     "charge_back"
+#define IPX_ACCESS_CODE_TOK     "ipx"
+
+/* Just in case ... */
+#ifdef NOT_ANSI_LIB
+# define LOG_FORMAT_S    "%s:%8.8x:%s:%10.10d:%s:%s%s%s%s%s%s%s%s%s\n"
+# define LOG_FORMAT    "%s:%8.8x:%s:%2.2d%2.2d%2.2d:%2.2d%2.2d%2.2d:%s:%s%s%s%s%s%s%s%s%s\n"
+#else /* !NOT_ANSI_LIB */
+# define LOG_FORMAT_S    "%s:%8.8lx:%s:%10.10ld:%s:%s%s%s%s%s%s%s%s%s\n"
+# define LOG_FORMAT    "%s:%8.8lx:%s:%2.2d%2.2d%2.2d:%2.2d%2.2d%2.2d:%s:%s%s%s%s%s%s%s%s%s\n"
+#endif /* NOT_ANSI_LIB */
+
+#ifndef TRUE
+#define TRUE 1
+#define FALSE 0
+#endif
+
+/* Xylogics builtin passwd functions */
+int setacppw();
+void endacppw();
+struct passwd *getacppw();
+
+/* Xylogics builtin shadow passwd functions */
+int setacpsp();
+void endacpsp();
+struct spwd *getacpsp();
+int lckacpf(),ulckacpf();
+
+#ifndef _WIN32
+/* These are in getacppw.c */
+extern char passwd_name[],ptmp_name[];
+extern char shadow_name[],stmp_name[];
+extern char lock_name[];
+#endif
+
+
+
+/*
+ * When DEFAULT_NO_USERINFO is set to 1, a user is allowed to dial in into
+ *					 the Annex even if the user does not
+ *					 have an entry in the acp_userinfo file.
+ *					 An access_code does not need to be
+ *					 assigned to all users. Notice that
+ *					 users requesting dialback must have
+ *					 a valid entry in acp_userinfo.
+ *
+ * When DEFAULT_NO_USERINFO is set to 0, all users are required to have an
+ *					 access_code defined in acp_userinfo
+ *					 for increased security. All users
+ *					 will be prompted for the access code
+ *					 during authentication.
+ */
+#define	DEFAULT_NO_USERINFO	1
+
+int acp_safeword_validate_ipx(); /*ADDING THese PROTOs. FOR THE FXN. 6/15/95.MA*/
+void log_accounting();
+int wild_match();
+
+#ifdef _WIN32
+struct passwd {
+    char *pw_name;
+    char *pw_passwd;
+    int pw_uid;
+    int pw_gid;
+    char *pw_age;
+    char *pw_comment;
+    char *pw_gecos;
+    char *pw_dir;
+    char *pw_shell;
+};
+#define ONE_SECOND 1000
+#else
+#define ONE_SECOND 1
+#endif
+

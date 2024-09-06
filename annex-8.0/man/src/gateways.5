@@ -1,0 +1,242 @@
+'''
+'''	$Header: /annex/common/src/./na/RCS/gateways.5,v 1.6 1993/10/07 10:10:26 emond Rel $
+'''
+.ig xy
+.TH GATEWAYS 4 ANNEX
+.xy
+.ie '\*(sy'V' .TH GATEWAYS 4 ANNEX
+.el .TH GATEWAYS 5 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+gateways \- Annex network initialization
+.SH DESCRIPTION
+When an Annex boots, it reads the
+.B gateways
+section of the 
+.B config.annex
+file from
+.BR /usr/spool/erpcd/bfs.
+This file contains commands to initialize the routing tables of all
+Annexes on the local network.
+Finally, it can be used to add host names to an annex's host name table.
+.PP
+For routing information, the Annex
+.B gateways
+category has a format that corresponds closely to the
+.B /etc/gateways
+file used by
+.ie '\*(sy'V' .IR routed (1M).
+.el .IR routed (8C).
+That is, you can prep the Annex routing table with routes for
+networks and hosts.
+However, a few differences exist.
+The basic entry has the format:
+.br
+.sp .5
+.RS
+.RB { net | host }
+.I addr1 
+.B gateway
+.I addr2
+.B metric
+.I value
+.RB { passive | hardwired }
+.RE
+.br
+.PP
+The keywords
+.B net
+and
+.B host
+indicate whether the Internet address
+.I addr1
+specifies a destination network or host. The Internet address
+.I addr2
+specifies the gateway via which the destination is reached.
+.PP
+Since the
+.SM RIP
+implementation on an Annex is listen-only
+and does not exchange any routing information with other routers,
+the Annex does not have the notion of active gateways.
+Thus,
+.B active
+routes are not supported in the Annex
+.B gateways
+file.
+However, a route learned from an active gateway producing
+.SM RIP
+broadcasts will be aged.
+Thus, if that gateway stops including a route in its routing updates,
+the route will eventually be discarded.
+.PP
+The Annex does support passive gateways,
+and the keyword
+.B passive
+marks a route as such.
+This indicates that the gateway
+does not generate its own routing information.
+The principal effect of a
+.B passive
+route is to keep a routing
+entry from being aged and ultimately discarded.
+However, such a route can be overridden by a routing update
+containing a better route to the destination.
+The Annex also supports the notion of
+.B hardwired
+(or
+.IR fixed )
+routes, marked by the keyword
+.BR hardwired .
+Such a route will never be changed or deleted,
+even if a routing update containing a
+better route is received by the Annex.
+.PP
+Finally, the metric
+.I value
+indicates the number of hops needed to reach the destination.
+.PP 
+There are a few additional differences between the Annex
+.B gateways
+category and the
+.B /etc/gateways
+file used by
+.ie '\*(sy'V' .IR routed (1M).
+.el .IR routed (8C).
+First, all Internet addresses in the Annex
+.B gateways
+file are required to be specified in standard Internet dot notation.
+This is because when the Annex is reading the gateways file,
+it is still in the process of booting,
+and thus cannot yet do name-to-address translations.
+Comments can be placed in the
+.B gateways
+section and are introduced by a \*Q#\*U character
+anywhere on a line and terminated by the end of that line.
+Excess white space in the file is ignored.
+.PP
+If an Annex has syslogging enabled,
+it will report errors encountered while reading the
+.B gateways
+section with an extensive selection of syslog messages.
+The messages are self-descriptive
+and include the line number of the offending line.
+Various information useful for only for debugging
+is logged at the the
+.I info
+and
+.I debug
+levels.
+.PP
+In addition to routing information, there are two  
+other types of entries possible in the
+.B gateways
+category.
+The first is the conditional:
+.br
+.sp .5
+.nf
+.RS
+.BI annex \ ipaddr
+\0...
+.B else
+\0...
+.B end
+.RE
+.fi
+.br
+.PP
+The ellipses represent any group of entries normally valid in the
+gateways file.
+This conditional causes all the entries in the first set of ellipses to be
+evaluated only on the Annex that uses the given Internet address
+.I ipaddr
+for its Ethernet interface.
+The optional
+.B else
+clause causes all the entries in the second set of ellipses to
+be evaluated on all Annexes,
+except for the Annex that matched the
+.B annex
+clause.
+This can be used to selectively assign routes to hosts,
+such as only giving a default route to an external gateway to
+certain Annexes.  
+.PP
+The second additional entry is used for adding host name entries
+to the host table of an annex.  The entries are similar to entries
+in the
+.B /etc/host
+file, except aliasing is not supported.  When the Annex boots, it
+adds the host name entries in the 
+.B gateway
+section of the configuration file to its host table.
+The format of a host name entry is the Internet Address of the
+host followed by the host name. For example:
+.br
+.sp .5
+.RS
+192.9.200.2 snoopy
+.RE
+.br
+.PP
+Host name entries may be conditional with the use of the
+.B annex
+and
+.B end
+statements.  This restricts the loading of the host names to
+particular annexes.
+.PP
+The following is an example: 
+.sp
+.br
+.nf
+.RS
+annex 132.245.10.7
+	net 132.245.5.0 gateway 132.245.99.2 metric 1 hardwired
+else
+	net 132.245.5.0 gateway 132.245.10.7 metric 2 hardwired
+	host 132.245.99.2 gateway 132.245.10.7 metric 2 hardwired
+end
+.fi
+.br
+.PP
+These entries inform
+.I annex01,
+ipaddr 132.245.10.7, that 
+.I host01,
+ipaddr 132.245.99.2, is a gateway to network 132.245.5 and informs
+other Annexes on network 132.245.10 that
+.I annex01
+is a gateway to either 
+.I host01
+or network 132.245.5.
+.RE
+.SH BUGS
+.PP
+The current implementation does not allow the
+.BR annex / else / end
+clause to be nested.  That is, you cannot use another
+.B annex
+conditional while already in the scope of another
+.B annex
+or
+.B else
+clause.
+While an error message will not be generated if they are nested,
+the results will not be what is expected.
+.SH FILES
+/usr/spool/erpcd/bfs/config.annex
+.SH SEE ALSO
+.ie '\*(sy'V' erpcd(1M), routed(1M), config.annex(5)
+.el erpcd(8), routed(8C), config.annex(5)
+.br
+\f2Annex Network Administrator's Guide\f1
+

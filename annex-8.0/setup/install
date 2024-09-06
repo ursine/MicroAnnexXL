@@ -1,0 +1,1292 @@
+#!/bin/sh
+
+#############################################################################
+#
+# This script is the common installation script that is used to install
+# two products.  It can be used to install the host utilities 
+#  The quick description of how it does this is:
+#	o It does environment checking (root, platform, etc)
+#	o It sets up for questions (creating temp files, etc)
+#	o It asks which installation should be done.
+# 	o It asks where the distribution software should be placed.
+# 	o It changes directory to the named installation directory
+#         and then performs an installation by calling the product's
+#	  installation script.
+#
+# Please see the section "Special notes" at the bottom of the file
+# for more information.
+#
+# Bill Bailey 12/23/98 Change Annex to Versalar
+#
+#############################################################################
+
+
+
+#############################################################################
+# Start: Values that vary depending upon the names of the products.
+#############################################################################
+#
+# Different flavors of the products go out with different names.
+# Changes in names can be made here and the rest of the script left as is.
+# Alternatively, if there is a file named "override.txt" in the same
+# directory as this one then source it in.  This file could contain new
+# assignments for the variables.
+
+# General name of the product (used for creating a temporary directory)
+PROD=Annex
+
+# The short description of the products
+# Do not change variable names - the kitting tool searches for the names
+HST_TOOLS="Versalar Software"
+
+# Use these to get the same number of letters in HST_TOOLS
+# There must be at least one space in each.
+# Do not change variable names - the kitting tool searches for the names
+HST_SPACES=" "
+
+# Names of the installation scripts
+THIS_INSTALL=install
+HST_INSTALL=install-annex
+
+# The **START** of the default installation directory name
+PROD_DIR="/usr/annex"
+
+# The **NEXT** part of the default installation directory names
+# (The final part is computed from the release of the product)
+HST_DIR_LEAD="ra_"
+
+#############################################################################
+# End: Values that vary depending upon the names of the products.
+#############################################################################
+
+
+
+
+#############################################################################
+# 
+# Other variables
+
+num_products=2
+loop=true
+env_var_asked=false
+medium=unknown
+tarfile=unknown
+test_script=false
+nonrootflag=""
+denynonroot=true
+
+# Variables used so the .mkpath code (et al) is the same between the
+# HST_TOOLS installation code and the code here.
+
+startsh="#!/bin/sh"
+mkdir=mkdir
+expr=expr
+sed=sed
+expr=expr
+
+
+
+#############################################################################
+# 
+# Temporary files and scripts that get created
+
+cd_tmpdir=/tmp/${PROD}.$$
+mkdir $cd_tmpdir
+if [ ! -d $cd_tmpdir ]
+then
+    echo "ERROR: Unable to create directory: $cd_tmpdir"
+    exit 1
+fi
+TMPECHO=$cd_tmpdir/.echotmp
+TMPCONTAINS=$cd_tmpdir/.contains
+TMPREAD=$cd_tmpdir/.myread
+TMPGRIMBLE=$cd_tmpdir/.grimble
+TMPGREP=$cd_tmpdir/.greptmp
+TMPMKPATH=$cd_tmpdir/.mkpath
+TMPCKFILE=$cd_tmpdir/.ckfile
+TMPFILEXP=$cd_tmpdir/.filexp
+TMPQUIT=$cd_tmpdir/.quit
+tempfiles="$TMPECHO $TMPCONTAINS $TMPREAD $TMPGRIMBLE $TMPGREP $TMPMKPATH $TMPCKFILE $TMPFILEXP"
+cd_tempfiles="$tempfiles $TMPQUIT"
+rm -f $cd_tempfiles
+export cd_tempfiles
+
+
+
+#############################################################################
+# Create a trap handler
+#
+# 1 = hangup (SIGHUP)	2 = interrupt (SIGINT)	3 = quit (SIGQUIT)
+# 15 = software termination signal from kill (SIGTERM)
+
+trap 'echo " "; rm -rf $cd_tempfiles; rmdir $cd_tmpdir; exit 3' 1 2 3 15
+
+
+
+
+
+#############################################################################
+# Start: Check I/O
+#############################################################################
+error=false
+if [ ! -t 0 ]
+then
+    error=true
+    echo "Your standard input must be connected to a terminal" 1>&2
+fi
+if [ ! -t 1 ]
+then
+    error=true
+    echo "Your standard output must be connected to a terminal" 1>&2
+fi
+$error && exit 1
+
+#############################################################################
+# End: Check I/O
+#############################################################################
+
+
+
+
+#############################################################################
+# Start: Command line parsing
+#############################################################################
+#
+# Read in the command line options. Check for valid and meaningful ones
+# for this script only. The rest get passed to the other installation
+# scripts (the one for non CD-ROM installations).
+# Some options may be applicable to more than one installation script.
+
+# Get the name of this script
+scriptname=$0
+
+error=false
+my_options=""
+host_options=""
+for arg
+do
+#   # Arguments -b, -f, -d and -k are passed to the host install script
+    host_options="$host_options $arg"
+    case "$arg" in
+	-b) ;;
+	-f) ;;
+	-d) ;;
+	-k) ;;
+	-n) denynonroot=false;;
+	*)  error=true ; echo "ERROR: Invalid argument: $arg" ;;
+    esac
+done
+$error && exit 1
+
+#############################################################################
+# End: Command line parsing
+#############################################################################
+
+
+
+#############################################################################
+# Start: Get the directory name of this script and tar files
+#############################################################################
+
+# Get the full path name to this script
+cwd=`pwd`
+tmp=`echo $scriptname | sed -e "s:^/::"`
+if [ "$tmp" != "$scriptname" ]
+then
+#   # Name starts with slash
+    cd_instscript_long=$scriptname
+else
+    tmp=`echo $scriptname | sed -e "s:^\./::"`
+    if [ "$tmp" != "$scriptname" ]
+    then
+#	# Name starts with a dot
+	cd_instscript_long=`echo $scriptname | sed -e "s:^\./:$cwd/:"`
+    else
+#	# Relative name
+	cd_instscript_long="$cwd/$scriptname"
+    fi
+fi
+
+
+#
+# We now have the full path to this installation script
+#
+
+# Get the script name (basename)
+
+cd_instscript_short=`basename $cd_instscript_long`
+
+# Now get name of the install script's path
+# (I've seen systems without dirname and so I use expr to get the name)
+
+dir_with_script=`expr $cd_instscript_long : "\(.*\)/.*"`
+
+#############################################################################
+# End: Get the directory name of this script and tar files
+#############################################################################
+
+
+
+
+#############################################################################
+# Start: Get file names
+#############################################################################
+#
+# Do early so we can get the name of the file containing the release
+# information and thus get the release numbers for messages.
+
+name1="$cd_instscript_short"
+case "$name1" in
+    install)
+	host_full_tarfile=software.tar
+	release_file=releases.txt
+	override_file=override.txt
+	;;
+
+    INSTALL)
+	host_full_tarfile=SOFTWARE.TAR
+	release_file=RELEASES.TXT
+	override_file=OVERRIDE.TXT
+	;;
+
+    install*)
+	name2="install"
+	host_full_tarfile=`echo "$name1" | sed -e "s:$name2:software.tar:"`
+	release_file=`     echo "$name1" | sed -e "s:$name2:releases.txt:"`
+	override_file=`    echo "$name1" | sed -e "s:$name2:override.txt:"`
+	;;
+
+    INSTALL*)
+	name2="INSTALL"
+	host_full_tarfile=`echo "$name1" | sed -e "s:$name2:SOFTWARE.TAR:"`
+	release_file=`     echo "$name1" | sed -e "s:$name2:RELEASES.TXT:"`
+	override_file=`    echo "$name1" | sed -e "s:$name2:OVERRIDE.TXT:"`
+	;;
+    *)
+	echo "ERROR: Error translating filenames"
+	exit 1
+	;;
+esac
+
+host_full_tarfile="$dir_with_script/$host_full_tarfile"
+if [ -f $dir_with_script/$release_file ]
+   then
+   release_file="$dir_with_script/$release_file"
+else
+   release_file="$dir_with_script/release"
+   fi
+
+override_file="$dir_with_script/$override_file"
+
+cdrom_install=false
+
+# Check if the files we need are available
+
+error=false
+if $cdrom_install
+then
+    for file in "$host_full_tarfile" "$release_file"
+    do
+	if [ ! -f "$file" ]
+	then
+	    error=true
+	    echo "ERROR: Could not find file: $file"
+	fi
+    done
+else
+#   # This could check for all files in the "setup" directory but we will
+#   # assume that if the big ones are there then the rest will be there also.
+    for file in "$THIS_INSTALL" "$HST_INSTALL"
+    do
+	if [ ! -f "$dir_with_script/$file" ]
+	then
+	    error=true
+	    echo "ERROR: Could not find file: $file"
+	fi
+    done
+fi
+$error && exit
+
+# Read in override values for variables if they are present
+if [ -f "$override_file" ]
+then
+    . "$override_file"
+fi
+
+#############################################################################
+# End: Get file names
+#############################################################################
+
+
+
+#############################################################################
+# Start: Check for root privileges
+#############################################################################
+#
+# Get the name of the invoker two ways: If one way gets a null name
+# then use the other. If both are non-null they better be equal.
+# The echo statement below echos a blank that get removed so platforms
+# that hiccup on echoes with no arguments do no cause a problem.
+
+# Use "id" and change non-alphanumerics to spaces and then get second field
+tmp=`(id 2> /dev/null) 2> /dev/null | sed -e 's/[^a-zA-Z0-9=]/ /g' \
+	-e 's/^[^ ]* //g' -e 's/ .*//g'`
+tmp=`echo $tmp " " | sed -e "s/ $//g"`
+
+# Use whoami
+tmp2=`(whoami 2> /dev/null) 2> /dev/null`
+tmp2=`echo $tmp2 " " | sed -e "s/ $//g"`
+
+# Perform checks
+notroot=true
+if [ -n "$tmp" -a -n "$tmp2" ]
+then
+#   # Two results; are they equal?
+    if [ "$tmp" != "$tmp2" ]
+    then
+	tmp=""
+    fi
+else
+#   # One or both are null
+    tmp="$tmp$tmp2"
+fi
+if [ -z "$tmp" ]
+then
+#   # Could not get name (or consistent name)
+    notroot=true
+else
+#   # Note that "root " has a trailing space
+    if [ "$tmp" = "root " ]
+    then
+	notroot=false
+    else
+	notroot=true
+    fi
+fi
+if $cdrom_install
+then
+    : Use what we found for root
+else
+    if $notroot
+    then
+#	# Try another check (which an installer can rewrite to return the
+#	# correct value if the normal code does not work right).
+	if [ -f setup/.am_root ]
+	then
+	    sh setup/.am_root
+	    if [ $? -eq 0 ]
+	    then
+		notroot=false
+	    fi
+	fi
+    fi
+fi
+
+#############################################################################
+# End: Check for root privileges
+#############################################################################
+
+
+
+
+###############################################################################
+# Start: Temp file creation
+###############################################################################
+# 
+# Write temporary files used for querying making directories and the like
+# This is identical to the host installation script but here we write the
+# files to /tmp as the cwd is not writable.
+
+
+# Some greps do not return status, grrr.
+echo "grimblepritz" > $TMPGRIMBLE
+c=true
+if grep blurfldyick $TMPGRIMBLE >/dev/null 2>/dev/null
+then
+    :
+else
+    if grep grimblepritz $TMPGRIMBLE >/dev/null 2>/dev/null
+    then
+	c=false
+    fi
+fi
+rm -f $TMPGRIMBLE
+
+
+if $c
+then
+    cat > $TMPCONTAINS << EOSS
+grep \$* > $TMPGREP 2>/dev/null && \
+	cat $TMPGREP >/dev/null 2>/dev/null && \
+	test -s $TMPGREP 1>/dev/null 2>/dev/null && exit 0
+exit 1
+EOSS
+else
+    cat > $TMPCONTAINS << EOSS
+grep \$* >/dev/null 2>/dev/null && exit 0
+exit 1
+EOSS
+fi
+chmod 755 $TMPCONTAINS
+
+
+# first determine how to suppress newline on echo command
+(echo "hi there\c" ; echo " ") >$TMPECHO
+if $TMPCONTAINS c $TMPECHO
+then
+    n='-n'
+    c=''
+else
+    n=''
+    c='\c'
+fi
+rm -f $TMPECHO
+
+
+# Now set up to do reads with possible shell escape
+# This is almost identical to what the host tools installation
+# script does except for the logging in an "errors" directory.
+shell=sh
+test -n "$SHELL" && shell="$SHELL"
+cat > $TMPREAD << EOSC
+cont=true
+while \$cont
+do
+    echo $n "\$rp $c"
+    read ans
+    case "\$ans" in
+    !)
+	$shell
+	echo " "
+	;;
+    !!)
+	$shell -c "\$prevcmd"
+	echo " "
+	;;
+    !*)
+	ans=\`expr "\$ans" : "\![ ]*\(.*\)"\`
+	$shell -c "\$ans"
+	prevcmd="\$ans"
+	echo " "
+	;;
+    *)
+	cont=false
+	;;
+    esac
+done
+rp='Your answer:'
+EOSC
+
+
+# Create a command that can make directories for us
+
+cat > $TMPMKPATH << MKPATH
+DIR=\$1
+DIRL=
+case "\$DIR" in
+	/*) ;;
+	*) DIR=\`pwd\`/"\$DIR" ;;
+esac
+while [ ! -z "\$DIR" ]
+do
+	DIRL="\$DIR \$DIRL"
+	DIR=\`$expr /\$DIR : '/\(.*\)/.*'\`
+done
+for i in \$DIRL
+do
+	if [ ! -d \$i ]
+	then
+		$mkdir \$i
+		if [ ! -d \$i ]
+		then
+			exit 1
+		fi
+	fi
+done
+exit 0
+MKPATH
+chmod 755 $TMPMKPATH
+
+
+# Create a script that checks whether a file is accessible from elsewhere
+# If accessible it prints the filename, if not it prints something else.
+# To see if accessible check equality of the input name and the output name.
+
+cat > $TMPCKFILE << CKFILE
+#!/bin/sh
+cd "\$1"
+if [ -f "\$2" ]
+then
+	echo "\$2"
+else
+	echo "X\$2"
+fi
+exit 0
+CKFILE
+chmod 755 $TMPCKFILE
+
+# See if this file is accessible from elsewhere
+
+tmp=`$TMPCKFILE /tmp $cd_instscript_long`
+if [ "$tmp" != "$cd_instscript_long" ]
+then
+    echo "ERROR: Unable to access $cd_instscript_long from /tmp"
+    exit
+fi
+
+
+# Set up shell script to do ~ expansion
+
+cat > $TMPFILEXP << EOSS
+$startsh
+# expand filename
+case "\$1" in
+~/*|~)
+    echo \$1 | $sed "s|~|\${HOME-\$LOGDIR}|"
+    ;;
+~*)
+    if test -f /bin/csh
+    then
+	/bin/csh -f -c "glob \$1"
+	echo ""
+    else
+	name=\`$expr x\$1 : '..\([^/]*\)'\`
+	dir=\`$sed </etc/passwd -n -e "/^${name}:/{s/^[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:\([^:]*\).*"'\$'"/\1/" -e p -e q -e '}'\`
+	if test ! -d "\$dir"
+	then
+	    me=\`basename \$0\`
+	    echo "\$me: can't locate home directory for: \$name" >&2
+	    exit 1
+	fi
+	case "\$1" in
+	*/*)
+	    echo \$dir/\`$expr x\$1 : '..[^/]*/\(.*\)'\`
+	    ;;
+	*)
+	    echo \$dir
+	    ;;
+	esac
+    fi
+    ;;
+*)
+    tmp=\`echo \$1 | sed -e "s:^/::"\`
+    if [ "\$tmp" = "\$1" ]
+    then
+	echo \`pwd\`/\$1
+    else
+	echo \$1
+    fi
+    ;;
+esac
+EOSS
+chmod 755 $TMPFILEXP
+
+###############################################################################
+# End: Temp file creation
+###############################################################################
+
+gui_supported=false
+
+
+###############################################################################
+# Start: Get the product release information; use file $release_file
+###############################################################################
+
+HST_REL=`grep "${HST_TOOLS}" "$release_file" 2> /dev/null | sed -e "s/.*:[ 	]*//"`
+
+. "$release_file"
+
+# Further modify the release data as needed
+if [ -z "$HST_REL" ]
+then
+    echo "WARNING: No host tool release info specified."
+    HST_REL="NONE"
+fi
+
+
+# Create default installation directories based on the product name
+# and the release for that product
+
+HST_REL_DIR="${HST_DIR_LEAD}${HST_REL}"
+
+###############################################################################
+# End: Get the product release information
+###############################################################################
+
+
+do_quit=false
+if $notroot
+then
+#############################################################################
+# Start: Terminate if not root
+#############################################################################
+#
+# Normally we exit if not root but we allow a back door for testing
+#
+	do_quit=true
+	cat << EOSS
+************************************************************************
+***        It is required that you run this script as root.          ***
+************************************************************************
+
+**** You are not the superuser (root).
+**** It is required that the installation be performed by root.
+
+EOSS
+fi
+
+if $denynonroot
+then
+	:
+else
+	do_quit=false
+	nonrootflag=-n
+fi
+
+if $do_quit
+then
+    # Cleanup before leaving
+    rm -f $cd_tempfiles 2> /dev/null
+    rmdir $cd_tmpdir    2> /dev/null
+    exit
+fi
+#############################################################################
+# End: Terminate if not root
+#############################################################################
+
+
+#############################################################################
+# Start: Present greetings
+#############################################################################
+
+cat << EOSS
+This command is used to install $HST_TOOLS (boot images,
+security, command line management) 
+The versions that will be installed are:
+
+	${HST_TOOLS}${HST_SPACES}      $HST_REL
+
+EOSS
+
+set a $IMG_PLATFORMS
+foo=$#
+set a $IMG_VERSIONS
+if [ $# -eq 1 -o $# -ne $foo ]
+then
+    echo "This release includes no new software for ${IMG_TOOLS}."
+else
+    shift
+    cat << EOSS
+Support for these $IMG_TOOLS is included in this release:
+
+	Platform                   Software version
+EOSS
+    # Get the unique list
+    UNIQ_IMG_PLATFORMS=""
+    for plat in $IMG_PLATFORMS
+    do
+	if [ "`echo $UNIQ_IMG_PLATFORMS | grep $plat`" = "" ]
+	then
+		UNIQ_IMG_PLATFORMS="$UNIQ_IMG_PLATFORMS $plat"
+	fi
+    done
+
+    for plat in $UNIQ_IMG_PLATFORMS
+    do
+	case $plat in
+	42) echo "	Com-Server Annex 3         "$1;;
+	52) echo "	Com-Server MicroAnnex      "$1;;
+	55) echo "      MicroAnnex ELS             "$1;;
+	46) echo "	RA4000                     "$1
+	    echo "	5390                       "$1
+	    echo "	5391                       "$1
+	    echo "	RA6100                     "$1
+	    echo "	MODMIM			   "$1
+	    echo "	CSMIMII                    "$1
+	    echo "	CSMIM-T1                   "$1;;
+	56) echo "	RA2000                     "$1
+	    echo "	MicroCS			   "$1;;
+	63) echo "	RA6300                     "$1
+	    echo "	5393                       "$1;;
+	64) echo "	5399			   "$1
+	    echo "	8000 RAC		   "$1;;
+	esac
+	shift
+    done
+fi
+echo ""
+
+ask_q=true
+cont_msg="Do you wish to install $HST_TOOLS"
+
+cat << EOSS
+At any question prompt you can escape to a shell by typing "!".
+When you exit that shell you will bounce back to the question prompt.
+Many of the questions will have default answers in square brackets;
+pressing carriage return will select the default.
+
+EOSS
+
+#############################################################################
+# End: Present greetings
+#############################################################################
+
+
+
+###############################################################################
+# Start: Query for continuation
+###############################################################################
+#
+# User may have called this script to install the gui but it may not be
+# supported and the host tools is the only option.  This allows the user
+# to terminate before seeing an action menu.
+
+do_quit=false
+while $ask_q
+do
+	dfltans=y
+	rp="$cont_msg (y/n/q=quit) [$dfltans]:"
+	. $TMPREAD
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case "$ans" in
+	    q*|Q*)
+		do_quit=true
+		break
+		;;
+	    n*|N*)
+		do_quit=true
+		break
+		;;
+	    y*|Y*)
+		break
+		;;
+	    "?")
+cat << EOSS
+
+If you continue you will be asked where the software for the product(s)
+are to be installed.  The software will be extracted from the distribution
+medium and placed in that directory.  Then the installation process will
+move the software from that location to other locations that you select.
+
+EOSS
+		continue
+		;;
+	    *)
+		echo " "
+		echo "**** Enter 'Yes' or 'No', please!"
+		echo "     (or 'Quit' to quit the installation)"
+		echo " "
+		continue
+		;;
+	esac
+done
+
+if $do_quit
+then
+    # Cleanup before leaving
+    rm -f $cd_tempfiles 2> /dev/null
+    rmdir $cd_tmpdir 2> /dev/null
+    exit
+fi
+###############################################################################
+# End: Query for continuation
+###############################################################################
+
+
+
+
+#############################################################################
+# Start: Get type of distribution media
+#############################################################################
+#
+# Get the method of the distribution (e.g., tape, floppies, etc)
+# and the device or file from which we do the extraction.
+#
+if $cdrom_install
+then
+    medium="cd-rom"
+else
+    : Ask user what the medium is
+
+#   # Remove a temp file needed to store variable assignments
+    tmpfile=$cd_tmpdir/ask_vars
+    rm -f $tmpfile
+
+#   # Export values needed by the .media_ask script
+    SCRIPT_DIR=$dir_with_script
+    MSG_FILE=${SCRIPT_DIR}/.msg_file
+    indent="    "
+    dbg_hdr="DEBUG: "
+    debug=false
+    export n c SCRIPT_DIR MSG_FILE indent dbg_hdr debug
+
+#   # Get into a sub-shell so we can change directories easily
+    (
+#	# Change to the directory that has the .myread file
+	cd $cd_tmpdir
+
+#	# Call on another script to actually ask for media information
+	sh ${SCRIPT_DIR}/.media_ask "$medium" "$tarfile" "$tmpfile"
+
+#	# Check for an abort
+	tmp=$?
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; touch $TMPQUIT ; exit $tmp ;;
+	esac
+    )
+    if [ -f $TMPQUIT ]
+    then
+	loop=false
+    else
+#	# Read in the new values for medium, tarfile and tar_needed
+#	# from a file that was written to by the above script 
+	. $tmpfile
+	rm -f $tmpfile
+    fi
+fi
+
+#############################################################################
+# End: Get type of distribution media
+#############################################################################
+
+
+
+#############################################################################
+# Start: Keep looping to perform actions
+#############################################################################
+
+#   # Fake that we already installed the gui
+num_products=1
+next_prod_long="$HST_TOOLS"
+next_prod_short="hosts"
+action="$next_prod_short"
+did_an_install=false
+
+
+while $loop
+do
+    case $num_products in
+	2)
+#	    # We have more than one product that can be installed, ask user to
+#	    # pick and then have this script loop again after the install.
+	    did_an_install=false
+	    echo " "
+	    echo " "
+	    echo " "
+	    echo "After installing one product you will be asked if you want"
+	    echo "to install the other product."
+	    echo "Indicate desired action:"
+	    echo "    1) Install $HST_TOOLS"
+	    echo "    2) Quit"
+	    echo " "
+	    dfltans=1
+	    rp="Enter desired action [$dfltans]:"
+	    . $TMPREAD
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	    ;;
+
+	1)
+	    while true
+	    do
+		if $did_an_install
+		then
+		    action=$next_prod_short
+		    dfltans=y
+		    rp="Do you wish to install the $next_prod_long (y/n/q=quit) [$dfltans]:"
+		    . $TMPREAD
+		else
+#		    # Only ever had one product to install.
+#		    # We asked permission eariler, don't ask again.
+		    ans=y
+		fi
+		if [ -z "$ans" ]
+		then
+		    ans=$dfltans
+		fi
+		case "$ans" in
+		    q*|Q*)
+			do_quit=true
+			break
+			;;
+		    n*|N*)
+			do_quit=true
+			break
+			;;
+		    y*|Y*)
+			ans=$action
+			break
+			;;
+		    "?")
+cat << EOSS
+
+Usually you may install two products :
+
+The $HST_TOOLS contain the software for boot images, security,
+and command line management.
+
+
+If you continue you will be asked where the software for the product(s)
+are to be installed.  The software will be extracted from the distribution
+medium and placed in that directory.  Then the installation process will
+move the software from that location to other locations that you select.
+
+EOSS
+			continue
+			;;
+		    *)
+			echo " "
+			echo "**** Enter 'Yes' or 'No', please!"
+			echo "     (or 'Quit' to quit the installation)"
+			echo " "
+			continue
+			;;
+		esac
+	    done
+	    if $do_quit
+	    then
+		ans=quit
+	    fi
+	    ;;
+
+	0)
+	    echo " "
+	    echo " "
+	    echo "All products installed"
+	    echo " "
+	    echo " "
+	    ans=quit
+	    do_quit=true
+	    break
+	    ;;
+    esac
+
+#   #########################################################################
+#   # Start: Get installation choice
+#   #########################################################################
+
+
+    installation=""
+    case "$ans" in
+
+	hosts|1)
+	    # The host tools
+	    last_prod_long="$HST_TOOLS"
+	    installation=host
+	    dfltinstdir=$PROD_DIR/$HST_REL_DIR
+	    whatdir="$HST_TOOLS"
+	    ;;
+
+	2|q*|Q*)
+	    do_quit=true
+	    break
+	    ;;
+
+	"?")
+cat << EOSS
+
+Usually you may install two products The $HST_TOOLS contain the
+software for boot images, security, and command line management.  
+
+If you continue you will be asked where the software for the product(s)
+are to be installed.  The software will be extracted from the distribution
+medium and placed in that directory.  Then the installation process will
+move the software from that location to other locations that you select.
+EOSS
+	    continue
+	    ;;
+
+	*)
+	    echo " "
+	    echo "**** Enter a valid number, please!"
+	    echo " "
+	    continue
+	    ;;
+    esac
+#   #########################################################################
+#   # End: Get installation choice
+#   #########################################################################
+
+
+
+#   #########################################################################
+#   # Start: Get installation directory name
+#   #########################################################################
+#   # Present a detailed explanation of what the installation directory is
+#   # prior to asking the user the name of the directory.
+
+cat << EOSS
+
+For the installation to proceed, we must copy software to a directory
+on a hard disk on the host.  Please enter the name of the directory to
+be used.
+
+EOSS
+
+
+#   # Get a writable installation directory
+    qmsg=" [$dfltinstdir]:"
+    errmsg=""
+    while true
+    do
+	ask_q=true
+	if [ -n "$errmsg" ]
+	then
+	    echo " "
+	    echo "$errmsg "
+	    errmsg=""
+	fi
+
+#	# Query the user for the name of the installation directory
+	while $ask_q
+	do
+	    give_help=false
+	    ask_q=false
+	    echo " "
+	    echo "Enter the name of the $whatdir installation directory."
+	    rp="Directory name$qmsg"
+	    . $TMPREAD
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltinstdir
+	    fi
+	    case $ans in
+		q|Q)
+		    rm -f $cd_tempfiles 2> /dev/null
+		    rmdir $cd_tmpdir 2> /dev/null
+		    break
+		    ;;
+		""|"?")
+		    give_help=true
+		    ask_q=true
+		    ;;
+		*)
+#		    # Assume a device or file name
+		    installdir=`$TMPFILEXP "$ans"`
+		    ;;
+	    esac
+	    qmsg=" (q=quit) [$dfltinstdir]:"
+
+	    if $give_help
+	    then
+cat << EOM
+
+The first step in the installation of the host utilities is to copy
+software from the distribution medium to a hard disk of the host.
+Later the installation will continue by copying selected files from
+there to other directories that you name.
+
+Please enter the name of the directory where the files will be copied to.
+
+EOM
+	    fi
+	done
+
+#	# Check the name of the installation directory
+#	# Make the directory if needed
+	if [ ! -d $installdir ]
+	then
+	    if $TMPMKPATH $installdir
+	    then
+		if [ ! -d $installdir ]
+		then
+		    errmsg="Unable to find or create directory: $installdir"
+		    continue
+		fi
+	    else
+		errmsg="Unable to find or create directory: $installdir"
+		continue
+	    fi
+	fi
+
+#	# See if the installation directory is writable
+	tmpfile=$installdir/.${PROD}.$$
+	rm -f $tmpfile
+	touch $tmpfile
+	if [ -f $tmpfile ]
+	then
+		rm -f $tmpfile
+		break
+	else
+		errmsg="Unable to write files in directory: $installdir"
+		rm -f $tmpfile
+		continue
+	fi
+
+#	# See if this file is accessible from elsewhere
+	tmp=`$TMPCKFILE $installdir $cd_instscript_long`
+	if [ "$tmp" != "$cd_instscript_long" ]
+	then
+		errmsg="Unable to access $cd_instscript_long from $installdir"
+		continue
+	fi
+
+    done
+#   #########################################################################
+#   # End: Get installation directory name
+#   #########################################################################
+
+
+
+#   #########################################################################
+#   # Start: Do the desired installation
+#   #########################################################################
+#   # Note that filename variables are quoted.  This protects the shell from
+#   # picking up any semi-colon in the filename.  On some systems (HPs???) the
+#   # CD-ROM may appear to have a ";<version_number>" at the end of file names.
+
+    if $test_script
+    then
+	installation=test_$installation
+    else
+	if $cdrom_install
+	then
+	    installation=cd_$installation
+	else
+	    installation=tar_$installation
+    
+    #	# Create a "setup" directory in $installdir
+	    SCRIPT_DIR=$installdir/setup
+	    if $TMPMKPATH ${SCRIPT_DIR}
+	    then
+		if [ ! -d ${SCRIPT_DIR} ]
+		then
+		    installation=error
+		    errmsg="Unable to find or create directory: ${SCRIPT_DIR}"
+		fi
+	    else
+		installation=error
+		errmsg="Unable to find or create directory: ${SCRIPT_DIR}"
+	    fi
+	fi
+    fi
+
+    case "$installation" in
+
+	error)
+		echo "ERROR: $errmsg"
+		;;
+
+	test_host)
+#		# Developer can force installation=test to test this script
+#		# without having to run product installs.
+		echo " "
+		echo " "
+		echo "$HST_TOOLS installed"
+		did_an_install=true
+		num_products=`expr $num_products - 1`
+		echo " "
+		echo " "
+		;;
+
+	cd_host)
+		did_an_install=true
+		num_products=`expr $num_products - 1`
+		echo " "
+		echo " "
+		echo " "
+		(
+		    cd $installdir
+		    tar -xf "$host_full_tarfile" "setup"
+		    sh setup/$HST_INSTALL $host_options $nonrootflag "-$medium" "$host_full_tarfile"	
+		)
+		[ $? -ne 0 ] && do_quit=true
+		;;
+
+	tar_host)
+#		# Copy the setup directory (See "Special notes")
+		cp $dir_with_script/.[a-z]* ${SCRIPT_DIR} 2> /dev/null
+		cp $dir_with_script/.[A-Z]* ${SCRIPT_DIR} 2> /dev/null
+		cp $dir_with_script/[a-z]*  ${SCRIPT_DIR} 2> /dev/null
+		cp $dir_with_script/[A-Z]*  ${SCRIPT_DIR} 2> /dev/null
+		chmod u+x ${SCRIPT_DIR}/$HST_INSTALL
+
+		did_an_install=true
+		num_products=`expr $num_products - 1`
+		echo " "
+		echo " "
+		echo " "
+		(
+		    cd $installdir
+		    sh setup/$HST_INSTALL $host_options $nonrootflag "-$medium" "$tarfile"
+		)
+		[ $? -ne 0 ] && do_quit=true
+		;;
+    esac
+#   ########################################################################
+#   # End: Do the desired installation
+#   #########################################################################
+
+    if $do_quit
+    then
+	break
+    else
+	echo " "
+	echo " "
+    fi
+done
+
+#############################################################################
+# End: Keep looping to perform actions
+#############################################################################
+
+
+# Cleanup before leaving
+rm -f $cd_tempfiles 2> /dev/null
+rmdir $cd_tmpdir 2> /dev/null
+
+exit
+
+
+
+
+#############################################################################
+# Special notes
+#############################################################################
+#
+# Note: This script is used to install from a tarfile, tape, floppies
+# or a CD-ROM.  The method of installation on a CD-ROM is different in
+# the following ways:
+# 
+# First: if on a CD-ROM it is there with only a few other files and so
+# we can set a flag that indicates the type of installation by checking
+# for a file that would not be present for a CD installation but would
+# be there for a tape installation (or other non-CD installation).
+# 
+# Second: when the CD-ROM is mounted, various O/S's may see the files on
+# the CD with different names (uppercase, lowercase, maybe with
+# extensions such as ";1").  Because of this we have to compute
+# filenames for CD installs at runtime.
+# 
+# Third: There is another catch to all this, variables containing the
+# names of files must be quoted.  This protects the shell from picking
+# up any semi-colon in the filename (from extensions such as ";1") and
+# treating it as a command delimiter.
+#
+#############################################################################
+# 
+# 
+# When it comes time to actually to an install there are some cases in a
+# case statement that actually handles the different type of installs.
+# Here is some further documentation about these cases.
+# 
+# ------------------------------------------------------------------
+# 
+# tar_host)
+# 
+# When doing a "tar_host" we copy the setup directory using cp.  What
+# would be nice is to just tar the setup off the the distribution medium
+# like we do for cd_host.  There are possibilities of mishaps here
+# though and thus the use of cp.  For example, if the medium were
+# floppies there is a good chance that the floppy containing the "setup"
+# directory may no longer be in the drive.
+# 
+# ------------------------------------------------------------------
+# 
+#############################################################################
+

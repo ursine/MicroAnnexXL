@@ -1,0 +1,20 @@
+#
+# termcap entries (these are built into the Annex image
+#			- vt100 is default)
+#
+vt100:\
+   :co#80:li#24:\
+   :cd=\E[J:ce=\E[K:cm=\E[%i%d;%dH:cs=\E[%i%d;%dr:ho=\E[H:\
+   :mb=\E[5m:md=\E[1m:me=\E[m:mr=\E[7m:us=\E[4m:
+wy75:\
+   :co#80:li#24:\
+   :cd=\E[J:ce=\E[K:cm=\E[%i%2;%2H:cs=\E[%i%d;%dr:ho=\E[H:\
+   :mb=\E[5m:md=\E[1m:me=\E[m:mr=\E[7m:us=\E[4m:
+wy85:\
+   :co#80:li#24:\
+   :cd=\E[0J:ce=\E[0K:cm=\E[%i%d;%dH:cs=\E[%i%d;%dr:ho=\E[H:\
+   :mb=\E[5m:md=\E[1m:me=\E[m:mr=\E[7m:us=\E[4m:
+ibm3151:\
+   :co#80:li#24:\
+   :cd=\EJ:ce=\EI:cl=50\EL:cm=\EY%+ %+ :is=\EY7 :ho=\EH:\
+   :mb=\E4D:md=\E4H:me=\E4@:mr=\E4A:us=\E4B:

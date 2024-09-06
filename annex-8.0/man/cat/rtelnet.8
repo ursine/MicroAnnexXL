@@ -1,0 +1,462 @@
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          rtelnet - Annex reverse TELNET daemon
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          rrrrtttteeeellllnnnneeeetttt [ -aaaabbbbccccddddffffhhhhkkkkmmmmnnnnoooopppprrrrssssttttCCCCDDDDFFFFOOOOPPPPRRRRTTTTVVVV ] [ -llll ffffiiiilllleeee ] [ -uuuu uuuusssseeeerrrr ]
+          [ -MMMM mmmmooooddddeeee ] _a_n_n_e_x _p_o_r_t _d_e_v_i_c_e-_n_a_m_e
+
+     AAAARRRRGGGGUUUUMMMMEEEENNNNTTTTSSSS
+          -aaaa    Select use of alternate pty set.  If your system has
+                both System V and Berkeley pseudo-terminals, then this
+                option will select the use of the Berkeley instead of
+                the System V ptys.
+
+          -bbbb    Negotiate TELNET binary mode when communicating with
+                the Annex.  This is a useful option for terminal
+                (getty(8)) connections.  This option tells _r_t_e_l_n_e_t to
+                negotiate TELNET BINARY mode, and not to translate
+                CR/LF sequences.  CR will be sent as CR/NUL and
+                translated back to CR by the Annex with this option
+                enabled.  (See also ----tttt and ----cccc options below.)
+
+          -cccc    Default to CBREAK mode on the pty to avoid cooked-mode
+                line breaks (see tty(4)).  Use of this option requires
+                that the slave pty be kept open by _r_t_e_l_n_e_t on System V
+                compliant machines.
+
+          -dddd    Turn on socket-level debugging.  This just sets the
+                SO_DEBUG flag (or equivalent) on the created network
+                connection -- the actual operation of this option
+                depends on the underlying operating system.
+
+          -ffff    Enable the _c_o_n_n_e_c_t _o_n _t_h_e _f_l_y mode, where _r_t_e_l_n_e_t
+                opens the network connection when the slave pty is
+                opened.  This option causes _r_t_e_l_n_e_t to wait for the
+                pty to open before it attempts to create the
+                connection to the Annex.  This option is incompatible
+                with any option that would keep the pty open, such as
+                ----oooo.  The ----mmmm switch is usually also used with this mode
+                to ensure that _r_t_e_l_n_e_t will drop the connection when
+                the slave device is not in use.
+
+          -hhhh    Send a _r_e_s_e_t _p_o_r_t RPC to the Annex when the slave
+                pseudo device is closed.  If this option is used, then
+                the ----mmmm switch should also be specified.  This option
+                uses the same NETADM protocol used by nnnnaaaa.  This will
+                currently only work on Annexes without an _a_n_n_e_x
+                _p_a_s_s_w_o_r_d parameter set, or with _a_n_n_e_x _e_n_a_b_l_e__s_e_c_u_r_i_t_y
+                set to _N.
+
+          -kkkk    Periodically retry network connection.  This option
+                tests the connection to the Annex by attempting to
+                reopen the same port every 20 seconds, when the
+
+
+
+     Page 1                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+                connection is quiet.  If this new connection succeeds,
+                then the old connection must have become disconnected
+                -- presumably by a reboot of the Annex -- and a new
+                one is necessary.  This is useful when the traffic is
+                primarily from the Annex to the host and SO_KEEPALIVE
+                is unimplemented, since writes from the host to the
+                Annex will be able to detect a failed connection, but
+                reads will not.
+
+          -llll <<<<ffffiiiilllleeee>>>>
+                Append log output to given file name.  This option
+                opens the requested file in append mode so that all
+                error and debugging output is placed there once
+                command line parsing is complete.
+
+          -mmmm    Momentarily drop the network connection to the Annex
+                when the slave pseudo-device is closed.  This can be
+                used to cause the Annex to drop DTR, (if the _p_o_r_t
+                _c_o_n_t_r_o_l__l_i_n_e_s parameter is set to _m_o_d_e_m__c_o_n_t_r_o_l or to
+                _b_o_t_h) which can be used to cause a dial-out modem to
+                hang up when a program like tip exits.
+
+          -nnnn    Never open slave side of pty.  This option will
+                prohibit some systems which require ioctl(2) calls to
+                be made on the slave side from setting up default I/O
+                modes.  This is recommended for use when either ----ffff or
+                ----mmmm or both are specified.
+
+          -oooo    Hold slave side of pty open at all times.  This is a
+                useful option when detecting pty open/close isn't
+                necessary.  Since closing the slave pty causes the
+                master pty to close (on most systems), there is a
+                small timing window where, if the slave pty is closed
+                and then rapidly reopened, the second open will fail
+                because the _r_t_e_l_n_e_t process hasn't had a chance to
+                close and reopen the master pty.  This most often
+                occurs in scripts where one might use:
+
+                        echo "Some text" > /dev/mypty
+                        echo "Some more text" > /dev/mypty
+
+                The second _e_c_h_o command may fail because the shell
+                will open and close the pty too rapidly.  This option
+                will keep the slave open at all times so that the
+                master does not need to be recycled.
+
+          -pppp    Give process ID of child on standard output.  This is
+                useful for logging the PIDs of all the _r_t_e_l_n_e_t_s
+                started on a system so that they can be removed
+                quickly.  For example:
+
+                        rtelnet -pt myannex 1 /dev/port1 > rtlist
+
+
+
+     Page 2                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+                        rtelnet -pt myannex 2 /dev/port2 >> rtlist
+
+                Now to cleanly terminate both connections, type:
+
+                        kill `cat rtlist`
+
+          -rrrr    Remove the device _d_e_v_i_c_e-_n_a_m_e if it already exists and
+                if it is not a regular file or directory.  Without ----rrrr,
+                _r_t_e_l_n_e_t will exit with an error message if _d_e_v_i_c_e-_n_a_m_e
+                already exists.
+
+          -ssss    Use a symbolic link instead of a hard link for the
+                slave.  This option allows you to place the slave pty
+                anywhere in the file system.  If this option isn't
+                specified, then a hard link is created by default, and
+                hard links cannot normally span across mounted
+                devices.
+
+          -tttt    Use a transparent TCP connection to the indicated
+                Annex.  This will cause the connection to be made
+                through Annex ports in the 7000 range, rather than the
+                5000 range, and no TELNET option negotiation or CR/LF
+                mapping will be used.  Use this option to create a
+                fast, completely transparent data path.  (If used with
+                ----ffff option, the pty may not default to RAW mode.)
+
+          -uuuu <<<<uuuusssseeeerrrr>>>>
+                This option will cause _r_t_e_l_n_e_t to change its real UID
+                to the given user.  This is useful with System V
+                machines, where the owner of the slave pty granted is
+                set to the user that requests it.  Without this
+                option, System V will grant all ptys as "root," which
+                may make some applications unusable.
+
+          -CCCC    Don't try to fix cooked-mode pseudo terminal problems
+                by inserting LF characters.  Ordinarily, _r_t_e_l_n_e_t will
+                attempt to avoid a problem in Unix pseudo terminals
+                that causes the slave to lock up if it is in line-
+                buffered ("cooked") mode and too many characters are
+                written between line-feed characters.  _R_t_e_l_n_e_t will do
+                this insertion if it cannot determine the line mode or
+                if it does find the line in "cooked" mode.  This
+                option disables this action, and is useful with binary
+                connections in applications where the mode of the
+                slave pseudo terminal can be guaranteed to be
+                unbuffered.
+
+          -DDDD [[[[ DDDD ............ ]]]]
+                Turns on verbose debugging output.  In this case,
+                _r_t_e_l_n_e_t does not fork off a daemon unless the -FFFF
+                switch is also used; instead, it displays TELNET
+                option negotiation and all received data on the
+
+
+
+     Page 3                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+                terminal where _r_t_e_l_n_e_t was started.
+
+          -FFFF    Force _r_t_e_l_n_e_t to fork into background, even in debug
+                mode.  This is usually used with the ----llll option (above)
+                when doing long-term testing.
+
+          -MMMM <<<<mmmmooooddddeeee>>>>
+                Set the default file modes for the slave pty to the
+                octal number given.  (See chmod(1) for a list of these
+                modes.)
+
+          -OOOO    Disable out-of-band telnet data (for pre-R7.0
+                Annexes).  For compatibility with older Annex
+                operational code, the TELNET IAC DM signal, which is
+                used to implement the output flush ioctl(2) system
+                call, is disabled with this switch.
+
+          -PPPP    Interpret the _p_o_r_t argument as a TCP port (decimal 1
+                through 65535 or a service name).  This can be used to
+                establish a slave pty that links to the Annex _P_o_r_t
+                _S_e_r_v_e_r (port 23), the _V_C_L_I (port 5000) or to rotaries
+                in the 6000-range.
+
+          -RRRR    Rename the slave pseudo terminal rather than linking
+                the given name to it.  This option is provided for
+                systems that assign meanings to the major and minor
+                numbers of the pseudo terminal device, and which do
+                not expect to see more than one device with the same
+                numbers.  This is a dangerous option to use, since an
+                abend of the system may leave some slave terminals in
+                an unusable state.
+
+          -TTTT    Truncate (rather than break) lines that would choke
+                the pty in cooked mode.
+
+          -VVVV    Display version information on standard output and
+                exit.  This information is useful for Xylogics
+                technical support so that they can precisely identify
+                the version of software you are using.
+
+          _a_n_n_e_x The hostname or Internet address (in standard Internet
+                dot separated notation) of the Annex.
+
+          _p_o_r_t  The serial port number on the Annex, or the TCP port
+                number or TCP service name.  (See ----PPPP flag above.)
+
+          _d_e_v_i_c_e-_n_a_m_e
+                name of psuedo device to create (usually in the /dev
+                directory).
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          _R_t_e_l_n_e_t is a modified version of the Berkeley telnetd
+
+
+
+     Page 4                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+          program.  It will create a pseudo-tty (pty) device on the
+          host that is connected via _T_E_L_N_E_T or raw _T_C_P to an Annex
+          serial port.  This allows _U_N_I_X programs such as tip(1C) and
+          uucp(1C) to access serial devices attached to Annex ports.
+          Rtelnet works like a telnet daemon program (telnetd) except
+          in a reverse fashion; instead of accepting connections from
+          other network machines, rtelnet makes connections to
+          Annexes.  _R_t_e_l_n_e_t creates a new file-like device (usually in
+          /_d_e_v) that programs can open and use like a normal /_d_e_v/_t_t_y
+          terminal.
+
+          Normally, _r_t_e_l_n_e_t makes the connection to the Annex
+          immediately.  This ties the Annex port to exactly one host,
+          which is useful for dedicated devices.  On the other hand,
+          this will not interact correctly with a port set to aaaaddddaaaappppttttiiiivvvveeee
+          mode, which would normally be used for a dial-in/dial-out
+          modem.  Such a configuration should use the _c_o_n_n_e_c_t _o_n _t_h_e
+          _f_l_y (----ffff) option.  In that case, _r_t_e_l_n_e_t will not make the
+          connection immediately, but will instead wait until another
+          process opens the slave device.  When that happens, _r_t_e_l_n_e_t
+          will attempt to make the network connection.  When the
+          connection is established, data will flow normally.  If the
+          connection cannot be made, _r_t_e_l_n_e_t will try again using an
+          exponential backoff.
+
+          _R_t_e_l_n_e_t is designed as a core set of routines that should
+          compile on all machines, and a set of machine-dependent
+          files for various systems.  See the accompanying release
+          notes, and README and INTERN files for more information on
+          the internals of _r_t_e_l_n_e_t.
+
+          Example usage:
+
+               A dial-out modem is attached to port 15 of an Annex
+               named "modem-annex".  To enable its use via _t_i_p on a
+               4BSD host:
+
+               1.   Configure port 15 using _n_a or local CLI admin to:
+
+                            "control_lines: modem_control"
+                            "         mode: slave"
+
+               2.   Start up _r_t_e_l_n_e_t to create the pseudo-device:
+
+                            rtelnet -rbm modem-annex 15 /dev/modem1
+
+                    Normally, this would be added to the system
+                    startup file (/etc/rc).
+
+               3.   Create new system definition in /etc/remote
+                    specifying /dev/modem1 as the tip (dv) device.
+                    For example:
+
+
+
+     Page 5                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+                            dialer|generic dial-out: \
+                                    :dv=/dev/modem1:cm=^M^JATe1^M^J:at=hayes:du:
+
+
+     FFFFIIIILLLLEEEESSSS
+          /dev/ptmx               master pseudo-terminal clone device
+          /dev/pty[p-s][0-9a-f]   default list of master pseudo-terminals
+          /dev/tty[p-s][0-9a-f]   default list of slave pseudo-terminals
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          Annex Network Administrator's Guide
+
+          chmod(1), su(1), ln(1) and pty(4).
+
+     DDDDIIIIAAAAGGGGNNNNOOOOSSSSTTTTIIIICCCCSSSS
+          Messages should be self-explanatory.  Be sure to have the
+          output of "rtelnet -V" handy if you need help from Annex
+          support.
+
+          Debug messages take the form:
+
+                  TYPE:pid:yyyymmddhhmmss: <message>
+
+          Where "TYPE" is one of:
+
+                  INIT - Entry or exit message.
+                  INFO - Informational message (from debugging code).
+                  WARN - Warning message.
+                  ERR  - Error message.
+                  FATL - Fatal error message -- rtelnet aborted.
+
+          These tags indicate the severity and content of the message
+          -- they are not necessarily tied to the debug level flag.
+          (Although "ERR " and "FATL" messages are usually sent out
+          regardless of debug level.)
+
+          Using the ----DDDD switch, one may specify the debug level on
+          start-up.  This number filters the output sent to the log
+          file -- the higher the level, the more verbose the output
+          that is sent to the file.  Setting level 2, for example, is
+          accomplished by specifying ----DDDDDDDD.  The levels are roughly
+          defined as:
+
+                  0 - Unexpected system errors and fatal errors only.
+                  1 - Exceptional conditions and entry / exit.
+                  2 - I/O statistics and verbose TELNET protocol data.
+                  3 - Flow control upcalls and system library calls.
+                  4 - I/O selection and testing verification.
+                  5 - Raw I/O dump
+                      (can be used to reconstruct a session).
+
+          While rtelnet is running, you may change these levels by
+
+
+
+     Page 6                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))                                             RRRRTTTTEEEELLLLNNNNEEEETTTT((((8888))))
+
+
+
+          issuing a SIGUSR1 to increase the debug level, or SIGURG2 to
+          set it back to zero.  For example, if the pid of the rtelnet
+          process is 9654:
+
+                  kill -USR2 9654
+
+          This would disable debugging on that copy of rtelnet without
+          aborting any current data transfer.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 7                                         (printed 2/20/100)
+
+
+

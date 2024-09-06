@@ -1,0 +1,430 @@
+#!/bin/sh
+# select_image
+# select the Annex image(s) to be installed from the BFS directory on tape
+# Modification history:
+# Larry DeLuca		7 July 1996	original version
+# Larry DeLuca		1 Aug 1996	added firmware questions
+# Larry DeLuca		22 Aug 1996	modified to set bfs_extract_basenames
+#					instead of passing to stdout
+#					(which broke ultrix)
+# Larry DeLuca		7 March 1997	lots of rearranging to accommodate
+#					the possibility that no objects of
+#					a given type exist, in which case
+#					no question is asked.
+# Bill Bailey 12/17/98 autoselect if only 1 image is found
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+	if [ "$STANDALONE" = "" ]
+	then
+#		# The following line can be commented out to get test versions running
+		echo "**** $0: No environment is setup" ; exit 1
+	fi
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+
+# Important variables
+if [ -z "${DEBUG_CFG_FILE}" ]
+then
+	BFS_CFG=${SCRIPT_DIR}/.bfs_configfile
+else
+	BFS_CFG=${DEBUG_CFG_FILE}
+fi
+
+if [ "$VERBOSE" != "" ]
+then
+	set -x
+fi
+
+IMAGE_ID="I"
+FIRMWARE_ID="F"
+MODEM_FW_ID="M"
+ALWAYS_LOAD="A"
+HAVE_IMAGE="N"
+HAVE_MODEM_FW="N"
+HAVE_FIRMWARE="N"
+TMP_SELFILE=/tmp/imgsel.$$
+
+if [ "$DEBUG" != "" ]
+then
+	set -x
+fi
+
+# Start by getting the Annex Image Names Out of the file
+# Reset the variables
+
+CURRENT_IMAGE_NAME=""
+CURRENT_FAMILY=""
+CURRENT_IMAGE_NUMBER="0"
+IMAGE_LIST=""
+UNIQUE_IMAGE_LIST=""
+FAMILY_LIST=""
+ALWAYS_LOAD_IMAGES=""
+LOAD_IMAGES=""
+LOAD_FAMILIES=""
+
+# Clean out the temp selfile
+echo > $TMP_SELFILE
+
+# The following line pulls the comments out of the file and sorts it in
+# order by image name (the first field).
+#
+# NOTE WELL: Images that are to be always loaded are also picked up during
+# this first scan.  
+#
+for annex in `cat $BFS_CFG | sed -e '/^#/d' -e 's/#.*$//' -e 's/ /~/g' | sort`
+do
+	# Put the current args in the list
+	SAVE_ARGS=$*
+	set `echo $annex | sed -e 's/:/ /g'`
+	
+	# If we need this one for all annexes, silently add it 
+	if [ "$2" = "$ALWAYS_LOAD" ]
+	then
+		ALWAYS_LOAD_IMAGES="$ALWAYS_LOAD_IMAGES $1"
+	elif [ "$2" != "$IMAGE_ID" ]
+	then
+		continue				# skip it
+	elif [ "$1" != "$CURRENT_IMAGE_NAME" -o "$3" != "$CURRENT_FAMILY" ]		# Different image
+	then
+		# Bump the image number and change the current name
+		CURRENT_IMAGE_NUMBER=`expr $CURRENT_IMAGE_NUMBER + 1`
+		CURRENT_IMAGE_NAME=$1
+		CURRENT_FAMILY=$3
+	
+		# Add it to the list of images we've found
+		IMAGE_LIST="$IMAGE_LIST $CURRENT_IMAGE_NAME"
+		FAMILY_LIST="$FAMILY_LIST $CURRENT_FAMILY"
+
+		# Add it to the "unique" list used for "all" selected
+		if echo $UNIQUE_IMAGE_LIST | grep $CURRENT_IMAGE_NAME > /dev/null 2>&1
+		then
+			: do nothing - already there
+		else
+			UNIQUE_IMAGE_LIST="$UNIQUE_IMAGE_LIST $CURRENT_IMAGE_NAME"
+		fi
+
+		# Print out a NL and the new image and number
+		echo ""	 >> $TMP_SELFILE
+		echo "$CURRENT_IMAGE_NUMBER)	`echo $4 | sed -e 's/~/ /g'`"  >> $TMP_SELFILE
+	else
+		# Just print the new image name
+		echo "	`echo $4 | sed -e 's/~/ /g'`"  >> $TMP_SELFILE
+	fi
+	
+done
+
+# Add the option to select all images, if there was more than one
+if [ "$CURRENT_IMAGE_NUMBER" -gt "1" ]
+then
+	echo ""  >> $TMP_SELFILE
+	echo "`expr $CURRENT_IMAGE_NUMBER + 1`)	Install all images"  >> $TMP_SELFILE
+fi
+
+# If there were no images, don't bother prompting at all.
+while [ "$CURRENT_IMAGE_NUMBER" -gt "0" -a "$HAVE_IMAGE" = "N" ]
+do
+
+if [ "$CURRENT_IMAGE_NUMBER" = "1" ]
+then
+	echo 
+	echo "Image files for the following will be installed:" 
+	ans="1"
+fi
+
+	# Cat the selection file
+	cat $TMP_SELFILE
+	
+if [ "$CURRENT_IMAGE_NUMBER" -gt "1" ]
+then
+	# Now get the user's input
+	echo "" 
+	echo "Please select the Versalar model(s) you will be using." 
+	rp="You can specify a list separated by spaces or 'N' for none: " 
+	. ./.myread 
+	
+	if [ "$ans" = "" ]
+	then
+		echo 
+		echo "**** You must specify at least one Versalar model, or 'N' for none." 
+		continue
+	fi
+
+	if [ "$ans" = "N" -o "$ans" = "n" ]
+	then
+		break
+	fi
+fi
+	
+	GET_IMAGE_LIST=$ans
+	
+	for GET_IMAGE in $GET_IMAGE_LIST
+	do
+		if [ "$GET_IMAGE" = `expr $CURRENT_IMAGE_NUMBER + 1` ]
+		then
+			LOAD_IMAGES="$UNIQUE_IMAGE_LIST"
+			LOAD_FAMILIES="$FAMILY_LIST"
+			HAVE_IMAGE=Y
+			break
+		elif [ "$GET_IMAGE" -lt 1 -o "$GET_IMAGE" -gt $CURRENT_IMAGE_NUMBER ]
+		then
+			echo 
+			echo "**** Invalid selection.  Please retry." 
+			HAVE_IMAGE=N
+			break
+		else
+			# Now we know which image - just shift the appropriate 
+			# number of times
+			SAVE_GET_IMAGE=$GET_IMAGE
+			set $IMAGE_LIST
+			while [ $GET_IMAGE -gt 1 ]
+			do
+				shift
+				GET_IMAGE=`expr $GET_IMAGE - 1`
+			done
+			
+			# Add it to the image list
+			if echo $ALWAYS_LOAD_IMAGES $LOAD_IMAGES | grep $1 > /dev/null 2>&1
+			then
+				: do nothing - already there
+			else
+				LOAD_IMAGES="$LOAD_IMAGES $1"
+			fi
+
+			# Do the same thing to get the family name
+			set $FAMILY_LIST
+			GET_IMAGE=$SAVE_GET_IMAGE
+			while [ $GET_IMAGE -gt 1 ]
+			do
+				shift
+				GET_IMAGE=`expr $GET_IMAGE - 1`
+			done
+			
+			# Add it to the image list
+			if echo $LOAD_FAMILIES | grep $1 > /dev/null 2>&1
+			then
+				: do nothing - already there
+			else
+				LOAD_FAMILIES="$LOAD_FAMILIES $1"
+			fi
+			HAVE_IMAGE=Y
+		fi
+	done
+done
+
+# Next we need to get the appropriate modem firmware files out of the
+# BFS config file.  This is done by loading all of the files for all of
+# the families specified.
+
+LOAD_MODEM_FW=""
+SAVE_ARGS=$*
+
+# Extract the modem firmware entries, removing the comments 
+for modemfw in `grep ":$MODEM_FW_ID:" $BFS_CFG | sed -e '/^#/d' -e 's/#.*$//' -e 's/ /~/g' `
+do
+	# Put the current args in the list
+	set `echo $modemfw | sed -e 's/:/ /g'`
+
+	# See if it's already on our list
+	if echo $LOAD_MODEM_FW | grep $1 > /dev/null 2>&1
+	then
+		continue	# already loaded
+	fi
+
+	# Look for the family specifier, and add the image name if
+	# necessary.
+	for family in `echo $3 | sed -e 's/,/ /g' -e 's/~/ /g'`
+	do
+		if echo "$LOAD_FAMILIES" | grep "$family" > /dev/null 2>&1
+		then
+			LOAD_MODEM_FW="$LOAD_MODEM_FW $1"
+			break
+		fi
+	done
+done
+
+# Put the old args back
+set $SAVE_ARGS
+
+# Now we need to get the PRI images that always need to be loaded, if
+# any, and load them.
+
+ALWAYS_LOAD_FIRMWARE=""
+SAVE_ARGS=$*
+
+# Extract the pri firmware entries, removing the comments 
+for prifw in `grep ":$FIRMWARE_ID$ALWAYS_LOAD:" $BFS_CFG | sed -e '/^#/d' -e 's/#.*$//' -e 's/ /~/g' `
+do
+	# Put the current args in the list
+	set `echo $prifw | sed -e 's/:/ /g'`
+
+	# See if it's already on our list
+	if echo $ALWAYS_LOAD_FIRMWARE | grep $1 > /dev/null 2>&1
+	then
+		continue	# already loaded
+	fi
+
+	# Look for the family specifier, and add the image name if
+	# necessary.
+	for family in `echo $3 | sed -e 's/,/ /g' -e 's/~/ /g'`
+	do
+		if echo "$LOAD_FAMILIES" | grep "$family" > /dev/null 2>&1
+		then
+			ALWAYS_LOAD_FIRMWARE="$ALWAYS_LOAD_FIRMWARE $1"
+			break
+		fi
+	done
+done
+
+# Put the old args back
+set $SAVE_ARGS
+
+# Now see about the PRI modules that are optional
+
+# Clean out the temp selfile
+echo "Wan firmware for the following will be installed:" > $TMP_SELFILE
+
+# Reset the variables
+
+CURRENT_COUNTRY=""
+CURRENT_COUNTRY_NUMBER="0"
+COUNTRY_LIST=""
+LOAD_FIRMWARE=""
+
+#
+# For the firmware files, we need to grab any that relate to the annex
+# family(ies) we are working with and add them to our selection list
+#
+# The first part just gets the country list and prompts the user for
+# a choice
+#
+for fwfile in `grep ":$FIRMWARE_ID:" $BFS_CFG | sed -e '/^#/d' -e 's/#.*$//' -e 's/ /~/g' `
+do
+	# Put the current args in the list
+	SAVE_ARGS=$*
+	set `echo $fwfile | sed -e 's/:/ /g'`
+	
+	# Check and see if we have the country already or not
+	if echo "$COUNTRY_LIST" | grep "$4" > /dev/null 2>&1
+	then
+		: Do nothing - already on list.
+		continue
+	fi
+
+	for family in `echo $3 | sed -e 's/,/ /g' -e 's/~/ /g'`
+	do
+		if echo "$LOAD_FAMILIES" | grep "$family" > /dev/null 2>&1
+		then
+			# Bump the image number and change the current name
+			CURRENT_COUNTRY_NUMBER=`expr $CURRENT_COUNTRY_NUMBER + 1`
+	
+			# Add it to the list of images we've found
+			COUNTRY_LIST="$COUNTRY_LIST $4"
+	
+			# Print out a NL and the new image and number
+			echo ""	 >> $TMP_SELFILE
+			#echo "$CURRENT_COUNTRY_NUMBER)	`echo $4 | sed -e 's/~/ /g'`"  >> $TMP_SELFILE
+			echo "	`echo $4 | sed -e 's/~/ /g'`"  >> $TMP_SELFILE
+
+			# If one family matches that's good enough.  We
+			# Do not care about the rest.
+			break
+		else
+			: We do not need to load this one.  Do nothing.
+		fi
+	done
+done
+	
+# Add the option to select all images, if there was more than one
+#if [ "$CURRENT_COUNTRY_NUMBER" -gt "1" ]
+#then
+#	echo ""  >> $TMP_SELFILE
+#	echo "`expr $CURRENT_COUNTRY_NUMBER + 1`)	Install all versions"  >> $TMP_SELFILE
+#fi
+	
+# If there were no images, don't bother prompting at all.
+while [ "$CURRENT_COUNTRY_NUMBER" -gt "0" -a "$HAVE_FIRMWARE" = "N" ]
+do
+
+	# Cat the selection file
+	echo "" 
+	cat $TMP_SELFILE
+	
+	# Now get the user's input
+	echo "" 
+	#echo "Please select the geographic region(s) most applicable to you."
+	#rp="You can specify a list separated by spaces or CR for none: " 
+	#. ./.myread 
+	echo "" 
+	ans=`expr $CURRENT_COUNTRY_NUMBER + 1`
+	
+	if [ "$ans" = "" ]
+	then
+		HAVE_FIRMWARE=Y
+		break
+	fi
+	
+	GET_COUNTRY_LIST=$ans
+	
+	for GET_COUNTRY in $GET_COUNTRY_LIST
+	do
+		if [ "$GET_COUNTRY" = `expr $CURRENT_COUNTRY_NUMBER + 1` ]
+		then
+			LOAD_FIRMWARE=`grep ":$FIRMWARE_ID:" $BFS_CFG | awk -F: '{print $1}' | sort | uniq`
+			HAVE_FIRMWARE=Y
+			break
+		elif [ "$GET_COUNTRY" -lt 1 -o "$GET_COUNTRY" -gt $CURRENT_COUNTRY_NUMBER ]
+		then
+			echo 
+			echo "**** Invalid selection.  Please retry." 
+			HAVE_FIRMWARE=N
+			break
+		else
+			# Now we know which image - just shift the appropriate 
+			# number of times
+			set $COUNTRY_LIST
+			while [ $GET_COUNTRY -gt 1 ]
+			do
+				shift
+				GET_COUNTRY=`expr $GET_COUNTRY - 1`
+			done
+			
+			# Add all the firmware for the country to the
+			# final list.
+			#
+			for fwfile in `grep ":$FIRMWARE_ID:" $BFS_CFG | sed -e '/^#/d' -e 's/#.*$//' -e 's/ /~/g' | grep "$1" | awk -F: '{print $1}' `
+			do
+				if echo $ALWAYS_LOAD_FIRMWARE $LOAD_FIRMWARE | grep $fwfile > /dev/null 2>&1
+				then 
+					: do nothing - already there 
+				else 
+					LOAD_FIRMWARE="$LOAD_FIRMWARE $fwfile" 
+				fi 
+			done
+			HAVE_FIRMWARE=Y 
+		fi
+	done
+done
+
+# Clean up
+rm -f $TMP_SELFILE
+
+# Set the variable 
+bfs_extract_basenames="$ALWAYS_LOAD_IMAGES $LOAD_IMAGES $LOAD_MODEM_FW $ALWAYS_LOAD_FIRMWARE $LOAD_FIRMWARE"
+	

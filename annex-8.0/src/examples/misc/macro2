@@ -1,0 +1,35 @@
+%macro
+
+#################################################################
+#
+# Example 2 of automatic login
+#
+# Network Administrator's Guide, Release 7.0
+#
+# Book A, Configuring Hosts and Severs Chapter in the section on Macros
+#
+# This example macro file will automatically connect any user
+# logging in on ports 1-32 of the defined annex to the given 
+# <system-address>. 
+#
+# Note that virtual ports will still have normal connection
+# options.
+#
+# It is host specific and annex specific.
+#
+# Note:	cli_inactivity should be set to immediate so that when
+#       a user logs off the macro is re-initiated. If this isn't done,
+#	the user will return to the cli instead of the macro on logout.
+#
+#      long_break and short_break should also be set to N to 
+#      prevent access to a CLI prompt.
+#
+#################################################################
+alias "Connecting to host"
+	init_cli 1-32@<annex-address>
+{
+>
+> Please wait while you are connected......
+>
+<rlogin <system-address>
+}

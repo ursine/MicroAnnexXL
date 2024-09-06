@@ -1,0 +1,184 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# This is a script used to edit a copy of the eservices.  The name of the
+# file containing the copy is passed in on the command line.  Also passed
+# in (optionally) is a flag that indicates whether the acp service is to
+# be enabled.  The flag is expected to be a "yes/no" type answer to a
+# question.  If that flag is not passed in then we will ask the installer
+# whether acp should be enabled.  However, under no circumstance, do we ask
+# the installer whether acp should be enabled if we see that acp is already
+# enabled in the eservices file.
+# 
+#############################################################################
+
+
+REQUIRED_FILES="./.contains ./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+$debug && echo "${dbg_hdr}Entering script that edits copy of eservices"
+
+
+# Initialize variables
+
+auto_answer_acp=false
+auto_answer="?"
+
+# Read command line
+
+file=$1
+if [ $# -gt 1 ]
+then
+    auto_answer_acp=true
+    auto_answer="$2"
+fi
+
+
+
+###########################################################################
+
+
+# Use a temporary file
+
+tmpfile=/tmp/edsrvs.$$
+rm -f $tmpfile
+
+# Check the copy of the eservices file for the line enabling acp
+# (we may add it later if it is missing or commented out).
+
+sed -e 's/.*acp[ 	]*$/FOUND_IT/g' $file > $tmpfile
+if ./.contains FOUND_IT $tmpfile
+then
+    # A line with acp is there 
+    missing=false
+    $debug && echo "${dbg_hdr}eservices has acp in it"
+
+    # See if the line is commented or not
+    sed -e 's/^[ 	]*#.*acp[ 	]*$/FOUND_IT/g' $file > $tmpfile
+    if ./.contains FOUND_IT $tmpfile
+    then
+	# Ok, there is a commented line
+	commented=true
+	$debug && echo "${dbg_hdr}eservices has a commented acp line"
+
+	# But now see if there is also an uncommented line
+	grep -v "#" $file | sed -e 's/.*acp[ 	]*$/FOUND_IT/g' > $tmpfile
+	if ./.contains FOUND_IT $tmpfile
+	then
+	    $debug && echo "${dbg_hdr}eservices also has a non-commented acp line"
+	    commented=false
+	fi
+    else
+	# There is no commented line
+	commented=false
+	$debug && echo "${dbg_hdr}eservices has a non-commented acp line"
+    fi
+else
+    # There is no line with acp there 
+    $debug && echo "${dbg_hdr}eservices does not have acp in it"
+    missing=true
+    commented=false
+fi
+rm -f $tmpfile
+
+# See if we have to ask the installer about whether we should have acp.
+# If acp is already active then do not ask.  This is something that the
+# administrator must have enabled previous to this installation since
+# the install or default files that get installed do not make it active.
+# We enter this code even if auto_answer_acp is turned on (so we get
+# consistent results but for that case we stifle the I/O.
+
+ask=false
+$missing && ask=true
+$commented && ask=true
+if $ask
+then
+    if $auto_answer_acp
+    then
+	true
+    else
+	msgid=ee_acpwanted
+	. $MSG_FILE
+    fi
+    while true
+    do
+	insert=true
+	dfltans=y
+	if $auto_answer_acp
+	then
+	    auto_answer_acp=false
+	    ans=$auto_answer
+	else
+	    rp="Do you want the erpcd daemon to provide access control (y/n) [$dfltans]:"
+	    . ./.myread
+	fi
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case $ans in
+	    Y*|y*)
+		comment=""
+		break
+		;;
+	    N*|n*)
+		# Even if the answer is "no" we insert the acp line as
+		# a comment unless the line is already there as a comment
+		comment="#"
+		$commented && insert=false
+		break
+		;;
+	    "?")
+		msgid=ee_acpwantedhelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+
+    # Now have an answer
+    $debug && echo "${dbg_hdr}Inserting acp line into eservices (with char1=<${comment}>)"
+    $insert && echo "${comment}3		0	99	acp" >> $file
+fi
+
+
+if $debug
+then
+    echo "${dbg_hdr}Here is what $file looks like:"
+    cat $file | sed -e "s/^/${dbg_hdr}${indent}/g"
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that edits copy of eservices"
+
+exit
+

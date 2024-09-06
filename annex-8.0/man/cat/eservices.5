@@ -1,0 +1,66 @@
+
+
+
+     EEEESSSSEEEERRRRVVVVIIIICCCCEEEESSSS((((4444))))                  AAAANNNNNNNNEEEEXXXX                  EEEESSSSEEEERRRRVVVVIIIICCCCEEEESSSS((((4444))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          eservices - erpcd network services database
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          ////eeeettttcccc////eeeesssseeeerrrrvvvviiiicccceeeessss
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          The ////eeeettttcccc////eeeesssseeeerrrrvvvviiiicccceeeessss file defines the services that the Annex
+          network server _e_r_p_c_d(1M) offers.
+
+          Each line of the file consists of four fields separated by
+          tabs or spaces.  The fields are:
+
+          o   a request number identifying the service
+
+          o   the lowest numbered version supported
+
+          o   the highest numbered version supported
+
+          o   the name of the server called to perform the service.
+
+          The two standard services are bbbbffffssss, the block file server
+          that downloads Annex operational code and uploads Annex
+          crash dumps, and aaaaccccpppp, the Access Control Protocol server
+          that handles security authorization requests from an Annex.
+
+          Lines beginning with "#" are comment lines.  The distributed
+          /etc/eservices file is:
+
+          # erpc remote programs
+          #
+          # prog no.       verlo  verhiimage
+          #
+          1        0       0      bfs
+          #3       0       99     acp
+
+          Note that the line describing the aaaaccccpppp service is commented
+          out.  Be sure to read the chapter on security in the _A_n_n_e_x
+          _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e before removing this comment.
+
+     FFFFIIIILLLLEEEESSSS
+          /etc/eservices
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          _e_r_p_c_d(1M).
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e.
+
+
+
+
+
+
+
+
+
+     Page 1                                         (printed 2/20/100)
+
+
+

@@ -1,0 +1,87 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1992, Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use. 
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Description::
+ *
+ * 	Debugging support routines for sending output to syslog(3).
+ *
+ * Original Author:  James Carlson	Created on: 05AUG92
+ *
+ * Module Reviewers:
+ *	lint
+ *
+ * Revision Control Information:
+ * $Id: debugging.sys,v 1.2 1992/08/05 15:57:13 carlson Rel $
+ *
+ * This file created by RCS from
+ * $Source: /annex/common/src/./newrtelnet/RCS/debugging.sys,v $
+ *
+ * Revision History:
+ * $Log: debugging.sys,v $
+ * Revision 1.2  1992/08/05  15:57:13  carlson
+ * Added missing module header.
+ *
+ * This file is currently under revision by: $Locker:  $
+ *
+ *****************************************************************************
+ */
+
+/*
+ *	Include Files
+ */
+
+#include <stdio.h>
+#include <syslog.h>
+#include "rtelnet.h"
+
+#ifndef NO_DEBUG
+
+/*
+ *	External Definitions
+ */
+
+extern int debug;
+
+/*
+ *	Global Data Declarations
+ */
+
+char dbgrev[] = "$Revision: 1.2 $";
+char dbgsrc[] = "$Source: /annex/common/src/./newrtelnet/RCS/debugging.sys,v $";
+
+/*
+ *	Static Data Declarations
+ */
+
+static int severity[] = {
+	LOG_NOTICE,	/* Entry/Exit messages */
+	LOG_INFO,	/* Informational messages */
+	LOG_WARNING,	/* Warnings */
+	LOG_ERR,	/* Errors */
+	LOG_ALERT	/* Fatal internal problems */
+};
+
+void
+initialize_debugging()
+{
+	(void)openlog("rtelnet",LOG_PID);
+}
+
+/*VARARGS 3*/
+void
+_DBG(level,sever,fmt,a,b,c,d,e,f,g)
+int level,sever;
+char *fmt,*a,*b,*c,*d,*e,*f,*g;
+{
+	if (debug >= level)
+		syslog(severity[sever],fmt,a,b,c,d,e,f,g);
+}
+
+#endif /* NO_DEBUG */

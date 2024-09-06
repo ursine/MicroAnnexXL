@@ -1,0 +1,61 @@
+
+
+		RTELNET (Reverse Telnet)
+
+Rtelnet is a modified version of the Berkeley telnetd program. Its
+purpose is to create a pseudo-tty device that is connected to an
+Annex serial port. This allows UNIX programs such as tip and uucp to
+access serial devices attached to Annex ports. Rtelnet works like
+a telnet daemon program (telnetd) except in a reverse fashion. Instead
+of accepting telnet connections from other network machines, rtelnet
+makes telnet connections to Annex ports. Rtelnet creates a new file-like
+device (usually in /dev) that programs can open and use like
+a normal /dev/tty.
+
+Rtelnet will run as-is on any 4.2/4.3 BSD system or SUN workstation.
+To run on other systems may require some code modification.
+
+
+Syntax:
+
+rtelnet [-<switches>] <annex> <port> <device name>
+
+where,
+	switches - can be 'm' and/or 'r'
+
+	annex - is the Inet address or hostname of the Annex
+
+	port - is the Annex port number
+
+	device name - is the file name to be created
+
+
+switches:
+
+	r - means remove <device name> if it exists. The default is
+		to print an error message and exit.
+
+	m - means to momentarily drop the network connection to the
+		Annex port whenever the pseudo device is closed.
+		This can be used to cause a dial-out modem to
+		hangup when a program like tip exits.
+
+
+
+Example usage:
+
+	You have a dial-out modem attached to port 15 of an Annex
+	named "modem-annex". You would like users on a SUN workstation
+	to be able to use the modem via 'tip'.
+
+
+1. Configure Annex port 15 using 'NA' to "control_lines: modem_control"
+
+2. Add an entry to /etc/rc script to create the tip pseudo-device whenever
+	the SUN is booted. Entry would be:
+
+	rtelnet -rm modem-annex 15 /dev/modem1
+
+3. Create new system definition in /etc/remote specifying /dev/modem1
+	as the tip (tv) device.
+

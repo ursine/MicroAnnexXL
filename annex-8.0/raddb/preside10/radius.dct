@@ -1,0 +1,349 @@
+################################################################################
+# radius.dct - the baseline Radius dictionary implementation for STRUCTURED 
+#              vendor specific attributes
+#
+# Notes:
+#     NRHH = Not Required to Honor the Hint (applies to request attributes). 
+#            This language (the expansion of NRHH) is taken directly from the 
+#            RADIUS spec.
+# 
+# (See README.DCT for more details on the format of this file)
+#
+#
+# updated 10/12/99	DJM
+#
+################################################################################
+
+
+ATTRIBUTE  User-Name                     1     string            c
+
+ATTRIBUTE  User-Password                 2     string            c
+
+ATTRIBUTE  CHAP-Password                 3     string            c
+
+ATTRIBUTE  NAS-IP-Address                4     ipaddr            C
+
+ATTRIBUTE  NAS-Port                      5     integer           C               # NAS dependent value
+
+ATTRIBUTE  Service-Type                  6     integer           Cr              # NRHH
+VALUE      Service-Type                  Login                           1
+VALUE      Service-Type                  Framed                          2
+VALUE      Service-Type                  Callback-Login                  3
+VALUE      Service-Type                  Callback-Framed                 4
+VALUE      Service-Type                  Outbound                        5
+VALUE      Service-Type                  Administrative                  6
+VALUE      Service-Type                  NAS-Prompt                      7
+VALUE      Service-Type                  Authenticate-Only               8
+VALUE      Service-Type                  Callback-NAS-Prompt             9
+VALUE      Service-Type                  Call-Check             	10
+VALUE      Service-Type                  Callback-Administrative	11
+
+
+ATTRIBUTE  Framed-Protocol               7     integer           Cr
+VALUE      Framed-Protocol               PPP                             1
+VALUE      Framed-Protocol               SLIP                            2
+VALUE      Framed-Protocol               ARAP                            3
+VALUE      Framed-Protocol               Gandalf-proprietary...          4
+VALUE      Framed-Protocol               Xylogics-proprietary-IPX/SLIP   5
+
+ATTRIBUTE  Framed-IP-Address             8     ipaddr-pool       Cr              # NRHH
+
+ATTRIBUTE  Framed-IP-Netmask             9     ipaddr            Cr              # NRHH
+
+ATTRIBUTE  Framed-Routing                10    integer            r
+VALUE      Framed-Routing                None                            0
+VALUE      Framed-Routing                Send-routing-packets            1
+VALUE      Framed-Routing                Listen-for-routing-packets      2
+VALUE      Framed-Routing                Send-and-listen                 3
+
+ATTRIBUTE  Filter-Id                     11    string             R
+
+ATTRIBUTE  Framed-MTU                    12    integer            r
+
+ATTRIBUTE  Framed-Compression            13    integer           CR              # NRHH
+VALUE      Framed-Compression            VJ-TCP-IP-header-compression    1
+VALUE      Framed-Compression            IPX-header-compression          2
+VALUE      Framed-Compression            Stac-LZS-compression		 3
+
+ATTRIBUTE  Login-IP-Host                 14    ipaddr           Cr              # NRHH
+
+ATTRIBUTE  Login-Service                 15    integer            r
+VALUE      Login-Service                 Telnet                          0
+VALUE      Login-Service                 Rlogin                          1
+VALUE      Login-Service                 TCP-Clear                       2
+VALUE      Login-Service                 Portmaster                      3
+VALUE      Login-Service                 LAT                             4
+
+ATTRIBUTE  Login-TCP-Port                16    integer            r
+
+ATTRIBUTE  Reply-Message                 18    string             RO
+
+ATTRIBUTE  Callback-Number               19    string            Cr              # NRHH
+
+ATTRIBUTE  Callback-Id                   20    string             r
+
+ATTRIBUTE  Framed-Route                  22    string             R
+
+ATTRIBUTE  Framed-IPX-Network            23    ipxaddr-pool      r
+
+ATTRIBUTE  State                         24    string            c                # automatically inserted
+
+ATTRIBUTE  Class                         25    string             R
+
+ATTRIBUTE  Session-Timeout               27    integer            r
+
+ATTRIBUTE  Idle-Timeout                  28    integer            r
+
+ATTRIBUTE  Termination-Action            29    integer            r
+VALUE      Termination-Action            Default                         0
+VALUE      Termination-Action            RADIUS-Request                  1
+
+ATTRIBUTE  Called-Station-Id             30    string            C               # format of string is NAS dependent
+
+ATTRIBUTE  Calling-Station-Id            31    string            C               # format of string is NAS dependent
+
+ATTRIBUTE  NAS-Identifier                32    string            C 
+
+ATTRIBUTE  Proxy-State                   33    string                            # automatically inserted
+
+ATTRIBUTE  Login-LAT-Service             34    string            Cr              # NRHH
+
+ATTRIBUTE  Login-LAT-Node                35    string            Cr              # NRHH
+
+ATTRIBUTE  Login-LAT-Group               36    string            Cr              # NRHH
+
+ATTRIBUTE  Framed-AppleTalk-Link         37    integer            r
+
+ATTRIBUTE  Framed-AppleTalk-Network      38    integer            R
+
+ATTRIBUTE  Framed-AppleTalk-Zone         39    string             r 
+
+ATTRIBUTE  Acct-Status-Type              40    integer             
+VALUE      Acct-Status-Type              Start                           1
+VALUE      Acct-Status-Type              Stop                            2
+VALUE      Acct-Status-Type      	 Interim             		 3
+VALUE      Acct-Status-Type              Call-Start                      4
+VALUE      Acct-Status-Type              Call-Stop                       5
+VALUE      Acct-Status-Type              Accounting-On                   7
+VALUE      Acct-Status-Type              Accounting-Off                  8
+VALUE      Acct-Status-Type              Tunnel-Start			 9
+VALUE      Acct-Status-Type              Tunnel-Stop			10
+VALUE      Acct-Status-Type              Tunnel-Reject			11
+VALUE      Acct-Status-Type              Tunnel-Link-Start		12
+VALUE      Acct-Status-Type              Tunnel-Link-Stop		13
+VALUE      Acct-Status-Type              Tunnel-Link-Reject		14
+
+ATTRIBUTE  Acct-Delay-Time               41    integer                  
+ATTRIBUTE  Acct-Input-Octets             42    integer                    
+ATTRIBUTE  Acct-Output-Octets            43    integer                    
+ATTRIBUTE  Acct-Session-Id               44    string                     
+
+ATTRIBUTE  Acct-Authentic                45    integer                    
+VALUE      Acct-Authentic                RADIUS                          1
+VALUE      Acct-Authentic                Local                           2
+VALUE      Acct-Authentic                Remote                          3
+
+ATTRIBUTE  Acct-Session-Time             46    integer                    
+
+ATTRIBUTE  Acct-Input-Packets            47    integer                    
+
+ATTRIBUTE  Acct-Output-Packets           48    integer                    
+
+ATTRIBUTE  Acct-Termination-Cause        49    integer                    
+VALUE      Acct-Termination-Cause        User-Request                    1 
+VALUE      Acct-Termination-Cause        Lost-Carrier                    2 
+VALUE      Acct-Termination-Cause        Lost-Service                    3 
+VALUE      Acct-Termination-Cause        Idle-Timeout                    4 
+VALUE      Acct-Termination-Cause        Session-Timeout                 5 
+VALUE      Acct-Termination-Cause        Admin-Reset                     6 
+VALUE      Acct-Termination-Cause        Admin-Reboot                    7 
+VALUE      Acct-Termination-Cause        Port-Error                      8 
+VALUE      Acct-Termination-Cause        NAS-Error                       9 
+VALUE      Acct-Termination-Cause        NAS-Request                    10
+VALUE      Acct-Termination-Cause        NAS-Reboot                     11
+VALUE      Acct-Termination-Cause        Port-Unneeded                  12
+VALUE      Acct-Termination-Cause        Port-Preempted                 13
+VALUE      Acct-Termination-Cause        Port-Suspended                 14
+VALUE      Acct-Termination-Cause        Service-Unavailable            15
+VALUE      Acct-Termination-Cause        Callback                       16
+VALUE      Acct-Termination-Cause        User-Error                     17
+VALUE      Acct-Termination-Cause        Host-Request                   18
+
+ATTRIBUTE  Acct-Multi-Session-Id         50    string               
+
+ATTRIBUTE  Acct-Link-Count               51    integer
+
+ATTRIBUTE  Acct-Input-Gigawords          52    integer
+
+ATTRIBUTE  Acct-Output-Gigawords         53    integer
+
+ATTRIBUTE  Event-Timestamp               55    time
+
+ATTRIBUTE  CHAP-Challenge                60    string                            # automatically inserted
+
+ATTRIBUTE  NAS-Port-Type                 61    integer           C
+VALUE      NAS-Port-Type                 Async                           0
+VALUE      NAS-Port-Type                 Sync                            1
+VALUE      NAS-Port-Type                 ISDN-Sync                       2
+VALUE      NAS-Port-Type                 ISDN-Async-V-120                3
+VALUE      NAS-Port-Type                 ISDN-Async-V-110                4
+VALUE      NAS-Port-Type                 Virtual                         5
+VALUE      NAS-Port-Type                 PIAFS				 6
+VALUE      NAS-Port-Type                 HDLC-Clear-Channel		 7
+VALUE      NAS-Port-Type                 X.25				 8
+VALUE      NAS-Port-Type                 X.75				 9
+VALUE      NAS-Port-Type                 G.3-Fax			10
+VALUE      NAS-Port-Type                 SDSL				11
+VALUE      NAS-Port-Type                 ADSL-CAP			12
+VALUE      NAS-Port-Type                 ADSL-DMT			13
+VALUE      NAS-Port-Type                 IDSL-ISDN			14
+VALUE      NAS-Port-Type                 Ethernet			15
+VALUE      NAS-Port-Type                 xDSL  				16 
+VALUE      NAS-Port-Type                 Cable 				17
+VALUE      NAS-Port-Type                 Wireless			18	
+
+
+ATTRIBUTE  Port-Limit                    62    integer           Cr              # NRHH
+
+ATTRIBUTE  Login-LAT-Port                63    string            Cr              # NRHH
+
+#
+# Tunnel Attributes
+#
+ATTRIBUTE Tunnel-Type                    64    integer               t
+VALUE     Tunnel-Type                    PPTP                            1
+VALUE     Tunnel-Type                    L2F                             2
+VALUE     Tunnel-Type                    L2TP                            3
+VALUE     Tunnel-Type                    ATMP                            4
+VALUE     Tunnel-Type                    VTP                             5
+VALUE     Tunnel-Type                    AH                              6
+VALUE     Tunnel-Type                    IP-Encap                        7
+VALUE     Tunnel-Type                    MIN-IP-IP                       8
+VALUE     Tunnel-Type                    ESP                             9
+VALUE     Tunnel-Type                    GRE                            10
+VALUE     Tunnel-Type                    DVS                            11
+VALUE	  Tunnel-Type			 IP-in-IP			12
+
+ATTRIBUTE Tunnel-Medium-Type             65    integer               t
+VALUE     Tunnel-Medium-Type             IP                              1
+VALUE     Tunnel-Medium-Type             X.25                            2
+VALUE     Tunnel-Medium-Type             ATM                             3
+VALUE     Tunnel-Medium-Type             Frame-Relay                     4
+
+ATTRIBUTE Acct-Tunnel-Client-Endpoint        66   string  
+
+ATTRIBUTE Tunnel-Server-Endpoint         67   [fill1=0 data=string]  t
+
+ATTRIBUTE Acct-Tunnel-Connection         68    string               
+
+#
+# Note: Attribute 69 (Tunnel-Password) has been left as a place holder for
+#       those vendors that choose to implement it.
+#
+#ATTRIBUTE Tunnel-Password               69    string                t   tunnel-pw-encrypt
+
+#
+# Extension Draft Attributes
+#
+ATTRIBUTE ARAP-Password                  70    hexadecimal
+
+ATTRIBUTE ARAP-Features                  71    hexadecimal
+
+ATTRIBUTE ARAP-Zone-Access               72    integer
+VALUE     ARAP-Zone-Access               Access-Default-Zone             1
+VALUE     ARAP-Zone-Access               Use-Zone-Filter-Inclusively     2
+VALUE     ARAP-Zone-Access               Use-Zone-Filter-Exclusively     4
+
+ATTRIBUTE ARAP-Security                  73    integer
+
+ATTRIBUTE ARAP-Security-Data             74    string
+
+ATTRIBUTE Password-Retry                 75    integer      r
+
+ATTRIBUTE Prompt                         76    integer      r
+VALUE     Prompt                         No-Echo                         0
+VALUE     Prompt                         Echo                            1
+
+ATTRIBUTE Connect-Info                   77    string       c
+
+ATTRIBUTE Configuration-Token            78    string
+
+ATTRIBUTE EAP-Message                    79    hexadecimal
+
+ATTRIBUTE Signature                      80    hexadecimal		#test keyword?
+
+ATTRIBUTE Tunnel-Private-Group-ID        81  [fill1=0 data=string]  t
+
+ATTRIBUTE Tunnel-Assignment-ID           82  [fill1=0 data=string]  t
+
+ATTRIBUTE Tunnel-Preference              83  integer                t
+
+ATTRIBUTE ARAP-Challenge-Response        84  string
+
+ATTRIBUTE Acct-Interim-Interval          85  integer	r
+
+ATTRIBUTE Acct-Tunnel-Packets-Lost       86  integer
+
+ATTRIBUTE NAS-Port-ID                    87  string	C
+
+ATTRIBUTE Framed-Pool                    88  string	r
+
+ATTRIBUTE Tunnel-Client-Auth-Id		 90  string	t
+
+ATTRIBUTE Tunnel-Server-Auth-Id		 91  string	t
+
+#
+# ----------------------------- MS CHAP Attributes -----------------------------
+#
+
+# Password attribute that we will be receiving from the NAS
+#
+ATTRIBUTE MS-CHAP-Response     26  [vid=311 type1=1 len1=+2 data=hexadecimal]
+
+ATTRIBUTE MS-CHAP-Error        26  [vid=311 type1=2 len1=+2 data=string]
+ATTRIBUTE MS-CHAP-CPW-1        26  [vid=311 type1=3 len1=+2 data=hexadecimal]
+ATTRIBUTE MS-CHAP-CPW-2        26  [vid=311 type1=4 len1=+2 data=hexadecimal]
+ATTRIBUTE MS-CHAP-LM-Enc-PW    26  [vid=311 type1=5 len1=+2 data=hexadecimal]
+ATTRIBUTE MS-CHAP-NT-Enc-PW    26  [vid=311 type1=6 len1=+2 data=hexadecimal]
+
+# Attributes that can be sent back to NAS to inform it of the NT domain against 
+# which the user was authenticated (not implemented yet)
+#
+#ATTRIBUTE MS-CHAP-Domain      26  [vid=311 type1=10 len1=+2 data=hexadecimal] r  return-NT-Domain
+
+# Challenge attribute with which MS-CHAP user was challenged
+#
+ATTRIBUTE MS-CHAP-Challenge    26  [vid=311 type1=11 len1=+2 data=hexadecimal]
+
+# Attributes that can be sent back to NAS to inform it of the LanMan and NT 
+# keys that will need to be set up for PPTP encryption
+#
+ATTRIBUTE MS-CHAP-MPPE-Keys    26  [vid=311 type1=12 len1=+2 data=hexadecimal] r  return-MPPE-keys
+
+# Attributes that can be sent back to NAS to inform it of the LanMan and NT 
+# keys that will need to be set up for PPTP encryption
+#
+
+ATTRIBUTE MS-CHAP-MPPE-Types    26  [vid=311 type1=200 len1=+2 data=int4] r 
+VALUE     MS-CHAP-MPPE-Types                         Disable                         0
+VALUE     MS-CHAP-MPPE-Types                         Auto                            1
+VALUE     MS-CHAP-MPPE-Types                         40-Bit                          2
+VALUE     MS-CHAP-MPPE-Types                         128-Bit                         3
+VALUE     MS-CHAP-MPPE-Types                         Required                        4
+
+#
+# ---------------------- Funk Vendor-Specific Attributes ----------------------
+#
+
+ATTRIBUTE Funk-Full-User-Name         26 [vid=1411 type1=1 len1=+2 data=string]  cr
+
+ATTRIBUTE Funk-Concurrent-Login-Limit 26 [vid=1411 type1=2 len1=+2 data=integer] cr
+
+ATTRIBUTE Funk-Reject-Reason-Code     26 [vid=1411 type1=3 len1=+2 data=integer] cr
+VALUE     Funk-Reject-Reason-Code     Over-Concurrency-Limit        1
+VALUE     Funk-Reject-Reason-Code     Processing-Error              2
+
+################################################################################
+# radius.dct - the baseline Radius dictionary implementation for STRUCTURED 
+#              vendor specific attributes
+################################################################################

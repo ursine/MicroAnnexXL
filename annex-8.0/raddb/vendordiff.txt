@@ -1,0 +1,12 @@
+Vendor differences notes
+Dave Mitton (DJM) 2/11/99
+
+bsac13 - no tunnel support - all "t" flagged attributes changed to "r"
+            no tunnel keywords, removed, clear password
+bsac15 - tunnel support added
+bsac20
+bsac21 - accounting attributes controlled by account.ini - remove "a" flags
+
+merit35 - regular VSAs
+merit41 - Tunnel VSAs have tag datatype
+    

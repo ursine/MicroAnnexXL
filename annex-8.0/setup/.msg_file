@@ -1,0 +1,1669 @@
+
+#############################################################################
+#
+# This file contains some of the messages that get printed by the
+# installation script.  They are placed here for several reasons:
+#     1) The same message is printed out in different places.
+#     2) To make code reading in the main installation script easier.
+#     3) To allow easier updating of messages easier.
+#
+# The file is used by the installation script by code similar to the
+# following (which should show why this is a help in code reading):
+#	case "$ans" in
+#		"?")
+#			msgid=xyz
+#			. $MSG_FILE
+#			;;
+#	esac
+#
+# Most messages are printed using "here documents" ( cat << LABEL --- LABEL)
+# This allows easy modification because quotes do not have to be matched.
+#
+# The case statement is mainly used for printing messages but there may
+# actually be a few cases where other code gets executed (such as removing
+# files, assigning variables and such).  This should not be done lightly.
+# One case that could be considered valid is putting code here that would be
+# called more than once (simulating a shell function).  The main code should
+# note well what is happening if it does that.
+#
+# Also note that some of the messages may be expected to be written to
+# a file and that the filename is expected to be set with
+# msgfile="name_of_file" before assigning "msgid".  The first line of the
+# "here document" would look like "cat << LABEL > $msgfile" in this case.
+#
+#############################################################################
+#
+# Possible Enhancement: Seek out "no_msg_avail=true" and add messages
+#			where helpful. Some of these places are candidates
+#			for extra messages but not all are.
+#                       
+#
+
+
+# A number of cases can print out redundant information.  For them we set
+# some flags and then at the end of the case statement we print messages
+# if the flags are set.  Always clear these flags first.
+
+manual_install=false
+no_msg_avail=false
+
+
+#############################################################################
+# Start the case statement:
+
+case "$msgid" in
+
+youarenotroot)
+cat << LABEL
+
+**** You are not the superuser (root).
+**** It is required that the installation be performed by root.
+
+LABEL
+;;
+
+
+youarenotroothelp)
+cat << LABEL
+
+Normally you should never be able to see this message because it was
+determined that you are not the superuser ("root") and the installation
+ended.  However, you have set an environment variable that is allowing
+you to continue.
+
+If you really are root then you will be able to continue with the installation.
+
+If you are not root and you did not expect to see this message then you
+should normally quit.  If you continue then there may be errors that
+prevent a correct installation.
+
+LABEL
+;;
+
+
+sysmenuhelp)
+cat << LABEL
+
+The installation has not been able to determine the type of system you
+are running on.  The list that was printed is the list of supported
+platforms that cannot be determined automatically. If your system is one
+of these platforms then enter the number which indicates the correct
+platform.
+
+If your platform is not one of the ones listed then you may attempt to
+continue the installation by selecting the "Generic" platform.  You will
+then be asked questions that will aid the installation process in
+modifying source files so they can be compiled on your system.
+
+You may also cause the installation to quit by typing "quit" at the prompt.
+
+LABEL
+;;
+
+
+unisyssyshelp)
+# Detailed help for the unisys menu asking for system type
+no_msg_avail=true
+;;
+
+ncrsyshelp)
+# Detailed help for the ncr menu asking for system type
+no_msg_avail=true
+;;
+
+
+pyramidsyshelp)
+# Detailed help for the pyramid menu asking for system type
+no_msg_avail=true
+;;
+
+
+concurrentsyshelp)
+# Detailed help for the concurrent menu asking for system type
+no_msg_avail=true
+;;
+
+
+hpsyshelp)
+# Detailed help for the hp menu asking for system type
+no_msg_avail=true
+;;
+
+decsyshelp)
+# Detailed help for the hp menu asking for system type
+no_msg_avail=true
+;;
+
+
+sequentsyshelp)
+# Detailed help for the hp menu asking for system type
+no_msg_avail=true
+;;
+
+
+primesyshelp)
+# Detailed help for the prime menu asking for system type
+no_msg_avail=true
+LABEL
+;;
+
+
+bullsyshelp)
+# Detailed help for the bull menu asking for system type
+no_msg_avail=true
+LABEL
+;;
+
+
+genericsyshelp)
+cat << LABEL
+
+The system you are installing on is not a supported system.  However, it
+may still be possible to build the $Box host tools.
+
+The installation will proceed by collecting information from you so that
+when the source code is extracted from the distribution medium it can be
+modified to increase the chances that it will compile on your system.
+
+Here we are asking which operating system is most like the one your
+system is running.
+
+LABEL
+;;
+
+
+netsyshelp)
+# Detailed help for: 
+# What kind of network software does your OS have?
+# ${indent}1. 4.[234]BSD or compatible
+# ${indent}2. Excelan EXOS package
+# ${indent}3. CMC package
+# ${indent}4. Wollongong WINS package
+# ${indent}5. None.  Use user-level SLIP (SysV / XENIX only)
+# ${indent}6. TLI.  (Transport Layer Interface)
+no_msg_avail=true
+;;
+
+
+
+yqonly)
+cat << LABEL
+
+**** Enter 'Yes' or 'Quit', please!
+     (or '?' for help)
+
+LABEL
+;;
+
+
+ynq)
+cat << LABEL
+
+**** Enter 'Yes' or 'No', please!
+     (or '?' for help or 'Quit' to quit the installation)
+
+LABEL
+;;
+
+ynonly)
+cat << LABEL
+
+**** Enter 'Yes' or 'No', please!  (or '?' for help)
+
+LABEL
+;;
+
+abort_quit)
+#   # Called when the user aborts by answering a question
+    rm -f $tempfiles
+    echo " "
+    echo "**** User abort!"
+    echo " "
+    exit 2
+;;
+
+
+trap_quit)
+#   # Called when a trap is taken (e.g., the user aborts by CNTL-C)
+    rm -f $tempfiles
+    echo " "
+    echo "**** Trap abort!"
+    echo " "
+    exit 3
+;;
+
+
+ma_asktype)
+cat << LABEL
+
+What type of install will be performed?
+${indent}1. Tarfile previously copied to hard disk
+${indent}2. Quit
+
+LABEL
+;;
+
+
+ma_explain)
+cat << LABEL
+
+Choices 1 and 2)
+   The $Box software distribution may be on a tape, a collection of $floppies
+   or a CD-ROM.  If it is on $floppies or a tape please indicate here. You
+   will be asked for the name of the drive holding the distribution tarfile.
+
+Choice 3)
+   Less likely is that the distribution is on a tarfile.  The software
+   distribution on a tape or a CD-ROM contains a tarfile.  This tarfile could
+   be copied onto a hard disk and also used as a distribution medium.  You
+   will be asked for the name of the file.
+
+Choice 4)
+   The installation program can also be run after all files have been
+   extracted from the medium, in which case no further extraction is needed.
+   For example, a complete tape distribution was extracted by the tar command
+   prior to calling the install script.
+
+LABEL
+;;
+
+
+ma_devname)
+cat << LABEL
+
+- You are expected to answer with the name of a device or file.
+- If you answer 'Q' you will exit the installation program.
+- If you answer with a 'RETURN' then this help is given.
+- A check will be made to see if the device or file is accessible.
+  If it is not then this question will be asked again. This will
+  allow opportunity for you to fix any problems.  This may be done from
+  another process or you may enter '!' at the prompt to enter a shell in
+  which to work. When you exit the shell you will be prompted again.
+
+LABEL
+;;
+
+
+ee_acpwanted)
+# Do not print message
+true
+#cat << LABEL
+#
+#Do you want the erpcd daemon to handle security authorization requests?
+#To get help enter "?" at the prompt.
+#
+#LABEL
+;;
+
+ee_acpwantedhelp)
+cat << LABEL
+
+One service provided by erpcd is the Access Control Protocol (acp)
+service that handles security authorization requests.  To enable this
+service an uncommented line in a special format must be placed in the
+eservices file.  This will be done for you if you want.
+
+LABEL
+;;
+
+
+mi_pickone)
+cat << LABEL
+
+The following files in the $startup_dir directory mention erpcd.
+${indent}$files
+
+Please choose the one that we will edit.
+(Only a copy will be edited. You will later be asked if you want the
+edited copy to be copied to $startup_dir/annex-initd).
+LABEL
+;;
+
+
+mi_help)
+cat << LABEL
+
+Please enter the name of the file you want to be edited.  Only a copy of
+this file will be edited.  You will later be asked if you want to copy
+the edited version of the file to $startup_dir/annex-initd. 
+You can prevent the copy from happening if you do not want the original
+file from being changed.
+
+LABEL
+;;
+
+
+uf_eservicescpfails)
+cat << LABEL
+
+WARNING: The file ${diracp}/eservices does not exist.
+         This file is crucial for erpcd to work properly.
+         You may get a version by copying file $tmp
+
+LABEL
+;;
+
+
+uf_copychoices)
+cat << LABEL
+
+If you answer 'Yes' to this question then the file '$modified' 
+will be copied to become the new version of '$real'.
+
+If you answer 'No' then you may do the copy yourself after the
+installation completes.
+
+A copy of the original version of '$real' has been saved in the
+file '$saved'.
+
+LABEL
+;;
+
+
+uf_nisnotice)
+cat << LABEL
+
+NOTICE: NIS was found to be running.
+        You must update the NIS services database manually.
+        As a guide use the services listed in file $modified.
+LABEL
+;;
+
+
+uf_notrootcopy)
+cat << LABEL
+
+NOTICE: You are not root. The installation will not copy file
+        $modified to $real
+LABEL
+;;
+
+uf_updateintro)
+cat << LABEL
+
+Copies of the following files have been updated:
+	$filelist
+LABEL
+;;
+
+
+uf_updateintrohelp)
+cat << LABEL
+
+As part of the installation, copies of files have been updated for you.
+The following new versions of these files are in the save/modified directory:
+	$filelist
+
+If you want to copy these files to their real (permanent) locations then
+answer "yes" to the following question. You will then be asked on a file by
+file basis whether you want to copy these files to their real (permanent)
+locations.
+
+LABEL
+;;
+
+
+uf_copyinitd)
+cat << LABEL
+
+NOTICE:  $real has been linked to /etc/rc2.d/S99annex
+    	 $real has been linked to /etc/rc2.d/K09annex
+
+LABEL
+;;
+
+
+acppasswd)
+cat << LABEL
+
+The ACP security regime uses files in the format of password files and
+password shadow files to verify users.  You can name the password file
+to be used now.  If shadow password files are being used then the file
+named "shadow" in the same directory as the password file will be used
+when needed.  Entering a carriage return here will cause the default
+file to be used (this is "$instdir/$acppwfile").
+
+LABEL
+;;
+
+
+krbpasswd)
+cat << LABEL
+
+The KERBEROS security regime uses files with user validation information
+to pass information to the erpcd daemon. These are called tickets.
+These files are expected to be placed into a directory and file in which
+a process id number is appended.  The default file name is
+    $kbbtickdir
+This may produce a file name of ${kbbtickdir}1776 for example.
+You may enter your own file specifier now.
+
+LABEL
+;;
+
+
+dfltregimehdr)
+cat << LABEL
+
+The access control protocol server (ACP) that handles security requests
+depends on data in a file named acp_regime.  This file does not exist and
+must be created with a line that specifies a security policy for your site.
+LABEL
+;;
+
+erpcdregerr)
+cat << LABEL
+
+The erpcd binary was examined and one one more problems were found.
+    1) It was found not to be built with the $regime regime enabled.
+    2) It was found to be using a shared library to implement the
+       $regime regime and either no shared library was found or just
+       one that would not allow validation. You may use this regime but
+       should use a real shared library. This library should be named
+           $instdir/$shar.1.n
+       where 'n' is greater than 0.
+
+LABEL
+;;
+
+
+whatisregime)
+cat << LABEL
+
+The access control protocol server (ACP) security regimes can be briefly
+described as follows:
+   o If no security is wanted (security=NONE or access to be unconditionally
+     granted to all users) then choose the NONE regime.
+   o Use of the DENY regime will deny access to all users.
+   o For the ACP regime, access will be allowed to users entered in a special
+     database file created specifically for ACP security.
+   o For the NATIVE regime, access will be granted to valid system users (as
+     entered in the /etc/passwd file or NIS database).
+   o For the SECUREID, ENIGMA and KERBEROS regimes, user authentication will
+     be performed by accessing a security service. The erpcd daemon must have
+     been linked with a library supplied by a different vendor and the service
+     must be running.
+LABEL
+;;
+
+
+regimenotbuilt)
+cat << LABEL
+
+WARNING: Regime $regime not built into erpcd
+LABEL
+;;
+
+
+sharregimeprob)
+cat << LABEL
+WARNING: The shared library will not support $regime
+LABEL
+;;
+
+diffregime)
+cat << LABEL
+
+At this prompt you may enter a '?' to get help.
+You were issued a warning about security regime ${regime}.
+LABEL
+;;
+
+
+regimeneedinfo)
+cat << LABEL
+
+For this security regime you must enter additional information.
+
+LABEL
+;;
+
+
+regimenofile)
+cat << LABEL
+
+WARNING: File not found: $pwfile
+         Be sure to create it.
+
+LABEL
+;;
+
+
+restrictintro)
+cat << LABEL
+
+Do you want the host restrictions specified in acp_restrict to apply
+to PPP and SLIP (IP) connections as well as CLI telnet and rlogin
+connections?
+
+LABEL
+;;
+
+
+restricthelp)
+cat << LABEL
+
+The restictions in the acp_restrict are valid for CLI telnet and rlogin as
+well as PPP and SLIP (IP) connections.  They once were valid only for the
+CLI telnet and rlogin connections.
+
+If you answer "yes" to this question the acp_restrict will remain unchanged.
+If you answer "no" then the file will be edited to so the restrictions will
+be for CLI telnets and rlogins only.
+
+A copy of the original file will be saved in save/original/acp_restrict.
+
+LABEL
+;;
+
+
+restrictnocopy1)
+cat << LABEL
+
+**** The acp_restrict file must be edited.
+**** The file "save/modified/acp_restrict" was not able to be copied to
+**** "$acpdir/acp_restrict".
+**** Please do this after the installation completes.
+
+LABEL
+;;
+
+
+restrictnocopy2)
+cat << LABEL
+
+**** The acp_restrict file must be edited.
+**** The installation failed to do this automatically.
+**** Please do this after the installation completes.
+**** You must include a "protocol" statement on each line.
+
+LABEL
+;;
+
+
+universe_notatt)
+cat << LABEL
+**** You MUST be in the att universe to run this script.
+**** Please enter the att universe and try again.
+LABEL
+;;
+
+
+universe_notucb)
+cat << LABEL
+**** You MUST be in the ucb universe to run this script.
+**** Please enter the ucb universe and try again.
+LABEL
+;;
+
+
+validnumprompt)
+	    # Unexpected answer
+	    echo " "
+	    echo "**** Enter a valid number, please!"
+	    echo " "
+	    ;;
+
+
+enterccname)
+cat << LABEL
+
+A C compiler has not been found in standard directories on your system.
+There are no binary images available for installation on this host.
+For the installation of the host tools to occur you must enter the
+name of the C compiler you want to use.
+
+LABEL
+;;
+
+helpccname)
+cat << LABEL
+
+A compiler has not been found in known locations and you are not
+installing pre-compiled binaries.  In order to continue the
+installation you must enter the full path name of the compiler you
+want to use to build the host tools from source.
+
+LABEL
+;;
+
+
+what_hbnc)
+cat << LABEL
+
+Binary images exist for this host.  A C compiler has not been found on
+your system.  You can install source code but you will not be able to
+compile it.  The recommended option is to install binary images only.
+
+LABEL
+;;
+
+what_hbnc_help)
+cat << LABEL
+
+The system that you are installing on has pre-compiled binaries that you
+may install.  The recommended option is to install binary images only.
+
+However you may also install source code and you may try to reinstall
+after adding a compiler (but you will need a complete build environment
+also).  You may continue to download the source now and then install a
+compiler.  If so, complete the installation yourself later by using the
+commands "cd src", "make all" and "make install".  This may require you
+to make many changes to code.
+
+If you are extracting from the distribution medium then each option
+lists the size of hard disk space you will need to sucessfully complete
+the installation.
+
+LABEL
+;;
+
+
+what_nbhc)
+cat << LABEL
+
+Binary images do not exist for your host.  You can install the source
+code version of the tools and either let the script compile it for you
+automatically or perform the compilation later by yourself.
+
+LABEL
+;;
+
+what_nbhc_help)
+cat << LABEL
+
+For both options the installation will proceed by modifying the source
+code and Makefiles to allow the building of the host tools on your
+system.  You have the option of having the installation build and install
+the host tools during this session or you can have the installation skip
+this step.
+
+If you skip having the installation do the build then you may edit the
+source code to customize the host tools.  Then, to complete the
+installation yourself, use the commands "cd src", "make all" and "make
+install".
+
+If you are extracting from the distribution medium then each option
+lists the size of hard disk space you will need to sucessfully complete
+the installation.
+
+LABEL
+;;
+
+
+what_nbnc)
+cat << LABEL
+
+Binary images do not exist for this host.  A C compiler has not been
+found in standard directories.  You can install source code and compile
+it later manually.
+
+LABEL
+;;
+
+
+what_nbnc_help)
+cat << LABEL
+
+It is recommended that you quit the installation now.
+
+You may try to reinstall after adding a compiler (but you will need a
+complete build environment also).  You may continue to download the
+source now and then install a compiler.  If so, complete the installation
+yourself later by using the commands "cd src", "make all" and "make
+install".  This may require you to make many changes to code however.
+
+If you are extracting from the distribution medium then each option
+lists the size of hard disk space you will need to sucessfully complete
+the installation.
+
+LABEL
+;;
+
+
+what_hbhc)
+cat << LABEL
+
+Binary images exist for this host.  You also have a C compiler so you
+could also install source code and compile it.  The recommended option
+is to install binary images only.
+
+LABEL
+;;
+
+what_hbhc_help)
+cat << LABEL
+
+You may load source code if you want to modify the way the host tools
+operate.  If so then you will have to modify the source code after the
+installation completes and compile the code yourself later by using the
+commands "cd src", "make all" and "make install".
+
+If you are extracting from the distribution medium then each option
+lists the size of hard disk space you will need to sucessfully complete
+the installation.
+
+LABEL
+;;
+
+
+binwarnacp)
+cat << LABEL
+WARNING: Possible binary installation.  If the $Box utilities are not
+         installed in /usr/annex, then the -s switch may be needed
+         for proper operation of erpcd.  See the Network Administrator's Guide
+         for more information on the erpcd program.
+LABEL
+;;
+
+
+binwarnbfs)
+cat << LABEL
+
+WARNING: Possible binary installation.  If the $Box operational images are
+         not installed in $ERPCD/bfs, then the -f switch may be needed
+         for proper operation of erpcd.  See the Network Administrator's Guide
+         for more information on the erpcd program.
+LABEL
+;;
+
+
+binwarnboth)
+cat << LABEL
+
+WARNING: You did not chose directory /usr/annex for the $Box utilities
+         and you did not chose /usr/spool/erpcd/bfs for the operational images.
+         You will need to start erpcd with the -s and -f switches for proper
+         operation.  See the Network Administrator's Guide for more information
+         on the erpcd program.
+
+LABEL
+;;
+
+
+execdirhelp)
+# Add help message for question:
+#	"Utility directory"
+cat << LABEL
+
+The directory that you name here will be used as the installation
+directory for the $Box host tools.  The executable files will be
+placed in this directory and all the host tool commands run should be
+the images in this directory.
+
+If pre-compiled binaries are not being used then this directory name
+will be compiled into the erpcd program.
+
+In addition, this directory will be the directory that the erpcd
+daemon will look for acp security files.
+
+Use the "df" command to check for available disk space in the file
+system that contains the directory where you want the files installed.
+You have the option of escaping to a shell to do that now by answering
+the question with a "!".  When you exit from the shell you will
+re-enter the installation program.
+
+
+LABEL
+;;
+
+
+bfsdirhelp)
+# Detailed help message for question:
+#	"Select a directory for the $Box operational images and boot files.
+cat << LABEL
+
+The directory you select here will be installed with the files needed
+to boot the $Box.  If this directory already exists then any files
+that would be over-written will be backed up first by being placed
+into a sub-directory.
+
+If pre-compiled binaries are not being used then this directory name
+will be compiled into the erpcd program.
+
+Use the "df" command to check for available disk space in the file
+system that contains the directory where you want the files installed.
+You have the option of escaping to a shell to do that now by answering
+the question with a "!".  When you exit from the shell you will
+re-enter the installation program.
+
+
+LABEL
+;;
+
+
+nonexistdir)
+cat << LABEL
+********** This directory doesn't exist **********
+Please create it prior to installing the software,
+or enter the name of another directory to use.
+LABEL
+;;
+
+
+auxlibdirhelp)
+cat << LABEL
+
+To produce the host tools the installation may have to link the object
+files created from the compilation of the source code with network
+libraries.
+
+If you answer "y" to this question then you will be prompted to name the
+additional loader options for the libraries (e.g., "-lnet" or "-lsocket").
+
+LABEL
+;;
+
+
+altincdirhelp)
+cat << LABEL
+
+To compile the source code it is necessary to know details about the
+network setup.  These details are in header files (".h" files) located
+in various directories depending on the system.
+
+If you answer "y" to this question then you will be prompted to name the
+directory (e.g., /usr/include/NET-5000)
+
+LABEL
+;;
+
+
+comptoolshelp)
+# Detailed help message for
+#	rp="Shall I compile the tools for you?"
+
+cat << LABEL
+
+The installation will compile the host tools for you from the source
+files in the "src" directory.
+
+If you answer "y" the installation will proceed to compile the files
+and record the build commands in the file "Build.out".  It will not
+automatically install the files.  The installation of the built
+commands happens in a later step.
+
+If you answer "n" then you may complete the installation yourself
+later by using the commands "cd src", "make all" and "make install".
+
+If there is already a $instdir/erpcd file then the
+installation will install the new version of erpcd to file $instdir/erpcd.new.
+You will have to move erpcd.new to erpcd yourself after having shutdown any
+running erpcd daemon.
+
+LABEL
+;;
+
+
+man_layouthelp)
+cat << LABEL
+
+If you answer "None" then the manual pages will not be extracted from
+the distribution medium.
+
+The other choices present different directories that the manual pages
+appear in on different systems.  Enter the number for the directory
+layout appropriate for your system.
+
+LABEL
+;;
+
+
+man_numdirhelp)
+# Detailed help for the question 
+#		echo " "
+#		echo "How should the on-line manual pages be installed?"
+#		echo " "
+#		echo " 0. Abort; don't install manual pages"
+#		echo " 1. One directory (i.e., $xonedir)"
+#		echo " 2. Multiple directories (i.e., $xdist)"
+cat << LABEL
+
+If you answer "Abort" then the manual pages will not be extracted from
+the distribution medium.
+
+The other choices present different directories that the manual pages
+appear in on different systems.  Examine the manual page directories on
+your system and enter the number for the directory layout appropriate
+for your system.
+
+LABEL
+;;
+
+
+man_pageexthelp)
+# Detailed help for the question
+#	    echo " "
+#	    echo "How are manual page extensions handled in $mansrc?"
+#	    echo " "
+#	    echo " 0. Abort; don't install manual pages"
+#	    echo " 1. They use a fixed extension like \".$dflt\""
+#	    echo " 2. They use the extension of the manual page"
+#	    echo "    (i.e., \".1\", \".5\", \".8\" - note that this is not typical)"
+cat << LABEL
+
+If you answer "Abort" then the manual pages will not be extracted from
+the distribution medium.
+
+The other choices present different directories that the manual pages
+appear in on different systems.  Examine the manual page directories on
+your system and enter the number for the directory layout appropriate
+for your system.
+
+LABEL
+;;
+
+
+man_basedirhelp)
+# Detailed help for the question "What$base directory should be used?"
+no_msg_avail=true
+;;
+
+
+man_exthelp)
+# Detailed help for the question
+#	"What is the extension used? [$dflt]:"
+cat << LABEL
+
+If you answer "Abort" then the manual pages will not be extracted from
+the distribution medium.
+
+Otherwise examine the manual pages in $mansrc and enter the extension used.
+
+LABEL
+;;
+
+
+man_pagebasedirhelp)
+no_msg_avail=true
+;;
+
+
+man_installhelp)
+cat << LABEL
+
+If you answer "n" to this question the manual pages will not be
+extracted from the distribution.
+
+If you answer "y" to this question you may be asked more questions to
+determine where and how the the manual pages will be installed.
+
+If the installation proceeds by compiling the host tools, the manual
+pages will not be installed until the same time the host tools are
+installed.
+
+LABEL
+;;
+
+
+man_index)
+cat << LABEL
+On-line manual pages will be installed in the appropriate subdirectory
+(i.e., ANNEX and index) of the manual base directory.
+LABEL
+;;
+
+
+man_catman)
+cat << LABEL
+On-line manual pages will be installed in the appropriate subdirectory
+(i.e., a_man/man1, p_man/man5, u_man/man1) of the manual base directory.
+If you have on-line manual page sources, it's usually /usr/man.
+If you only have pre-nroff'd ("cat") manual pages, it's /usr/catman.
+LABEL
+;;
+
+
+oldsrcavail)
+cat << LABEL
+
+The installation has been directed to extract the "src" directory from
+the distribution. The "src" directory already exists in the installation
+directory.
+
+LABEL
+# This used to be in the message but because the .vars file is not always
+# available it gives worthless information (OLDvers=older) and even that
+# may be misleading):
+#   It appears to be a $OLDvers version.
+;;
+
+
+oldsrcavailhelp)
+cat << LABEL
+
+If you extract the "src" directory you will overwrite files already there.
+It is possible that some of these files have previously been modified by
+you to customize an installation.  You can quit the installation or continue
+with it.  If you continue you have the choice of extracting the "src"
+directory from the distribution or not.
+
+If you wish to extract the "src" directory but not overwrite what is already
+there you may defer answering the question until you have made a backup copy
+of the directory.  You have the option of escaping to a shell to do that now
+by answering the question with a "!".
+
+LABEL
+;;
+
+
+rmbindirbinhelp)
+cat << LABEL
+
+To save room on your system, the above directories can be removed.
+They contain the pre-compiled binary images for the various host-based
+utilities.  Since the installation of the host tools into directory
+$instdir appears to have succeeded, it should
+now be safe to remove these.  However, if you do choose to remove these
+directories, you should know that you will not be able to re-run this
+script for a binary install.  (You can always restore from the
+distribution kit if you need to re-run, or do a build/install.)
+
+LABEL
+;;
+
+
+rmbindircomphelp)
+cat << LABEL
+
+To save room on your system, the above directories can be removed.
+They contain the pre-compiled binary images for the various host-based
+utilities.  Since this installation will not be making use of these
+files, it should be safe to remove them.  However, if you do choose
+to remove these directories, you should know that you will not be able
+to re-run this script for a binary install.  (You can always restore
+from the distribution kit if you need to do a binary installation.)
+
+LABEL
+;;
+
+
+rmbindirbin)
+cat << LABEL
+
+To save room on your system, the above directories can be removed.
+You may want to enter "?" at the prompt below to get more help.
+
+LABEL
+;;
+
+rmbindircomp)
+cat << LABEL
+
+To save room on your system, the above directories can be removed.
+You may want to enter "?" at the prompt below to get more help.
+
+LABEL
+;;
+
+
+nosrcdir)
+cat << LABEL
+
+**** Directory not found: $tmp
+**** Skipping source modifications, configurations, builds and installations
+
+LABEL
+;;
+
+
+nocompconfig)
+cat << LABEL
+
+**** No compiler is available
+**** Skipping source modifications, configurations, builds and installations
+
+LABEL
+;;
+
+
+failedcompile)
+cat << LABEL
+
+**************************************************************************
+**** The compilation of the host tools FAILED.  See file "Build.out". ****
+**************************************************************************
+
+NOTICE: Please report the results in the "errors" directory to your support
+        representative.  If you want to attempt fixing the problems, make
+        your changes and then compile the host tools yourself with the
+        commands "cd src ; make all".  Then, to install the tools. use the
+	command "make install".
+
+LABEL
+;;
+
+
+failedinstall)
+cat << LABEL
+
+*****************************************************************************
+**** The installation of the host tools FAILED.  See file "Install.out". ****
+*****************************************************************************
+
+NOTICE: Please report the results in the "errors" directory to your support
+        representative.  If you attempt to correct the problem yourself
+        you may complete the installation later by using the commands
+        "cd src" and "make install".  If there is already a file named
+        $instdir/erpcd 
+        then the installation will install the new version of erpcd to file
+        $instdir/erpcd.new.
+        You will have to move erpcd.new to erpcd yourself after having
+        shutdown any running erpcd daemon.
+
+LABEL
+;;
+
+
+installingtools)
+cat << LABEL
+
+Installing the tools; output being saved in "Install.out"
+
+LABEL
+;;
+
+
+installasroot)
+cat << LABEL
+
+NOTICE: You must be running as root for the next step.
+        If you are not, then answer "no" and do it by hand.
+
+LABEL
+;;
+
+
+insttoolshelp)
+# Detail for question:
+#	rp="Shall I install the tools for you?"
+cat << LABEL
+
+The host tools programs have been compiled and are in the "src" directory.
+They and the operational images in the "bfs" have not been installed
+into directories $instdir and $USER_BFS
+
+If you answer "y", the installation will proceed to install the files and
+record the commands in the file "Install.out".
+
+If you answer "n" then you may complete the installation yourself later
+by using the commands "cd src" and "make install".
+
+LABEL
+;;
+
+
+makeprobmsg)
+cat << LABEL
+
+An error has been detected in the compilation or installation of the
+host tools.  It is still possible to continue with the installation
+but you will have to correct the build problem.  Enter "?" for help.
+
+LABEL
+;;
+
+makeprobmsghelp)
+cat << LABEL
+
+You may enter a "!" at the prompt below to escape to a shell and attempt
+to correct the problem.  Once the problem is corrected you can then exit
+from the shell to return to the installation.
+
+You may also choose to continue now and, if you do so, the installation will
+copy system files and then edit the copies using the full name of the erpcd
+program.  You will then be asked if you want these edited copies to be
+copied to final locations.  Afterwards you will have to come back to the
+"src" directory to correct the build or installation problem.
+
+LABEL
+;;
+
+
+longtermmsg)
+cat << LABEL
+
+            $package Software Installation Script
+
+************************************************************************
+***                              Done                                ***
+************************************************************************
+
+LABEL
+;;
+
+
+shorttermmsg)
+cat << LABEL
+
+Done
+
+LABEL
+;;
+
+
+usekoption)
+cat << LABEL
+You are currently in ${cwd}.  Installing here might be quite dangerous,
+and may destroy $cwd/bin.  Using /usr/annex as the installation
+directory is recommended.
+
+If you want to install here anyway, specify the -k switch on the command
+line.
+LABEL
+;;
+
+
+greetings)
+cat << LABEL
+
+            $package Software Installation Script
+
+This installation shell script will examine your system and possibly
+ask you questions to generate the needed configuration to allow you
+to compile the $Box host utilities.
+
+You can abort the script at any time and restart it without any 
+ill effects.  Once install-$box completes the configuration section,
+you will only need to use
+
+         "make all"    and    "make install"
+
+from the "src" directory to later re-build or re-install the utilities.
+
+At any question prompt you can escape to a shell by typing "!".
+When you exit that shell you will bounce back to the question prompt.
+Many of the questions will have default answers in square brackets;
+typing carriage return will give you the default.
+
+LABEL
+;;
+
+
+greetingshelp)
+no_msg_avail=true
+;;
+
+
+usesoption)
+cat << LABEL
+
+WARNING: Possible binary installation.  The -s switch on erpcd may be needed
+         for proper operation if the acp security files are not installed in
+         $instdir
+         See the Network Administrator's Guide for more information on the
+         erpcd program.
+
+LABEL
+;;
+
+
+mr_taketime)
+cat << LABEL
+This may take some time.
+LABEL
+;;
+
+
+mr_flopready)
+cat << LABEL
+
+Please answer 'Yes' when you have inserted $floppy #${fn} into the
+floppy drive.  The $floppy will be examined to see if it is the correct
+one.
+
+If you cannot find the $floppy you may answer 'Quit' to abort the
+installation now.
+
+LABEL
+;;
+
+
+mr_tarprobcont)
+
+
+- If you answer 'Quit' you will exit the installation program.
+- If you answer with a 'RETURN' then the answer is taken as a 'Yes'.
+- If you answer 'Yes' the installation program will continue. It will assume
+  that all files needed from the distribution have been placed onto the host.
+- Any other answer will cause the question to be repeated. This will
+  allow opportunity for you to fix any problems.  This may be done from
+  another process or you may enter '!' at the prompt to enter a shell in
+  which to work. When you exit the shell you will be prompted again.
+
+LABEL
+;;
+
+mr_flopcont)
+cat << LABEL
+
+Any response beginning with q or Q will abort the installation.
+Any response beginning with y or Y will continue with the installation.
+If you indicate that you want to continue, the installation program
+will assume that you have ejected the $floppy.
+
+LABEL
+;;
+
+
+mr_whichfloppies)
+cat << LABEL
+
+You will need to extract additional files from the distribution $floppies.
+These are the identification numbers of the $floppies you need:
+	$flopnums
+LABEL
+;;
+
+
+mr_ejectproblem)
+if [ -z "$had_mr_ejectproblem" ]
+then
+had_mr_ejectproblem=true
+cat << LABEL
+
+The 'eject' command did not appear to work. If you are in a windowed
+environment you could do the 'eject' from another window running on the
+same machine.  If you are not in a windowed environment then type '!' at
+the prompt.  This will put you in a subshell where you can execute the
+'eject' command.  When you exit that subshell the prompt will be repeated.
+If the 'eject' command is not found, check if the drive has an eject button
+on it.  If not, check with your system administrator about how to eject a
+floppy disk.
+
+LABEL
+else
+cat << LABEL
+
+The 'eject' command did not appear to work.  Please eject the floppy with
+the 'eject' command or the eject button on the drive.
+
+LABEL
+fi
+;;
+
+
+mr_useshell)
+cat << LABEL
+
+You may enter a shell to do this by responding to the prompt with "!".
+Once the all the additional files have been extracted, continue.
+
+LABEL
+;;
+
+
+execdirintro)
+cat << LABEL
+
+Please indicate the directory where the $Box host utilities are to be
+installed.  You will need at least $kb_needed KB of disk space in this
+directory.  Enter "?" for more help.
+
+Where do you want the $Box utilities installed?
+LABEL
+;;
+
+
+acpdirintro)
+# Currently the msgid will not be assigned this value
+no_msg_avail=true
+;;
+
+
+bfsdirintro)
+cat << LABEL
+
+Please indicate the directory where the $Box operational images and
+boot files are to be installed.  You will need at least $kb_needed KB of disk
+space in this directory just to install the images.  In addition you will
+need 4 to 8 megabytes for dump files for each $Box serviced by this file
+server.  Enter "?" for more help.
+
+LABEL
+;;
+
+
+execdirexists)
+cat << LABEL
+
+WARNING: The directory already exists.  Host tools in this directory
+         will be renamed prior to installation of new versions.
+
+LABEL
+;;
+
+
+acpdirexists)
+# Currently the msgid will not be assigned this value
+no_msg_avail=true
+;;
+
+
+bfsdirexists)
+cat << LABEL
+
+WARNING: The directory already exists.  Operational images in this
+         directory will be renamed prior to installation of new versions.
+
+LABEL
+;;
+
+
+binsmissing)
+cat << LABEL
+
+**** Compiled utilities for $hw_type are missing.
+**** They were expected in directory $bindir.
+
+LABEL
+;;
+
+
+dm_nonewerpcd)
+cat << LABEL
+
+WARNING: The new version of erpcd is not available.
+         The new version of the erpcd daemon will not be started.
+         If there is an old version of the erpcd daemon running it
+         will be left running.
+         Once the new version of erpcd is available it can be started
+         with the call:
+             $direxec/erpcd $required_options &
+LABEL
+;;
+
+
+dm_killqueshelp)
+# Detail for question:
+#	rp="Do you want to kill the erpcd daemon (y/n) [$dfltans]:"
+cat << LABEL
+
+To install the new erpcd program the old erpcd program must be
+overwritten.  To safely do this the running erpcd daemon should be
+shutdown.  If you request that this be done then the installation will
+attempt to bring down the daemon and move file $direxec/erpcd.new
+to $direxec/erpcd.  You will then be asked if you want to restart
+the new version of the erpcd daemon.
+
+LABEL
+;;
+
+
+dm_badkill)
+cat << LABEL
+
+**** Unable to shutdown the running erpcd daemon.
+
+NOTICE: To complete the installation:
+        ${indent}Shutdown the running erpcd daemon
+        ${indent}${move_cmd}
+        ${indent}Restart the erpcd daemon with the call:
+	${indent}${indent}$direxec/erpcd $required_options &
+
+LABEL
+;;
+
+
+dm_startqueshelp)
+# Detail for question:
+#	rp="Do you want to start-up the new version of the erpcd daemon?"
+cat << LABEL
+
+There is currently no erpcd daemon running. One can be started for you.
+The daemon must be running to allow the $Box to boot.  Also, erpcd may
+be handling security authorization requests through its Access Control
+Protocol (acp) service.  The daemon must be running to provide this
+service.
+
+LABEL
+;;
+
+
+dm_runningnokill)
+# Running erpcd but told not to kill it
+cat << LABEL
+
+NOTICE: To complete the installation:
+        ${indent}Shutdown the running erpcd daemon
+        ${indent}${move_cmd}
+        ${indent}Restart the erpcd daemon with the call:
+	${indent}${indent}$direxec/erpcd $required_options &
+
+LABEL
+;;
+
+
+dm_baderpcdmv)
+manual_install=true
+cat << LABEL
+
+**** Error moving file $direxec/erpcd.new to $direxec/erpcd
+
+LABEL
+;;
+
+
+bfssavewarning)
+cat << LABEL
+
+NOTICE: These files have been saved prior to installing new versions:
+        ${indent}$tmp
+        They are in directory $backup.
+
+LABEL
+;;
+
+
+modemsavewarning)
+cat << LABEL
+
+WARNING: An updated version of $i has been installed.
+LABEL
+;;
+
+
+noeservices)
+cat << LABEL
+
+**** File not found: ${acpdir}/eservices
+**** The erpcd daemon will not be started
+
+LABEL
+;;
+
+
+nosupport)
+cat << LABEL
+
+WARNING: The system you have chosen is not supported.
+         Neither the installation nor any executable programs that may
+         be produced have been tested on this type of system.
+         No assurances can be made regarding the use of our software on
+         this system.
+
+LABEL
+;;
+
+
+youneedmb)
+cat << LABEL
+
+To continue with this installation you need $szmb_all of disk space in
+directory `pwd`.
+Please ensure that this disk space is available.
+
+You may quit the installation or you may escape to a shell now to free
+up disk space and then continue with this installation (to do this
+answer "!" at the prompt below).
+
+LABEL
+;;
+
+
+youneedmbhelp)
+cat << LABEL
+
+To continue with this installation you need $szmb_all of disk space in
+directory `pwd`.
+Please ensure that this disk space is available.
+
+You may quit the installation or you may escape to a shell now to free
+up disk space and then continue with this installation (to do this
+answer "!" at the prompt below).
+
+Use the "df" command to check for available disk space in the file system
+containing directory `pwd`.
+
+LABEL
+;;
+
+
+
+#############################################################################
+# INSERT NEW CASES ABOVE THIS LINE
+#
+# This catch-all case handles errors the best that it can.
+# For checking: grep for "msgid=" in the installation scripts and then check
+# that each value assigned to msgid is covered in this file's case statement.
+#
+*)
+cat << LABEL
+ERROR: uninitialized or unknown value for variable msgid (msgid=$msgid)
+LABEL
+;;
+esac
+
+# Check for flags being set to reduce the number of identical messages
+# that would be printed
+
+if $no_msg_avail
+then
+cat << LABEL
+
+No detailed help available
+
+LABEL
+fi
+
+if $manual_install
+then
+cat << LABEL
+
+You must finish the installation youself (either because of a
+decision you made earlier or because an error condition was found).
+To do this, shutdown any running erpcd process and then move the file
+$instdir/erpcd.new (if it exists) to $instdir/erpcd.
+Next, restart the erpcd process by calling the new version of erpcd.
+You may have to supply values for the -s and -f options to erpcd.
+
+LABEL
+fi
+
+#
+# INSERT NEW CASES ABOVE THIS SECTION (ABOVE THE NEXT "####" LINE)
+#############################################################################
+
+# DO NOT END THIS FILE WITH AN EXIT!
+
+

@@ -1,0 +1,197 @@
+
+
+
+     RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))                   AAAANNNNNNNNEEEEXXXX                   RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          rotaries - Annex rotary database
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          The rotaries database contains entries describing the port
+          rotaries for any Annexes on the network.  The file,
+          ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx is stored in the directory ////uuuussssrrrr////ssssppppoooooooollll////eeeerrrrppppccccdddd////bbbbffffssss
+          contains all the rotary definition information.  See the
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e for more information on
+          the Annex port server and port rotaries.
+
+          Entries in the rotaries file follow these conventions:
+
+          o   Lines beginning with ``#'' are comments.
+
+          o   Blank lines are ignored.
+
+          o   Lines in the file have a maximum of 132 characters.
+
+          o   Entries can be continued on the next line by preceding
+              the newline with ``\''.
+
+          o   The following characters have special meanings:
+                  ::::  ++++  @@@@  ////  ,,,,  ;;;;  \\\\  ####
+
+          o   Any special character except ``,'' can be included in a
+              rotary name by quoting it with ``\''.
+
+          o   Space and tab characters can be used anywhere except in
+              a rotary name to improve readability. Keywords must be
+              delimited by space or tab characters.
+
+          Entries have the following syntax:
+9                _r_o_t_a_r_y__n_a_m_e:  [[[[ _k_e_y_w_o_r_d ... ]]]] _p_o_r_t_s@_l_o_c_a_t_i_o_n [[[[
+               /_a_u_x_p_o_r_t ]]]] [[[[ +_a_u_x_i_p_a_d_d_r ]]]] [[[[ ; _p_o_r_t_s@_l_o_c_a_t_i_o_n ]]]] ...
+
+          _R_o_t_a_r_y__n_a_m_e is an ASCII string terminated by a colon (::::).
+          The maximum length is 32 characters.  The string cannot
+          contain space, tab, or comma (,,,,) characters. It can contain
+          other special characters if they are escaped with a
+          backslash.
+
+          _P_o_r_t_s is a list of the serial ports in the rotary.  It can
+          be a number, a comma-separated list of numbers, two numbers
+          separated by a dash (indicated an inclusive range), or a
+          combination of these three formats.
+
+          _L_o_c_a_t_i_o_n identifies the Annex that has the given ports as a
+          rotary.  It can be either a hostname or an Internet address
+          in dot notation.  The _l_o_c_a_t_i_o_n can be supplemented with an
+          auxiliary TCP port number separated from the Annex
+          identifier by a slash (////).  The Annex will respond to
+
+
+9     Page 1                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))                   AAAANNNNNNNNEEEEXXXX                   RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))
+
+
+
+          requests to connect at this port in addition to responding
+          to the well-known TELNET port.  The number must be in the
+          range 6000 through 6999.  Finally, the location can also be
+          given an auxiliary Internet address (as a hostname or in dot
+          notation) separated by a plus sign (++++).  The Annex will
+          listen for requests to connect on this auxiliary Internet
+          address at the well-known TELNET port and automatically
+          connect to the given rotary.
+
+          Additional _p_o_r_t_s@_l_o_c_a_t_i_o_n entries can be given separated by
+          a semi-colon (;;;;) to indicate a rotary on another Annex with
+          the same name.
+
+          _K_e_y_w_o_r_d_s is a space separated list of optional features.
+          Currently supported are:
+
+          ppppssss====vvvviiiissssiiiibbbblllleeee
+          ppppssss====iiiinnnnvvvviiiissssiiiibbbblllleeee
+               Determines whether the rotary name is displayed by the
+               port server when a user is connected to the TELNET port
+               of the Annex's primary Internet address.  Rotaries
+               without auxiliary Internet addresses or auxiliary TCP
+               ports are always visible.  ppppssss====vvvviiiissssiiiibbbblllleeee is the default.
+
+          tttteeeellllnnnneeeetttt
+          rrrraaaawwww
+          bbbbiiiinnnnaaaarrrryyyy
+               Determines the protocol used with the rotary.  rrrraaaawwww
+               provides a data stream with no character processing and
+               is intended primarily for program access to the rotary.
+               tttteeeellllnnnneeeetttt is the default, ti configures tttteeeellllnnnneeeetttt as the
+               protocol between the port and the device.  The setting
+               pppprrrroooottttooooccccoooollll====bbbbiiiinnnnaaaarrrryyyy configures a binary rotary. The Annex
+               negotiates with the host to operate in tttteeeellllnnnneeeetttt bbbbiiiinnnnaaaarrrryyyy
+               mode in both directions.
+
+          ddddiiiirrrreeeecccctttt____ccccaaaammmmpppp____oooonnnn====aaaasssskkkk
+          ddddiiiirrrreeeecccctttt____ccccaaaammmmpppp____oooonnnn====aaaallllwwwwaaaayyyyssss
+          ddddiiiirrrreeeecccctttt____ccccaaaammmmpppp____oooonnnn====nnnneeeevvvveeeerrrr
+               Determines how port camp-on is handled for rotaries
+               with an auxiliary Internet address or auxiliary TCP
+               port.  _C_a_m_p-_o_n is the process of waiting for the next
+               free port in the rotary, if all of its ports are busy
+               when a connection is attempted.  aaaasssskkkk indicates that the
+               user is asked to camp-on.  When aaaallllwwwwaaaayyyyssss is selected, the
+               user will get the message indicating camp-on has
+               occurred.  If nnnneeeevvvveeeerrrr is used, then the TELNET connection
+               will be refused when the rotary is full.
+               ddddiiiirrrreeeecccctttt____ccccaaaammmmpppp____oooonnnn====aaaasssskkkk is the default except for raw
+               rotaries, in which case nnnneeeevvvveeeerrrr is the default.
+
+          sssseeeelllleeeecccctttt====ffffiiiirrrrsssstttt
+
+
+
+     Page 2                                         (printed 2/20/100)
+
+
+
+
+
+
+     RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))                   AAAANNNNNNNNEEEEXXXX                   RRRROOOOTTTTAAAARRRRIIIIEEEESSSS((((4444))))
+
+
+
+          sssseeeelllleeeecccctttt====nnnneeeexxxxtttt
+               The keyword sssseeeelllleeeecccctttt==== defines the order in which the
+               rotary selects ports. If sssseeeelllleeeecccctttt====ffffiiiirrrrsssstttt,,,, the rotary
+               selects the first available port in the _p_o_r_t__s_e_t;
+               sssseeeelllleeeecccctttt====nnnneeeexxxxtttt directs the rotary to keep track of the
+               last port that was selected, and to start its search
+               from that point.
+
+     EEEEXXXXAAAAMMMMPPPPLLLLEEEESSSS
+          #
+          # sample rotary for 2400 bps modems on the network
+          #
+          modem_2400: 1,2,3@63.42; 16,1,4 @ annex01; \
+               15@63.42; 12, 1, 4, 5, 6@ annex02
+          #
+          # "milking"-machine Annex: a non-networked host's serial ports are
+          # connected to Annex 63.38 on ports 1-8 and 16.  An auxiliary IP
+          # address 63.104 has been setup so that users can TELNET directly
+          # to the rotary.
+          #
+          milker: 1-8,16@63.38+63.104
+
+          HostC: ps=invisible 1,4,6-9@annex01+132.245.6.80
+
+          strip-record: protocol=raw direct_camp_on=always \
+          3,8@132.245.6.32/6300
+
+          modems: select=next 1-5@annex02
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          erpcd(1M).
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 3                                         (printed 2/20/100)
+
+
+

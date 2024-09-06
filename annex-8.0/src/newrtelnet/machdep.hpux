@@ -1,0 +1,1228 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1992 by Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use. 
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Description::
+ *
+ * 	Annex reverse-telnet daemon machine-dependent code for Hewlett-
+ *	Packard's HP-UX 8.0.  Based upon @(#)telnetd.c 4.26 (Berkeley) 83/08/06
+ *
+ * Original Author: James Carlson		Created on: 08DEC92
+ *
+ * Module Reviewers:
+ *	carlson
+ *
+ * Revision Control Information:
+ * $Id: machdep.hpux,v 1.7 1994/08/19 16:51:27 carlson Exp $
+ *
+ * This file created by RCS from
+ * $Source: /annex/common/src/./newrtelnet/RCS/machdep.hpux,v $
+ *
+ * Revision History:
+ * $Log: machdep.hpux,v $
+ * Revision 1.7  1994/08/19  16:51:27  carlson
+ * Different fix for last_data problem.
+ *
+ * Revision 1.6  1994/08/18  16:37:34  carlson
+ * SPR 3269 -- fixed rtelnet spinning on application's explicit
+ * close (but not on normal exit).
+ *
+ * Revision 1.5  1993/11/16  10:52:27  carlson
+ * Fixes from 15NOV93 visit to the HP Porting Center -- made compatible
+ * with old 7.0 systems.  (Tested on 9000/835 running A.B7.00, 9000/827
+ * running A.08.02 and 9000/735 running A.09.01.)
+ * 
+ *
+ * Revision 1.4  93/07/19  16:01:46  carlson
+ * Somehow forgot about the letter d.
+ * 
+ * Revision 1.3  93/06/30  12:42:26  carlson
+ * Fixes from 23JUN93 visit to the HP Porting Center.
+ * 
+ * Revision 1.2  93/02/08  16:08:03  carlson
+ * Added -auM flags, a few comments, and fixed controlling-terminal
+ * bug.
+ * 
+ * Revision 1.1  92/12/09  10:13:27  carlson
+ * Initial revision
+ * 
+ * 
+ * 
+ * This file is currently under revision by: $Locker:  $
+ *
+ *****************************************************************************
+ */
+
+
+#include "../inc/config.h"
+
+#include <stdio.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#include <netinet/in.h>
+#ifndef HPUX7
+#include <arpa/inet.h>
+#endif
+#include <netdb.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <termios.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <sys/ptyio.h>
+#include <errno.h>
+#include <limits.h>
+#include <pwd.h>
+
+#include "rtelnet.h"
+#include "../inc/erpc/netadmp.h"
+
+char machrev[] = "$Revision: 1.7 $";
+char machsrc[] = "$Source: /annex/common/src/./newrtelnet/RCS/machdep.hpux,v $";
+
+/*
+ * Berkeley-style ptys, 25 banks of 100 units, 25 banks of 16 units
+ * and 3 banks of 16 units -- 2948 total ptys.
+ */
+
+#define BANKS1	"zyxwvutsrqponmlkjihgfedcba"
+#define UNITS1	100
+#define BANKS2	"zyxwvutsrqponmlkjihgfedcba"
+#define UNITS2	16
+#define BANKS3	"rqp"
+#define UNITS3	16
+
+#define MASTER1	"/dev/ptym/pty%c%02d"
+#define SLAVE1	"/dev/pty/tty%c%02d"
+#define MASTER2	"/dev/ptym/pty%c%x"
+#define SLAVE2	"/dev/pty/tty%c%x"
+#define MASTER3	"/dev/pty%c%x"
+#define SLAVE3	"/dev/tty%c%x"
+
+static char master[64],slave[64],alias[64];
+static char log_fname[64];
+
+int process_id;
+
+extern int
+	hangup, symbolic, tcp_port, hold_open, transparent, show_pid,
+	cbreakmode, port_num, renametarget, alternate_ptys;
+
+#ifndef NO_DEBUG
+extern int so_debug,debug,force_fork;
+#endif
+
+extern int errno;
+extern char *myname;
+
+static char *new_node;		/* User's name for pty */
+static int progress = 0;	/* Internal flags (for cleanup) */
+static int erpc_port = 121;	/* Port for na communication */
+static int using_log_file = 0;	/* Flag and file descriptor */
+static int slave_pty = -1;	/* File descriptor for holding slave */
+static int max_input,max_canon;
+static int is_open = 0,just_opened = 0,last_data = 0;
+static int last_write_count = 0,just_closed = 0;
+static int pty_is_gone = 1;
+static int user_id = 0;		/* -u user for log & slave pty */
+static int file_mode = 0666;	/* -M file mode for slave pty */
+
+static struct sockaddr_in sin = { AF_INET };
+static struct sockaddr_in sin2 = { AF_INET };
+
+#define	LINKED_TTY	1
+#define RENAMED_PTY	2
+
+extern void
+	cleanup(),
+	show_rtelnet_statistics();
+
+extern int
+	telnet_halt_network();
+
+void
+	pty_close();
+
+
+int
+flag_check()
+{
+	if (alternate_ptys) {
+		(void)fprintf(stderr,
+		      "%s:  -a flag is not available on this system.\n",
+			myname);
+		return 1;
+	}
+	return 0;
+}
+
+void
+use_log_file(name)
+char *name;
+{
+	int fd;
+
+	if (using_log_file) {
+		(void)fprintf(stderr,
+			"Duplicate log file name \"%s\" ignored.\n",
+			name);
+		return;
+	}
+	if ((fd = open(name,O_RDWR|O_APPEND|O_CREAT|O_NOCTTY,0666))<0) {
+		perror(name);
+		return;
+	}
+	using_log_file = fd;
+	strcpy(log_fname,name);
+}
+
+void
+i_perror(str)
+char *str;
+{
+#ifdef NO_DEBUG
+	perror(str);
+#else
+	extern int sys_nerr;
+	extern char *sys_errlist[];
+
+	if (errno < 0 || errno >= sys_nerr)
+		DBG((0,D_ERR,"%s: error %d",str,errno));
+	else
+		DBG((0,D_ERR,"%s: %s",str,sys_errlist[errno]));
+#endif
+}
+
+void
+start_using_log()
+{
+	process_id = getpid();
+	if (using_log_file == 0)
+		return;
+	if (dup2(using_log_file,2) < 0) {
+		using_log_file = 0;
+		perror("dup2 log file");
+		return;
+	}
+	(void)close(using_log_file);
+	using_log_file = -1;
+	if (user_id == 0)
+		return;
+	if (chown(log_fname,user_id,-1) < 0) {
+		i_perror("chown");
+		exit(1);
+	}
+}
+
+int
+name_to_unit(port)
+char *port;
+{
+	int num;
+	struct servent *servp;
+
+	if (tcp_port) {
+/* User requested interpretation of port number as TCP port */
+		if (isdigit(*port))
+			num = atoi(port);
+		else if (servp = getservbyname(port,"tcp"))
+			num = ntohs((u_short)servp->s_port);
+		else {
+			(void)fprintf(stderr,
+				"%s:  tcp/%s:  unknown service.\n",
+				myname,port);
+			return -1;
+		}
+		if (num <= 0 || num >= 65536) {
+			(void)fprintf(stderr,
+				"%s:  Illegal TCP port number -- %d.\n",
+				myname,num);
+			return -1;
+		}
+	} else {
+/* Interpret port number as Annex serial port number */
+		num = atoi(port);
+		if (num <= 0 || num > MAX_PORT) {
+			(void)fprintf(stderr,
+		      "%s:  Illegal serial port specifier -- \"%s\".\n",
+				myname,port);
+			return -1;
+		}
+		num += PORT_MAP_BASE;
+	}
+	return num;
+}
+
+void
+resolve_annex(name)
+char *name;
+{
+	register struct hostent *host;
+	struct servent *servp;
+
+	sin.sin_addr.s_addr = inet_addr(name);
+	if (sin.sin_addr.s_addr != -1)
+		sin.sin_family = AF_INET;
+	else {
+		host = gethostbyname(name);
+		if (host) {
+			sin.sin_family = host->h_addrtype;
+			bcopy(host->h_addr,
+			      (caddr_t)&sin.sin_addr,
+			      host->h_length);
+		} else {
+			(void)fprintf(stderr, "%s: %s: unknown host\n",
+				myname,name);
+			exit(1);
+		}
+	}
+	if (hangup) {
+		servp = getservbyname("erpc", "udp");
+		if (servp == 0)
+			(void)fprintf(stderr,
+			   "%s: udp/erpc: unknown service, using %d.\n",
+				myname,erpc_port);
+		else
+			erpc_port = ntohs((u_short)servp->s_port);
+	}
+}
+
+void
+set_file_mode(fmode)
+char *fmode;
+{
+	int i;
+
+	i = (int)strtol(fmode,&fmode,8);
+	if (*fmode == '\0')
+		file_mode = i;
+	else {
+		(void)fprintf(stderr,"%s:  Illegal data in file mode: %s\n",
+			myname,fmode);
+		exit(1);
+	}
+}
+
+void
+set_user_name(uname)
+char *uname;
+{
+	struct passwd *pd;
+
+	errno = 0;
+	if ((pd = getpwnam(uname)) == NULL) {
+		if (errno != 0)
+			perror(uname);
+		else
+			(void)fprintf(stderr,
+				"%s:  User %s is unknown.\n",myname,
+				uname);
+		exit(1);
+	}
+	if (getuid() == pd->pw_uid)
+		return;
+	user_id = pd->pw_uid;
+}
+
+static void
+clean_a_group(banks,units,masterfmt)
+char *banks,*masterfmt;
+int units;
+{
+	struct stat stb;
+	int unit,pty;
+
+	for (; *banks; banks++) {
+		sprintf(master,masterfmt,*banks,0);
+		if (stat(master, &stb) < 0)
+			continue;
+		/* cannot rename unit 0! */
+		for (unit = units-1; unit > 0; unit--) {
+			sprintf(master,masterfmt,*banks,unit);
+			if (stat(master, &stb) >= 0)
+				continue;
+			strcpy(alias,master);
+			strcat(alias,".rtelnet");
+			if (stat(alias, &stb) >= 0 &&
+			    (pty = open(alias,O_RDWR|O_NOCTTY)) >= 0) {
+				(void)rename(alias,master);
+				(void)close(pty);
+			}
+		}
+	}
+}
+
+void
+startup_cleaning()
+{
+	clean_a_group(BANKS1,UNITS1,MASTER1);
+	clean_a_group(BANKS2,UNITS2,MASTER2);
+	clean_a_group(BANKS3,UNITS3,MASTER3);
+}
+
+static int
+control_c()
+{
+	DBG((1,D_INFO,"control_c interrupt"));
+	cleanup();
+}
+
+static int
+increase_debugging()
+{
+#ifndef NO_DEBUG
+	if (debug < 5)
+		debug++;
+	DBG((debug,D_INFO,"Setting debug to level %d.",debug));
+	show_rtelnet_statistics(debug);
+#endif
+}
+
+static int
+stop_debugging()
+{
+#ifndef NO_DEBUG
+	DBG((0,D_INFO,"Turning off debugging."));
+	debug = 0;
+#endif
+}
+
+void
+become_daemon()
+{
+	int fd;
+
+#ifndef NO_DEBUG
+	if (!debug || force_fork)
+#endif
+	{
+		if (fd = fork()) {
+			if (fd < 0) {
+				perror("fork");
+				exit(1);
+			}
+			if (show_pid)
+				(void)printf("%d\n",fd);
+			exit(0);
+		}
+		fd = getpid();
+		DBG((1,D_INIT,"Forked off child process %d",fd));
+		process_id = fd;
+
+/* So we don't keep this file system busy, go to root. */
+#ifndef NO_DEBUG
+		if (!debug)
+#endif
+		    if (chdir("/") < 0)
+			DBG((1,D_WARN,"chdir / failed -- %d",errno));
+		(void)close(0);
+		(void)close(1);
+		if (!using_log_file)
+			(void)close(2);
+		(void)setsid();
+	}
+
+	(void)signal(SIGINT,control_c);
+	(void)signal(SIGTERM,control_c);
+	(void)signal(SIGUSR1,increase_debugging);
+	(void)signal(SIGUSR2,stop_debugging);
+	(void)signal(SIGHUP,SIG_IGN);
+	(void)signal(SIGPIPE,SIG_IGN);
+	(void)signal(SIGTTIN,SIG_IGN);
+	(void)signal(SIGTTOU,SIG_IGN);
+	(void)signal(SIGIO,SIG_IGN);
+	(void)signal(SIGTSTP,SIG_IGN);
+}
+
+int
+set_io_block(s,flag)
+int s,flag;
+{
+	int on;
+
+	on = fcntl(s,F_GETFL,0);
+	if (on < 0)
+		return on;
+	if (flag)
+		on &= ~O_NONBLOCK;
+	else
+		on |= O_NONBLOCK;
+	return fcntl(s,F_SETFL,on);
+}
+
+int
+make_connection()
+{
+	int s,on=1;
+#ifndef HPUX7
+	struct linger linger;
+#endif
+
+	s = socket(AF_INET, SOCK_STREAM, 0);
+	if (s < 0) {
+		i_perror("socket");
+		return -1;
+	}
+
+#ifndef NO_DEBUG
+	if (so_debug &&
+	    setsockopt(s,SOL_SOCKET,SO_DEBUG,(int)&on,sizeof(on)) < 0)
+			i_perror("setsockopt SO_DEBUG");
+#endif
+
+	if (setsockopt(s,SOL_SOCKET,SO_KEEPALIVE,(int)&on,sizeof(on))<0)
+		i_perror("setsockopt SO_KEEPALIVE");
+
+#ifndef HPUX7
+	if (setsockopt(s,SOL_SOCKET,SO_OOBINLINE,(int)&on,sizeof(on))<0)
+		i_perror("setsockopt SO_OOBINLINE");
+#endif
+
+#ifdef HPUX7
+	if (setsockopt(s,SOL_SOCKET,SO_LINGER,(int)&on,sizeof(on)) < 0)
+		i_perror("setsockopt SO_LINGER");
+#else
+	linger.l_onoff = 1;
+	linger.l_linger = 120;
+	if (setsockopt(s,SOL_SOCKET,SO_LINGER,(int)&linger,
+	    sizeof(linger)) < 0)
+		i_perror("setsockopt SO_LINGER");
+#endif
+
+	if (bind(s,(struct sockaddr *)&sin2,sizeof(struct sockaddr))<0)
+		i_perror("bind");
+
+	sin.sin_port = htons((u_short)tcp_port);
+
+	if (connect(s, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
+		i_perror("connect");
+		(void)close(s);
+		return -1;
+	}
+
+/* Make I/O non-blocking */
+	if (set_io_block(s,0) < 0)
+		i_perror("set_io_block");
+
+	return s;
+}
+
+static void
+handle_pty_exception(dev_pty,fromp)
+int dev_pty,*fromp;
+{
+	struct request_info rinfo;
+
+	if (ioctl(dev_pty,TIOCREQCHECK,(char *)&rinfo) < 0) {
+		DBG((1,D_WARN,"exception is not a trapped condition"));
+		*fromp |= ERR_PTY;
+		return;
+	}
+	switch (rinfo.request) {
+	case TIOCOPEN:
+		is_open = just_opened = 1;
+		just_closed = 0;
+		DBG((3,D_INFO,"trapped an open"));
+		*fromp |= FROM_PTY;
+		break;
+	case TIOCCLOSE:
+	/* if no pending data, then force the close to completion */
+		if (!(*fromp & FROM_PTY)) {
+			last_data = 1;
+			*fromp |= FROM_PTY;
+		}
+		is_open = just_opened = 0;
+		just_closed = 1;
+		DBG((3,D_INFO,"trapped a close"));
+		break;
+	default:
+		DBG((3,D_INFO,"trapped request %X",rinfo.request));
+	}
+	rinfo.errno_error = rinfo.return_value = 0;
+	if (ioctl(dev_pty,TIOCREQSET,(char *)&rinfo) < 0) {
+		i_perror("TIOCREQSET");
+		*fromp |= ERR_PTY;
+	}
+}
+
+/*
+ * timet is in milliseconds.
+ */
+int
+wait_for_io(from,dev_pty,dev_net,timet)
+int from,dev_pty,dev_net,timet;
+{
+	int n_found,towait;
+	fd_set ibits,obits,xbits;
+	struct timeval timev,*timevp;
+#ifndef NO_DEBUG
+	char temp[64];	/* 58 bytes used */
+#endif
+
+	if (pty_is_gone)
+		return ERR_PTY | ERR_NET;
+	towait = dev_pty+1;
+	if (dev_net >= towait)
+		towait = dev_net+1;
+
+	for (;;) {
+		FD_ZERO(&ibits);
+		FD_ZERO(&obits);
+		FD_ZERO(&xbits);
+		if (dev_pty >= 0) {
+			if (from & FROM_PTY) {
+				if (just_closed)
+					last_data = 1;
+				FD_SET(dev_pty, &ibits);
+			}
+			if (from & TO_PTY) {
+				FD_SET(dev_pty, &obits);
+			}
+			FD_SET(dev_pty, &xbits);
+		}
+		if (dev_net >= 0) {
+			if (from & FROM_NET)
+				FD_SET(dev_net, &ibits);
+			if (from & TO_NET) {
+				FD_SET(dev_net, &obits);
+			}
+			FD_SET(dev_net, &xbits);
+		}
+
+		if (timet > 0 || last_data) {
+			if (timet > 0)
+				last_write_count = 0;
+			else
+				timet = 0;
+			timevp = &timev;
+			timev.tv_usec = (timet%1000)*1000;
+			timev.tv_sec = timet/1000;
+		} else {
+			last_write_count = 0;
+			timevp = (struct timeval *)NULL;
+		}
+
+#define FDB(x)	((x)->fds_bits[0])
+#define IOB	FDB(&ibits),FDB(&obits),FDB(&xbits)
+		DBG((3,D_INFO,"selecting: i %02X o %02X e %02X t %X.",IOB,timevp));
+		errno = 0;
+		n_found = select(towait,(int *)&ibits,(int *)&obits,
+			(int *)&xbits,timevp);
+		if (n_found < 0) {
+			if (errno == EINTR) {
+				DBG((3,D_INFO,"interrupted -- trying again."));
+				continue;
+			}
+			i_perror("select");
+			cleanup();
+		} else
+			break;
+	}
+	DBG((3,D_INFO,"%d found: i %02X o %02X e %02X.",n_found,IOB));
+	if (n_found == 0)
+		from = WFIO_TIMEOUT;
+	else
+		from = 0;
+#ifndef NO_DEBUG
+	(void)strcpy(temp,"\t");
+#define ADDS(s)	(void)strcat(temp,s)
+#else
+#define ADDS(s)
+#endif
+	if (dev_pty >= 0) {
+		ADDS("(pty");
+		if (last_data || FD_ISSET(dev_pty, &ibits)) {
+			last_data = 0;
+			from = FROM_PTY;
+			ADDS(" input");
+		}
+		if (FD_ISSET(dev_pty, &obits)) {
+			from |= TO_PTY;
+			ADDS(" output");
+		}
+		if (FD_ISSET(dev_pty, &xbits)) {
+			handle_pty_exception(dev_pty,&from);
+			ADDS(" exception");
+		}
+		ADDS((from&ALL_PTY) ? ")" : " none)");
+	}
+	if (dev_net >= 0) {
+		ADDS("(net");
+		if (FD_ISSET(dev_net, &ibits)) {
+			from |= FROM_NET;
+			ADDS(" input");
+		}
+		if (FD_ISSET(dev_net, &obits)) {
+			from |= TO_NET;
+			ADDS(" output");
+		}
+		if (FD_ISSET(dev_net, &xbits)) {
+			from |= ERR_NET;
+			ADDS(" exception");
+		}
+		ADDS((from&ALL_NET) ? ")" : " none)");
+	}
+	DBG((3,D_INFO,temp));
+	return from;
+}
+
+static void
+set_pty_flags(newpty)
+int newpty;
+{
+	struct termios b;
+	int on;
+
+	if (hold_open) {
+		if (slave_pty < 0)
+			slave_pty = open(slave,O_RDONLY|O_NOCTTY);
+		if (slave_pty < 0)
+			i_perror(slave);
+	}
+	if (tcgetattr(newpty,&b) < 0) {
+		i_perror("tcgetattr");
+		return;
+	}
+	if (transparent) {
+		b.c_iflag = IGNPAR;
+		b.c_oflag = 0;
+		b.c_cflag = B9600 | CS8 | CREAD /* | CLOCAL */;
+		b.c_lflag = NOFLSH;
+		b.c_cc[VMIN] = 1;
+		b.c_cc[VTIME] = 0;
+	} else if (cbreakmode) {
+		b.c_iflag = IGNPAR | ICRNL;
+		b.c_oflag = OPOST | ONLCR | TAB3;
+		b.c_cflag = B9600 | CS8 | CREAD /* | CLOCAL */;
+		b.c_lflag = 0;
+		b.c_cc[VMIN] = 1;
+		b.c_cc[VTIME] = 0;
+	} else {
+		b.c_iflag = IGNPAR | ICRNL | IXON | IXOFF;
+		b.c_oflag = OPOST | ONLCR | TAB3;
+		b.c_cflag = B9600 | CS8 | CREAD /* | CLOCAL */;
+		b.c_lflag = ICANON | ECHO | ECHOE | ECHONL;
+		b.c_cc[VMIN] = 1;
+		b.c_cc[VTIME] = 0;
+	}
+	if (tcsetattr(newpty,TCSANOW,&b) < 0) {
+		i_perror("tcsetattr");
+		return;
+	}
+	on = 1;
+        if (ioctl(newpty,(int)TIOCPKT,(char *)&on) < 0) {
+                i_perror("pty pkt");
+                return;
+        }
+        if (ioctl(newpty,(int)TIOCTRAP,(char *)&on) < 0) {
+                i_perror("pty trap");
+                return;
+        }
+	if (set_io_block(newpty,0))
+		i_perror("pty nbio");
+	pty_is_gone = 0;
+}
+
+static void
+unlink_pty()
+{
+	pty_close(-1);
+	if (progress & LINKED_TTY) {
+		if (renametarget)
+			(void)rename(new_node,slave);
+		else
+			(void)unlink(new_node);
+		progress &= ~LINKED_TTY;
+		DBG((2,D_INFO,"Removed link between %s and pty %s.",new_node,slave));
+	}
+	if (progress & RENAMED_PTY) {
+		(void)rename(alias,master);
+		progress &= ~RENAMED_PTY;
+	}
+}
+
+static int
+trygroup(banks,units,masterfmt,slavefmt,name)
+char *banks,*masterfmt,*slavefmt,*name;
+int units;
+{
+	struct stat stb;
+	int unit,i,newpty;
+
+	for (; *banks; banks++) {
+		sprintf(master,masterfmt,*banks,0);
+		if (stat(master, &stb) < 0) {
+		DBG((1,D_WARN,"%s: missing pty bank %c.",myname,*banks));
+			continue;
+		}
+		/* cannot rename unit 0! */
+		for (unit = units-1; unit > 0; unit--) {
+			sprintf(master,masterfmt,*banks,unit);
+			if ((newpty = open(master,O_RDWR|O_NOCTTY)) < 0)
+				continue;
+			sprintf(slave,slavefmt,*banks,unit);
+			if (symbolic)
+				i = symlink(slave,name);
+			else if (renametarget)
+				i = rename(slave,name);
+			else
+				i = link(slave,name);
+			if (i < 0) {
+				i_perror(name);
+				(void)close(newpty);
+				continue;
+			}
+			new_node = name;
+	    		progress |= LINKED_TTY;
+			if (chmod(new_node,file_mode) < 0)
+				i_perror("chmod");
+			if (user_id != 0 && chown(new_node,user_id,-1) < 0)
+				i_perror("chown");
+			strcpy(alias,master);
+			strcat(alias,".rtelnet");
+	     DBG((1,D_INFO,"Using master %s, slave %s linked to %s.",master,slave,new_node));
+	     DBG((1,D_INFO,"\talias for master is %s.",alias));
+			max_canon = fpathconf(newpty,_PC_MAX_CANON);
+			max_input = fpathconf(newpty,_PC_MAX_INPUT);
+	DBG((2,D_INFO,"Maximum input %d, canonical %d.",max_input,max_canon));
+			set_pty_flags(newpty);
+			return newpty;
+		}
+	}
+	return -1;
+}
+
+/*
+ * Berkeley style ptys.
+ * Open the master pty.  Search backwards, so that the pty we take
+ * permanently doesn't slow down other pty users.
+ */
+
+int
+openmaster(name)
+char *name;
+{
+	int newpty;
+
+	unlink_pty();
+	DBG((2,D_INFO,"Attempting to find pty for \"%s\".",name));
+	if ((newpty = trygroup(BANKS1,UNITS1,MASTER1,SLAVE1,name)) >= 0)
+		return newpty;
+	if ((newpty = trygroup(BANKS2,UNITS2,MASTER2,SLAVE2,name)) >= 0)
+		return newpty;
+	return trygroup(BANKS3,UNITS3,MASTER3,SLAVE3,name);
+}
+
+void
+machdep_cleanup()
+{
+	unlink_pty();
+}
+
+int
+reopen_pty(dev_pty)
+int dev_pty;
+{
+	int saved_errno,try;
+
+/*
+ * HP-UX pseudo-terminals -- our master stays open and gets a special
+ * signal for open and close requests on the pseudo-terminal.
+ */
+	if (rename(master,alias) < 0)
+		i_perror("rename master");
+	else
+		progress |= RENAMED_PTY;
+	pty_close(dev_pty);
+	if (!(progress&RENAMED_PTY))
+		return -1;
+	try = 0;
+	while ((dev_pty = open(alias,O_RDWR|O_NOCTTY)) < 0) {
+		saved_errno = errno;
+		if (++try > 2)
+			break;
+		(void)sleep(1);
+	}
+	if (rename(alias,master) < 0 || dev_pty < 0) {
+		if (dev_pty < 0) {
+			errno = saved_errno;
+			i_perror("reopen of alias");
+		} else {
+			i_perror("rename to normal");
+			(void)close(dev_pty);
+		}
+		progress &= ~RENAMED_PTY;
+		unlink_pty();
+		return -1;
+	}
+	progress &= ~RENAMED_PTY;
+	set_pty_flags(dev_pty);
+	return dev_pty;
+}
+
+/*
+ * This routine is called when the first real data packet is read from
+ * the pty.  We don't really care, since we can do ioctl's on the master
+ * side -- this interface is for System V machines.
+ */
+
+void
+first_pty_data()
+{
+}
+
+/*
+ * If we're in canonical input mode, then we can experience trouble
+ * with the pty if we give it more than MAX_CANON bytes between line
+ * feeds.
+ */
+
+int
+fix_cooked_mode_bug(columns,pty)
+int columns,pty;
+{
+	struct termios b;
+
+	if (columns == max_canon-1) {
+		if (tcgetattr(pty,&b) < 0)
+			return 0;
+		if (b.c_lflag & ICANON)
+			return 1;
+	}
+	return 0;
+}
+
+int
+get_interrupt_char(s)
+int s;
+{
+	struct termios b;
+
+	if (tcgetattr(s,&b) < 0)
+		return (int)'\177';
+	if ((b.c_oflag & OPOST) == 0)
+		return (int)'\0';
+	return (int)b.c_cc[VINTR];
+}
+
+/*
+ * If flag is zero, return character-erase, if non-zero return line-
+ * erase.
+ */
+int
+get_erase_char(s,flag)
+int s,flag;
+{
+	struct termios b;
+
+	if (tcgetattr(s,&b) < 0)
+		return flag ? (int)'\25' : (int)'\b';
+	return flag ? b.c_cc[VKILL] : b.c_cc[VERASE];
+}
+
+/*
+ * flag is 0 to clear, 1 to set, and option is 0 for raw mode, 1 for
+ * echo/crmod.
+ */
+
+int
+mode(s,flag,option)
+int s,flag,option;
+{
+	struct termios b;
+
+	if (tcgetattr(s,&b) < 0)
+		return 1;
+	switch (option) {
+	case MODEF_RAW:
+		if (flag) {
+			if (b.c_iflag != IGNPAR || (b.c_oflag & OPOST) ||
+			    (b.c_cflag&CSIZE) != CS8 || (b.c_lflag&ICANON)) {
+				b.c_iflag = IGNPAR;
+				b.c_oflag = 0;
+				b.c_cflag = (b.c_cflag&~CSIZE) | CS8;
+				b.c_lflag = NOFLSH;
+				b.c_cc[VMIN] = 1;
+				b.c_cc[VTIME] = /* 2 */0;
+				if (tcsetattr(s,TCSANOW,&b) < 0)
+					return 1;
+			}
+		} else {
+			if (!(b.c_iflag&ICRNL) || !(b.c_oflag&OPOST) ||
+			    !(b.c_lflag&ICANON)) {
+				b.c_iflag |= ICRNL;
+				b.c_oflag |= OPOST | ONLCR | TAB3;
+				b.c_lflag |= ICANON;
+				b.c_cc[VMIN] = 1;
+				if (tcsetattr(s,TCSANOW,&b) < 0)
+					return 1;
+			}
+		}
+		break;
+	case MODEF_ECHO:
+		if (flag) {
+			if ((b.c_lflag&(ICANON|ECHO)) != (ICANON|ECHO)) {
+				b.c_lflag |= ICANON | ECHO;
+				if (tcsetattr(s,TCSANOW,&b) < 0)
+					return 1;
+			}
+		} else {
+			if (b.c_lflag&ECHO) {
+				b.c_lflag &= ~ECHO;
+				if (tcsetattr(s,TCSANOW,&b) < 0)
+					return 1;
+			}
+		}
+		break;
+	}
+	return 0;
+}
+
+void
+reset_serial_line()
+{
+	sin.sin_port = htons((u_short)erpc_port);
+	(void)reset_line((struct sockaddr_in *)&sin,(u_short)SERIAL_DEV,
+		(u_short)port_num);
+}
+
+int
+force_send(fd,buff,len,flag)
+int fd,flag,len;
+char *buff;
+{
+	errno = 0;
+	return send(fd,buff,len,flag ? MSG_OOB : 0);
+}
+
+static int
+check_read(fd)
+int fd;
+{
+	fd_set rbits;
+	struct timeval timev;
+
+	FD_ZERO(&rbits);
+	FD_SET(fd,&rbits);
+	timev.tv_usec = timev.tv_sec = 0;
+	if (select(fd+1,&rbits,NULL,NULL,&timev) < 0)
+		return MDIO_ERROR;
+	if (FD_ISSET(fd,&rbits))
+		return 0;
+	return MDIO_DEFER;
+}
+
+static int
+check_write(fd)
+int fd;
+{
+	fd_set wbits;
+	struct timeval timev;
+
+	FD_ZERO(&wbits);
+	FD_SET(fd,&wbits);
+	timev.tv_usec = timev.tv_sec = 0;
+	if (select(fd+1,NULL,&wbits,NULL,&timev) < 0)
+		return MDIO_ERROR;
+	if (FD_ISSET(fd,&wbits))
+		return 0;
+	return MDIO_DEFER;
+}
+
+int
+network_read(fd,buffp,siz)
+int fd,siz;
+char **buffp;
+{
+	int cc;
+
+	errno = 0;
+	if (cc = check_read(fd))
+		return cc;
+	cc = read(fd,*buffp,siz);
+	if (cc > 0)
+		return cc;
+	if (cc == 0)
+		return MDIO_CLOSED;
+	return MDIO_ERROR;
+}
+
+int
+network_write(fd,buff,siz)
+int fd,siz;
+char *buff;
+{
+	int cc;
+
+	errno = 0;
+	if (cc = check_write(fd))
+		return cc;
+	cc = write(fd,buff,siz);
+	if (cc >= 0)
+		return cc;
+	if (errno == EWOULDBLOCK || errno == EINTR)
+		return MDIO_DEFER;
+	return MDIO_ERROR;
+}
+
+void
+network_close(fd)
+int fd;
+{
+	DBG((3,D_INFO,"Closing network file descriptor %d.",fd));
+	(void)shutdown(fd,2);
+	(void)close(fd);
+}
+
+int
+pty_read(fd,buffp,siz)
+int fd,siz;
+char **buffp;
+{
+	int done,cc;
+	char *cp = *buffp;
+	static int flag = 0;
+	struct termios b;
+
+	if (last_data) {
+		just_closed = last_data = 0;
+		close(fd);
+		pty_is_gone = 1;
+	}
+	if (pty_is_gone)
+		return MDIO_CLOSED;
+	if ((cc = check_read(fd)) != 0) {
+		if (just_closed) {
+			just_closed = last_data = 0;
+			close(fd);
+			pty_is_gone = 1;
+			return MDIO_CLOSED;
+		}
+		if (!is_open)
+			last_data = 1;
+		return cc;
+	}
+	if (flag == 0) {
+		errno = 0;
+		cc = read(fd,cp,siz);
+		if (cc < 0)
+			return MDIO_ERROR;
+		if (cc == 0)
+			return 0;
+		if (*cp == 0 && cc > 1) {
+			*buffp = cp + 1;
+			return cc - 1;
+		}
+		if (tcgetattr(fd,&b) < 0)
+			i_perror("tcgetattr");
+		else if (b.c_cc[VSTART] >= 0 && *cp == b.c_cc[VSTART])
+			/* telnet_halt_network(1), */ *cp = '\0';
+		else if (b.c_cc[VSTOP] >= 0 && *cp == b.c_cc[VSTOP])
+			/* telnet_halt_network(0), */ *cp = '\0';
+		flag = *cp &
+			(TIOCPKT_FLUSHREAD | TIOCPKT_FLUSHWRITE |
+			 TIOCPKT_STOP | TIOCPKT_START | TIOCPKT_DOSTOP |
+			 TIOCPKT_NOSTOP);
+	}
+
+DBG((flag!=0?2:3,D_INFO,"Processing pty packet flags %02X",flag));
+
+	done = 0;
+
+/*
+ * The order of flush write/read is important, due to the way the
+ * telnet protocol handles it.
+ */
+	if (flag & (TIOCPKT_STOP | TIOCPKT_START)) {
+		done |= flag & (TIOCPKT_STOP | TIOCPKT_START);
+		/* telnet_halt_network((flag&TIOCPKT_STOP)?1:0); */
+	}
+	if (flag & TIOCPKT_FLUSHWRITE) {
+		if (cancel_network_output())
+			done |= TIOCPKT_FLUSHWRITE;
+		telnet_halt_network(0);
+	}
+	if (flag & TIOCPKT_FLUSHREAD) {
+		if (cancel_network_input())
+			done |= TIOCPKT_FLUSHREAD;
+	}
+	if (flag & TIOCPKT_DOSTOP) {
+		if (telnet_ship_lflow(1))
+			done |= TIOCPKT_DOSTOP;
+	} else if (flag & TIOCPKT_NOSTOP) {
+		if (telnet_ship_lflow(0))
+			done |= TIOCPKT_NOSTOP;
+	}
+
+	if (done != 0)
+		DBG((3,D_INFO,"Processed pty packet flags %02X.",done));
+
+	flag &= ~done;
+
+	return MDIO_DEFER;
+}
+
+int
+pty_write(fd,buff,siz)
+int fd,siz;
+char *buff;
+{
+	int cc;
+
+	errno = 0;
+	if (cc = check_write(fd)) {
+		last_write_count = 0;
+		return cc;
+	}
+	if (ioctl(fd,FIONREAD,&cc) < 0)
+		return MDIO_ERROR;
+	cc += last_write_count;
+	if (cc >= max_input || cc < 0)
+		return MDIO_UNSELECT;
+	cc = max_input-cc;
+	if (siz > cc)
+		siz = cc;
+	cc = write(fd,buff,siz);
+	if (cc == 0)
+		return MDIO_DEFER;
+	if (cc > 0) {
+		last_write_count += cc;
+		return cc;
+	}
+	return MDIO_ERROR;
+}
+
+void
+pty_close(fd)
+int fd;
+{
+	struct termios b;
+
+	if (slave_pty >= 0) {
+		(void)close(slave_pty);
+		slave_pty = -1;
+	}
+	if (fd < 0)
+		return;
+	if (tcgetattr(fd,&b) >= 0) {
+		cfsetospeed(&b,B0);
+		DBG((1,D_INFO,"Setting line speed to zero to hang up"));
+		if (tcsetattr(fd,TCSAFLUSH,&b) < 0 && debug)
+			i_perror("tcsetattr/hangup");
+	} else {
+		if (debug)
+			i_perror("tcgetattr/hangup");
+		DBG((1,D_INFO,"Unable to hang up by changing speed"));
+	}
+	(void)close(fd);
+	pty_is_gone = 1;
+}

@@ -1,0 +1,144 @@
+Release notes will be files software.txt
+
+This file explains the directory and file layout used by the Annex
+installation.  It is intended as supplementary documentation for those
+customers who what to know more detail about the installation process
+than is supplied in the installation notes.
+
+It is recommended that the extraction of the software be done in a
+different directory for each release of the software.  This will help
+preserve older versions of the software and also more easily allow you
+to switch from one version to another.  To do this, you may want to
+name the directory into which the extraction is being done (i.e., the
+parent directory of the "setup" directory) so that it has the
+distribution release number as part of its name.
+
+The installation process starts with the extraction of the "setup"
+directory from the distribution medium.  This allows the easy
+extraction of all files dealing with installation from the
+distribution medium to the system's hard disk with one easy call to
+the "tar" command.
+
+The "setup" directory contains installation scripts, data files and
+documentation.  A large number of the scripts and data files are
+hidden from the "ls" command by being named with names that start with
+a dot ("."). These are scripts and data files which are meant to be
+executed or read only by the main installation script.  They are
+hidden to make it easier for you to find the files that contain the
+most important information to you (the primary installation scripts
+and the documentation files).
+
+The installation script "install" can be used to install two products,
+the Annex hosts tools and the Annex Manager.  The "install" script
+collects information from the user to set up calls to the product
+installation scripts "install-annex"
+
+To start the installation process you must be the superuser ("root").
+Call the installation script "setup/install".  When the installation
+is started, information is gathered and then more directories are
+extracted from the distribution medium as needed.  The extractions
+will be done in a directory whose name you specify and not normally in
+your current working directory.
+
+The extraction procedure keeps the entire distribution from having to
+be extracted and saves hard disk space.  For example, there is no need
+to load all the pre-compiled binaries for the host tools when only one
+directory is needed to be downloaded for your platform.  Also, if you
+are going to be installing pre-compiled binaries then there is no need
+to load all of the "src" directory.
+
+When the additional directories are extracted from the distribution
+medium they will be placed in the same directory as the "setup"
+directory.  As an example, assume you performed the installation in
+the following way:
+	mkdir /usr/annex/<distribution_name>
+	cd /usr/annex/<distribution_name>
+	tar xf /dev/rmt0 setup
+	setup/install
+Then say you instructed "setup/install" to install the Annex host
+tools into directory /usr/annex/ra_R10.0.  The /usr/annex/ra_R10.0
+directory would have the following sub-directories (if all extractions
+were performed by installation): setup, bin, bfs, man and src.
+
+Additionally, when installing Annex host tools, the installation
+script will copy some of the files from the bin, bfs and src directory
+to other directories that you name during the installation.  One of
+these directories is intended to contain the executable images needed
+by the Annex.  It gets these images from the UNIX host system at boot
+time.  The other directory is intended to contain the executable
+images of host tools (programs that run on the UNIX system).  Any
+files in these directories that would be overwritten by this
+installation will be backed-up first.
+
+During the installation process some temporary files are created.
+Some are kept in the /tmp directory.  Others are kept in the parent
+directory of "setup".  Most of these files are also named with names
+that start with a dot (".").  They are deleted when the installation
+is complete.
+
+
+Here is a short description of some of the files that are found in
+this directory:
+
+install - The script to call to install the Annex products.
+
+install-annex - The script called by "install" to install the Annex
+host tools.  It will extract files and directories from the
+distribution medium as required.
+
+
+release - Read in and executed as part of "install-annex" to set
+variables to values reflecting this release.
+
+.install_part2 - Read in and executed as part of "install-annex".
+
+.install_part3 - Read in and executed as part of "install-annex".
+
+.msg_file - Read in and executed as part of "install-annex".
+Used when printing long messages
+
+.media_ask - Called by "install" and "install-annex" to ask the user
+to pick the type of distribution medium being used.
+
+.media_read - Called by "install" and "install-annex" to extract files
+from the distribution medium.
+
+.daemon	 - Called by "install-annex" to shutdown and restart the erpcd
+daemon.
+
+.util_size - Called by "install-annex" to read the .filedatafile
+database to get size requirements for extracting directories.
+
+.update_files - Called by "install-annex" to create backup copies of
+system files and to produce modified versions of those files to
+reflect the installation.  The user is asked if the modifications are
+to be applied.
+
+.mk_eservices - Called by ".update_files" to create a copy of the
+original "eservices" file.
+
+.mk_initd - Called by ".update_files" to create a copy of the original
+"annex-initd" file.
+
+.mk_rc - Called by ".update_files" to create a copy of the original
+"rc.local" file.
+
+.mk_services - Called by ".update_files" to create a copy of the
+original "services" database.
+
+.ed_eservices - Called by ".update_files" to modify the copy of the
+"eservices" file created by ".mk_eservices".
+
+.ed_initd - Called by ".update_files" to modify the copy of the
+"rc.local" and "annex-initd" files created by ".mk_eservices"
+and ".mk_initd".
+
+.ed_services - Called by ".update_files" to modify the copy of the
+"services" database created by ".mk_services".
+
+.am_root - Called to determine whether the installer is "root".
+
+.not_nis - Checks whether running NIS for the services database.
+
+.get_pids - Finds the pids for processes running erpcd.
+

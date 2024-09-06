@@ -1,0 +1,293 @@
+'''
+'''	$Header: /annex/common/src/./erpcd/RCS/erpcd.8,v 1.10 1994/02/14 17:02:18 carlson Exp $
+'''
+.ig xy
+.TH ERPCD 1M ANNEX
+.xy
+.ie '\*(sy'V' .TH ERPCD 1M ANNEX
+.el .TH ERPCD 8 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+erpcd \- Annex network services daemon
+.SH SYNOPSIS
+.B erpcd
+[
+.BR \-\^b \fI\maxcon\fP
+] [
+.BR \-\^d [ \fI\ udpport\fP ]
+] [
+.BR \-\^D [ \fIlevel\fP ]
+] [
+.BR \-\^p
+]
+.br
+	[
+.BR \-\^f \fIbfs-directory\fP
+] [ 
+.BR \-\^g \fIperiod\fP
+] [
+.BR \-\^s \fIacp-directory\fP
+]
+.br
+	[
+.BR \-\^u
+[ \fIfilename\fP ] 
+] [
+.BR \-\^x \fImax_total\fP
+]
+
+.SH ARGUMENTS
+.TP 12n
+.BI \-b \ max_con 
+This option enables blacklisting based on consecutive login failures and sets the maximum
+allowed consecutive login failures to \fImax_con\fP, which can be any 
+non-negative number.  A value of 0 enables blacklisting on any login failure
+(not recommended).
+.TP
+.BI \-d \ udpport
+Change the udp port number used from the default of 121.
+The
+.B -d
+option used without the port number argument turns on socket level
+debugging. Note that there is a space between the
+.B -d
+and the number.
+.TP
+.BI \-D level
+Put
+.I erpcd
+into debug mode.
+.I erpcd
+will not detach from the tty and instead prints out extensive
+debugging information. The amount of debugging information can
+be increased by giving a debugging level with the
+.B -D
+option. Note that there is no space between
+.B -D
+and the number.
+.TP
+.BI \-p
+This flag will cause the PID number of the erpcd process started to be
+displayed on standard output.  This is useful in start-up/shut-down
+scripts which need to save the process ID of the main erpcd daemon.
+.TP
+.BI \-f path
+This option sets the location of the BFS boot files.  The default is
+.I /usr/spool/erpcd/bfs.
+This is useful when using pre-compiled host tools.  The space between
+the
+.B -f
+and the path is optional.
+.TP
+.BI \-g \ period
+This option sets the period of time, in weeks, over which to apply the non-consecutive 
+login failure allowance to \fIperiod\fP, which can be any non-negative 
+integer.
+.TP
+.BI \-s path
+This option sets the location of the ACP security files.  The default is
+.I /usr/annex.
+This is useful when using pre-compiled host tools.  The space between
+the
+.B -s
+and the path is optional.
+.TP
+.BI \-u \ \f2filename\f1
+The
+.B -u
+option invokes the
+.B acp_userinfo
+syntax checker on the file
+.I filename.
+This option does not start an
+.B erpcd
+daemon, it does syntax checking only. If
+.I filename
+is omitted, stdin is used.
+.TP
+.BI \-x \ max_total
+Enables blacklisting based on non-consecutive login failures and sets the 
+maximum number of allowed login failures(over the number of weeks specified
+with the -g option)before the user becomes blacklisted to \fImax_total\fP,
+which can be any value between 0 and 20.  A value of 0 enables blacklisting
+on any login failure(not recommended).
+.TP
+.SH DESCRIPTION
+.I erpcd
+is the Annex network services daemon.
+It is normally started at boot time from  
+.ie '\*(sy'V' \{ .BR /etc/init.d/ethernet ;
+see
+.IR brc (1M).  \}
+.el \{ the
+.IR rc (8)
+file. \}
+.PP
+The
+.I erpcd
+daemon is responsible for two services:
+the block file server used by the Annex to access host files,
+.IR bfs ,
+and the Annex access control protocol server that handles security requests,
+.IR acp .
+In both cases,
+.I erpcd
+listens at a well-known
+.SM UDP
+port (name "erpc", 121/udp)
+for messages indicating a request for services from an Annex.
+It authenticates these messages and then reads the file
+.B eservices
+to determine what types of requests to service and which server to execute.
+.PP
+Although the well-known port can be specified with the
+.B \-\^d
+.IR number,
+the default as specified in
+.B eservices
+should be used.
+.PP
+You do not need root privileges to use
+the
+.B -u
+option, and there is no interference with any other 
+.B erpcd 
+that may be running on the system. Once
+.I filename
+is error free and added to 
+.B acp_userinfo 
+you can send the real 
+.B erpcd
+a USR1 signal to cause it to recache the acp user information.
+Syntax errors are reported to stderr.
+.PP
+The
+.I bfs
+service is used by the Annex to down-load various host files
+from a server host and to up-load crash dump images to 
+a server host. All such files are resident in
+.B /usr/spool/erpcd/bfs
+or its subdirectories.
+.ie '\*(sy'V' \{ Subdirectories are used for Annex crash dump files.
+The name of the dump
+file depends on the Internet address of the Annex.  The first subdirectory is
+.BR dump ,
+the next is the Internet network number, and the last is the host number (see
+.IR inet (3N)).
+Directories are created when necessary.
+.PP
+Below are some examples (all pathnames are relative to
+.BR /usr/spool/erpcd/bfs ).
+.RS
+.PP
+.ta +24n +20n +20n
+Annex Internet Address	Pathname
+.sp .5
+63.75	dump/63/0.0.75	(Class A)
+.br
+131.140.23.1	dump/131.140/23.1	(Class B)
+.br
+195.46.2.15	dump/195.46.2/15	(Class C)
+.RE
+.PP \}
+.el \{ The dump file is named by prefixing "dump." to the
+Internet address of the Annex.
+\}
+The dump file names are unique
+for each Annex but not for each crash dump. An existing dump file is
+overwritten if the same Annex crashes again.
+A dump file is slightly larger than the amount of memory in the Annex.
+.PP
+When the Annex boots, it uses the
+.I bfs
+service to request three files.
+First, the boot rom obtains the Annex operational code that is
+loaded into Annex main memory. As part of its booting
+procedure, the Annex operational code requests the files
+.B gateways
+and
+.BR rotaries.
+The Annex first requests this file from the host whose address is
+specified by the
+.B na
+parameter
+.BR pref_load_addr .
+If this host does not respond, the Annex broadcasts the request.
+.PP
+An empty or missing
+.B config.annex
+file simply means there is no configuration.
+It is preferable to use an empty file rather than not having the file exist,
+as the Annex will find the empty file
+and thus won't have to wait for its open request to timeout.
+The
+.B gateways
+category of the 
+.B config.annex
+file is described in
+.ie '\*(sy'V' .IR gateways (4).
+.el .IR gateways (5).
+The
+.B rotaries
+category of the
+.B config.annex
+file is described in
+.ie '\*(sy'V' .IR rotaries (4),
+.el .IR rotaries (5).
+.PP
+The
+.I acp
+service is used by the Annex to implement host based security
+policies that govern Annex operations. See the
+.IR "Annex Network Administrator's Guide"
+for more information on the
+.I acp
+service.
+.SH NOTES
+The dump subdirectories should be carefully monitored and any crash
+dumps should be sent to your service representative.
+.SH FILES
+.br
+.ie '\*(sy'V' /usr/spool/erpcd/bfs/dump/*	crash dumps
+.el /usr/spool/erpcd/bfs/dump.*	crash dumps
+.br
+/usr/spool/erpcd/bfs/annex.*	Annex images
+.br
+/usr/spool/erpcd/bfs/oper.*	Annex images
+.br
+/usr/spool/erpcd/bfs/config.annex
+.br
+/etc/eservices
+.SH SEE ALSO
+.ie '\*(sy'V' \{
+brc(1M), gateways(4), na(1M), routed(1M).
+.br
+inet(3N), eservices(4), rotaries(4), config.annex(4).
+\}
+.el \{
+eservices(5), gateways(5), na(8), rc(8),
+.br
+routed(8C), rotaries(5), config.annex(5).
+\}
+.br
+\f2Annex Network Administrator's Guide\f1.
+.SH BUGS
+.PP
+If the
+.B config.annex
+file is not present on any host,
+the Annex may take up to an extra minute to complete its booting procedures.
+.PP
+The
+.B \-\^d
+option takes a space before number;
+the 
+.B \-\^D
+option does not.

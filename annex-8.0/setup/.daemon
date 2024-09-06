@@ -1,0 +1,438 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# DESCRIPTION: This script is used to shutdown a running erpcd daemon
+# and then start up another one using a new version of erpcd (the user
+# is asked whether the shutdowns and startups should happen).  After
+# shutting down the daemon and before starting up a new version it replaces
+# the old binary with a new version.  The old binary is expected to have
+# been backed up first.
+# 
+# ------------------------------------------------------------------------
+# 
+# There are 4 arguments (all but the first are optional).
+# 
+# The first argument is the name of the directory that will hold the new
+# copy of the erpcd daemon.  This name is required.
+# 
+# The second argument is the name of the directory that will hold the acp
+# data files used by erpcd (acp directory).
+# 
+# The third argument is the name of the directory that will hold the
+# bootfiles supplied through erpcd (bfs directory).
+# 
+# The fourth argument (if there) should be either "true" or "false".  If
+# true then it means that there is no new version of erpcd available and
+# thus this script should do nothing but print a message.
+# 
+# NOTE: Special case: if $5 exists then it is the name of some other
+# command besides "erpcd" (perhaps a script running "sleep").  This allows
+# the safe testing of this script. Messages may continue to say erpcd.
+#
+# Because the acp and bfs directories may actually have been compiled
+# into erpcd, the names of these directories may not actually have to be
+# supplied to erpcd with the -f and -s options.  However, if a
+# pre-compiled binary was installed and one or both of the acp/bfs
+# directories do not match what was compiled into the binary then the -f
+# and/or -s options will be needed.  To signal that the directory is
+# required the directory name passed in as an argument should begin with
+# a -f or a -s That is the indication that that directory must be passed
+# as an option to erpcd for erpcd to behave correctly.
+# 
+# As an example, if the pre-compiled erpcd was built using
+# "/usr/spool/erpcd/bfs" as the name of the bfs directory and that is
+# the name the installer choose then the bfs directory name could be
+# ommitted, passed in as null ("") or passed in as
+# "/usr/spool/erpcd/bfs".  If the installer choose a bfs directory name
+# of "/etc/bfs" then the bfs directory name should be passed in as
+# "-f /etc/bfs".
+# 
+#############################################################################
+
+
+
+REQUIRED_FILES="./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+
+# Constants (used for assignments and in a sed command)
+
+SUBSTITUTE_DIRNAME="directory_name"
+NEEDED="Needed"
+DOES_WHAT="starts-up and shuts-down processes"
+
+
+# Initialize values for variables
+
+prog=erpcd
+my_pid=$$
+running_erpcd=false
+do_kill=false
+ask_startup=true
+do_startup=true
+test_case=false
+required_options=""
+bfsneeded="Currently unneeded"
+acpneeded="Currently unneeded"
+diracp2="${SUBSTITUTE_DIRNAME}"
+dirbfs2="${SUBSTITUTE_DIRNAME}"
+
+# Initialize values for variables reset by the command line
+
+direxec=""
+diracp=""
+dirbfs=""
+stopflag=false
+
+
+#############################################################################
+# 
+# Read the command line
+
+# 
+# We need three directory names:
+# 	The name of the directory containing the erpcd executable.
+# 	The name of the acp directory.
+# 	The name of the bfs directory.
+# 
+
+if [ $# -eq 0 ]
+then
+    echo "$0: Usage: Requires a directory name" 1>&2
+    exit 1
+fi
+$debug && echo "${dbg_hdr}Entering script that $DOES_WHAT"
+if [ $# -gt 0 ]
+then
+    direxec="$1"
+fi
+if [ $# -gt 1 ]
+then
+    diracp="$2"
+fi
+if [ $# -gt 2 ]
+then
+    dirbfs="$3"
+fi
+if [ $# -gt 3 ]
+then
+    stopflag="$4"
+fi
+if [ $# -gt 4 ]
+then
+    prog=$5
+    echo 
+    my_pid=$my_pid
+    test_case=true
+fi
+
+
+#############################################################################
+
+
+if [ -n "$dirbfs" ]
+then
+    dirbfs2=`echo $dirbfs | sed -e "s:^-f::"`
+    dirbfs2=`echo $dirbfs2`
+    if [ "$dirbfs2" = "$dirbfs" ]
+    then
+	bfsneeded=Unneeded
+    else
+	required_options="$required_options $dirbfs"
+	bfsneeded="${NEEDED}"
+    fi
+fi
+
+if [ -n "$diracp" ]
+then
+    diracp2=`echo $diracp | sed -e "s:^-s::"`
+    diracp2=`echo $diracp2`
+    if [ "$diracp2" = "$diracp" ]
+    then
+	acpneeded=Unneeded
+    else
+	required_options="$required_options $diracp"
+	acpneeded="${NEEDED}"
+    fi
+fi
+
+# The "move_cmd" variable is used in the messages file when we explain
+# how to shutdown the running daemon and start a new one.  One step that
+# has to be taken if we are installing over old binaries is to copy the
+# new version of erpcd over the old one (once the daemon is killed).
+# We set set the variable here so the appropriate message is printed.
+move_cmd=""
+if [ -f $direxec/erpcd.new ]
+then
+    move_cmd="Move file $direxec/erpcd.new to erpcd."
+fi
+
+
+#############################################################################
+# Start: Check if possible
+#############################################################################
+if $stopflag
+then
+    msgid=dm_nonewerpcd
+    . $MSG_FILE
+    exit
+fi
+#############################################################################
+# End: Check if possible
+#############################################################################
+
+
+
+#############################################################################
+# Start: Check for a running erpcd process
+#############################################################################
+
+pidlist=`sh ${SCRIPT_DIR}/.get_pids $5`
+if [ -n "$pidlist" ]
+then
+    running_erpcd=true
+fi
+
+#############################################################################
+# End: Check for a running erpcd process
+#############################################################################
+
+
+
+
+#############################################################################
+# Start: Ask to kill erpcd
+#############################################################################
+if $running_erpcd
+then
+    echo "There is an erpcd daemon already running."
+    while true
+    do
+	dfltans="y"
+	rp="Do you want to kill the daemon and start-up the new version? (y/n) [$dfltans]:"
+	. ./.myread
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case "$ans" in
+	    Y*|y*)
+		do_kill=true
+		ask_startup=false
+		do_startup=true
+		break
+		;;
+	    N*|n*)
+		do_kill=false
+		ask_startup=false
+		do_startup=false
+		break;
+		;;
+	    "?")
+		msgid=dm_killqueshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+fi
+#############################################################################
+# End: Ask to kill erpcd
+#############################################################################
+
+
+
+
+#############################################################################
+# Start: Kill erpcd
+#############################################################################
+# If we were instructed to kill the erpcd daemon then kill it
+
+if $do_kill
+then
+    for pid in $pidlist
+    do
+	kill -15 $pid 2> /dev/null ; sleep 2
+	kill -1  $pid 2> /dev/null ; sleep 2
+	kill -9  $pid 2> /dev/null ; sleep 1
+    done
+else
+#   # We have been told not to kill any running erpcd process.
+#   # Exit and indicate what is happening.
+    if $running_erpcd
+    then
+	ask_startup=false
+	do_startup=false
+	msgid=dm_runningnokill
+	. $MSG_FILE
+	exit 0
+    fi
+fi
+#############################################################################
+# End: Kill erpcd
+#############################################################################
+
+
+
+
+#############################################################################
+# Start: Check to see if kill worked
+#############################################################################
+if $do_kill
+then
+
+    pidlist=`sh ${SCRIPT_DIR}/.get_pids $5`
+    if [ -n "$pidlist" ]
+    then
+#	# We still have a process running, the kill did not work
+	msgid=dm_badkill
+	. $MSG_FILE
+	exit 1
+    fi
+fi
+#############################################################################
+# End: Check to see if kill worked
+#############################################################################
+
+
+#
+# Get here only if the erpcd daemon is NOT running.
+#
+
+
+#############################################################################
+# Start: Get new erpcd
+#############################################################################
+#
+# Early on in this script we bailed out when we saw that the new erpcd
+# file was not available. If we get here we have installed erpcd.new
+# (and if erpcd was already there we have erpcd and some backup copy such
+# as OLDerpcd or OLD/erpcd).  We have shutdown the erpcd process and so it
+# is safe to create the new version of erpcd with the correct name.
+# (Although generally it is safe to replace a binary when a process is
+# running, there have been instances where that causes problems such as
+# when shared libraries are being used.
+
+if $test_case
+then
+    : Do not do anything with the file
+else
+    if [ -f $direxec/erpcd.new ]
+    then
+	mv $direxec/erpcd.new $direxec/erpcd
+	if [ $? -ne 0 ]
+	then
+	    msgid=dm_baderpcdmv
+	    . $MSG_FILE
+	    exit 1
+	fi
+    fi
+fi
+#############################################################################
+# End: Get new erpcd
+#############################################################################
+
+
+#
+# Get here only if the new erpcd was installed correctly
+#
+
+
+#############################################################################
+# Start: Ask for startup
+#############################################################################
+if $ask_startup
+then
+    echo " "
+    while true
+    do
+	dfltans="y"
+	rp="Do you want to start-up the new version of the erpcd daemon? (y/n) [$dfltans]:"
+	. ./.myread
+	if [ -z "$ans" ]
+	then
+	    ans=$dfltans
+	fi
+	case $ans in
+	    Y*|y*)
+		break
+		;;
+	    N*|n*)
+		do_startup=false
+		exit
+		break
+		;;
+	    "?")
+		msgid=dm_startqueshelp
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+fi
+#############################################################################
+# End: Ask for startup
+#############################################################################
+
+
+#
+# Get here only if the erpcd daemon is to be started
+#
+
+
+#############################################################################
+# Start: Startup
+#############################################################################
+if $do_startup
+then
+    if $test_case
+    then
+	echo "Would start daemon with the call:"
+	echo "    $direxec/erpcd $required_options &"
+    else
+	echo " "
+	echo "Starting-up the new version of the erpcd daemon."
+	$direxec/erpcd $required_options &
+    fi
+fi
+#############################################################################
+# End: Startup
+#############################################################################
+
+exit
+

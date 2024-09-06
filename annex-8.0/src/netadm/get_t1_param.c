@@ -1,0 +1,137 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1995 Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use.
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Function:
+ *      Use RPC's to get T1 parameters in a remote Annex.
+ *
+ * Original Author: Paul Couto      Created on: April 7, 1995
+ *
+ * Revision Control Information:
+ *
+ * $Id: get_t1_param.c,v 1.1.5.1 1995/08/16 13:33:50 slu Exp $
+ *
+ * This file created by RCS from:
+ * $Source: /annex/common/src/./netadm/RCS/get_t1_param.c,v $
+ *
+ * Revision History:
+ *
+ * $Log: get_t1_param.c,v $
+ * Revision 1.1.5.1  1995/08/16  13:33:50  slu
+ * Support NT.
+ * .,
+ *
+ * Revision 1.1  1995/05/04  16:17:16  sasson
+ * Initial revision
+ *
+ *
+ *
+ * This file is currently under revision by:
+ *
+ * $Locker:  $
+ *
+ *****************************************************************************
+ */
+
+
+#define RCSDATE $Date: 1995/08/16 13:33:50 $
+#define RCSREV  $Revision: 1.1.5.1 $
+#define RCSID   "$Header: /annex/common/src/./netadm/RCS/get_t1_param.c,v 1.1.5.1 1995/08/16 13:33:50 slu Exp $"
+#ifndef lint
+static char rcsid[] = RCSID;
+#endif
+
+/* Include Files */
+#include "../inc/config.h"
+
+#include <sys/types.h>
+#ifndef _WIN32
+#include <netinet/in.h>
+#include <sys/uio.h>
+#else 
+#include "../inc/port/xuio.h"
+#endif 
+#include "../libannex/api_if.h"
+
+#include "../inc/courier/courier.h"
+#include "../inc/erpc/netadmp.h"
+#include "netadm.h"
+#include "netadm_err.h"
+
+/* External Data Declarations */
+
+
+/* Defines and Macros */
+
+#define OUTGOING_COUNT  4
+
+/* Structure Definitions */
+
+
+/* Forward Routine Declarations */
+int rpc();
+
+
+/* Global Data Declarations */
+
+
+/* Static Declarations */
+
+
+get_t1_param(Pinet_addr, device_type, engine_number, cat, number, type, Pdata)
+    struct sockaddr_in *Pinet_addr;
+    u_short         device_type;
+    u_short         engine_number;
+    u_short         cat;
+    u_short         number;
+    u_short         type;
+    char            *Pdata;
+
+{
+    struct iovec    outgoing[OUTGOING_COUNT + 1];
+
+    u_short         param_one,
+                    param_two,
+                    param_three,
+                    param_four;
+
+    /* Check *Pinet_addr address family. */
+
+    if (Pinet_addr->sin_family != AF_INET)
+        return NAE_ADDR;
+
+    /* Set up outgoing iovecs.
+       outgoing[0] is only used by erpc_callresp().
+       outgoing[1] contains the device_type.
+       outgoing[2] contains the t1 engine_number.
+       outgoing[3] contains the catagory.
+       outgoing[4] contains the t1 param number. */
+
+    param_one = htons(device_type);
+    outgoing[1].iov_base = (caddr_t)&param_one;
+    outgoing[1].iov_len = sizeof(param_one);
+
+    param_two = htons(engine_number);
+    outgoing[2].iov_base = (caddr_t)&param_two;
+    outgoing[2].iov_len = sizeof(param_two);
+
+    param_three = htons(cat);
+    outgoing[3].iov_base = (caddr_t)&param_three;
+    outgoing[3].iov_len = sizeof(param_three);
+
+    param_four = htons(number);
+    outgoing[4].iov_base = (caddr_t)&param_four;
+    outgoing[4].iov_len = sizeof(param_four);
+
+    /* Call rpc() to communicate the request to the annex via erpc or srpc. */
+
+    return rpc(Pinet_addr, RPROC_GET_T1_PARAM, OUTGOING_COUNT, outgoing,
+	       Pdata, type);
+
+}   /* get_t1_param() */

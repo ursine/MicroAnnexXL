@@ -1,0 +1,505 @@
+#!/bin/sh
+
+
+#############################################################################
+# 
+# This script is used to make a modified version of the /etc/rc.local file.
+# There are 5 arguments (all but the first are optional).
+# 
+# NOTE: This script does NOT update the /etc/rc.local file in any way
+# (unless that was the name in the last argument).  It just works with a
+# copy and some other script is responsible for updating the
+# /etc/rc.local file with the edited copy.  This makes things simple for
+# testing purposes.
+# 
+# The first argument is the name of the directory that will hold the new
+# copy of the erpcd daemon.  This name is required.
+# 
+# The second argument is the name of the directory that will hold the acp
+# data files used by erpcd (acp directory).
+# 
+# The third argument is the name of the directory that will hold the
+# bootfiles supplied through erpcd (bfs directory).
+# 
+# The fourth argument is the name of the COPY of the /etc/rc.local file.
+# 
+# The fifth argument is the name of the file that holds the edited
+# version of the /etc/rc.local file.
+# 
+# Because the acp and bfs directories may actually have been compiled
+# into erpcd, the names of these directories may not actually have to be
+# supplied to erpcd with the -f and -s options.  However, if a
+# pre-compiled binary was installed and one or both of the acp/bfs
+# directories do not match what was compiled into the binary then the -f
+# and/or -s options will be needed.  To signal that the directory is
+# required the directory name passed in as an argument should begin with
+# a -f or a -s That is the indication that that directory must be passed
+# as an option to erpcd for erpcd to behave correctly.
+# 
+# As an example, if the pre-compiled erpcd was built using
+# "/usr/spool/erpcd/bfs" as the name of the bfs directory and that is
+# the name the installer choose then the bfs directory name could be
+# ommitted, passed in as null ("") or passed in as
+# "/usr/spool/erpcd/bfs".  If the installer choose a bfs directory name
+# of "/etc/bfs" then the bfs directory name should be passed in as
+# "-f /etc/bfs".
+# 
+#############################################################################
+
+
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+
+# Constants (used for assignments and in a sed command)
+
+SUBSTITUTE_DIRNAME="directory_name"
+NEEDED="Needed"
+DOES_WHAT="edits copies of system startup files"
+
+
+# Initialize values for variables
+
+required_options=""
+bfsneeded="Currently unneeded"
+acpneeded="Currently unneeded"
+diracp2="${SUBSTITUTE_DIRNAME}"
+dirbfs2="${SUBSTITUTE_DIRNAME}"
+
+# Initialize values for variables reset by the command line
+
+direxec=""
+diracp=""
+dirbfs=""
+saved=save/original/rc.local
+modified=save/modified/rc.local
+
+
+#############################################################################
+# 
+# Read the command line
+
+# 
+# We need three directory names:
+# 	The name of the directory containing the erpcd executable.
+# 	The name of the acp directory.
+# 	The name of the bfs directory.
+# 
+
+if [ $# -eq 0 ]
+then
+    echo "$0: Usage: Requires a directory name" 1>&2
+    exit 1
+fi
+$debug && echo "${dbg_hdr}Entering script that $DOES_WHAT"
+if [ $# -gt 0 ]
+then
+    direxec="$1"
+fi
+if [ $# -gt 1 ]
+then
+    diracp="$2"
+fi
+if [ $# -gt 2 ]
+then
+    dirbfs="$3"
+fi
+
+
+# 
+# Although normally the file names will be known, we want to be
+# able to pass in overriding values to make testing easier.
+# 
+
+if [ $# -gt 3 ]
+then
+    saved="$4"
+fi
+if [ $# -gt 4 ]
+then
+    modified="$5"
+fi
+
+
+#############################################################################
+
+if [ ! -f $saved ]
+then
+    $debug && echo "${dbg_hdr}File $saved does not exist."
+fi
+
+# In the case there is no invocation line already there compute what a
+# new invocation line should look line:
+
+erpcd=$direxec/erpcd
+
+
+# See if the acp and bfs directories are really needed.
+
+if [ -n "$dirbfs" ]
+then
+    dirbfs2=`echo $dirbfs | sed -e "s:^-f::"`
+    dirbfs2=`echo $dirbfs2`
+    if [ "$dirbfs2" = "$dirbfs" ]
+    then
+	bfsneeded=Unneeded
+    else
+	required_options="$required_options $dirbfs"
+	bfsneeded="${NEEDED}"
+    fi
+fi
+
+if [ -n "$diracp" ]
+then
+    diracp2=`echo $diracp | sed -e "s:^-s::"`
+    diracp2=`echo $diracp2`
+    if [ "$diracp2" = "$diracp" ]
+    then
+	acpneeded=Unneeded
+    else
+	required_options="$required_options $diracp"
+	acpneeded="${NEEDED}"
+    fi
+fi
+
+
+#############################################################################
+
+
+
+# See if there is already a mention of erpcd in the file
+# (this is done as a by-product of creating a sed command line).
+# Be careful with the format here. The sed command is putting each
+# word on a seperate line.
+
+absent=true
+
+# Get a list of all words with erpcd in it.
+# Note that we do not use any indents in this "if" statement.
+# Note also that we have the "sed" command using "/\\".  This is
+# causing the linefeed before the "/g" to be used in the substitution.
+# Thus, the "sed" statement is actually printing one word per line.
+
+if [ -f $saved ]
+then
+dirs=`cat $saved | sed -e 's/[ 	][ 	]*/\\
+/g' | grep erpcd | sort`
+dirs=`echo " " $dirs`
+else
+dirs=""
+fi
+
+
+# We sorted the list of erpcd words above.  Now get a unique list.
+# We do this instead of using sort -u (I do not trust that it is everywhere).
+
+tmpdirs=""
+prevdir=""
+for dir in $dirs
+do
+    if [ "$dir" != "$prevdir" ]
+    then
+	prevdir=$dir
+	tmpdirs="$tmpdirs $dir"
+    fi
+done
+
+
+# Now get the directory names from erpcd words and create the sed commands
+# that will change any of these names to a known value.
+
+dirs="$tmpdirs"
+change_name_cmd=""
+for dir in $dirs
+do
+    dir=`expr $dir : "\(.*\)/erpcd"`
+    if [ -n "$dir" ]
+    then
+	change_name_cmd="$change_name_cmd -e \"s:$dir/erpcd:${SUBSTITUTE_DIRNAME}/erpcd:g\""
+    fi
+done
+
+
+# At the end of the commands change the temporary substitute directory name
+# with the new real directory name.
+
+if [ -n "$change_name_cmd" ]
+then
+    absent=false
+    change_name_cmd="$change_name_cmd -e \"s:${SUBSTITUTE_DIRNAME}/erpcd:$direxec/erpcd:g\""
+fi
+
+
+#############################################################################
+
+# If there is not an invocation of erpcd in the file then we will add one.
+# Please see a special note at the bottom of the file.
+
+if $absent
+then
+    if [ -f $saved ]
+    then
+	cp $saved $modified
+    else
+	touch $modified
+    fi
+    echo " "							>> $modified
+    echo "# Startup erpc daemon"				>> $modified
+    echo "if [ -f $erpcd ]; then"				>> $modified
+    echo "        echo Starting erpc daemon > /dev/console"	>> $modified
+    echo "        ${erpcd}${required_options} &"		>> $modified
+    echo "fi"							>> $modified
+    $debug && echo "${dbg_hdr}Exiting script that $DOES_WHAT"
+    exit
+fi
+
+
+
+#############################################################################
+# 
+# We will get here only if erpcd was already mentioned in the file.
+# 
+#############################################################################
+
+
+# If the bfs directory name is no longer needed then substitute a
+# special name that can be filtered out later.
+
+if [ "$bfsneeded" = "${NEEDED}" ]
+then
+    newbfs="$dirbfs2"
+else
+    newbfs="${SUBSTITUTE_DIRNAME}"
+fi
+
+
+# If the bfs directory name is no longer needed then substitute a
+# special name that can be filtered out later.
+
+if [ "$acpneeded" = "${NEEDED}" ]
+then
+    newacp="$diracp2"
+else
+    newacp="${SUBSTITUTE_DIRNAME}"
+fi
+
+
+# Declare portions of some sed commands to make code reading easier
+# Note: cannot get away with xyzd="\(-[fs]${ws}[^ 	]*\)"
+# to replace both bfsd and acpd
+
+ws='[ 	][ 	]*'
+field1='\(.*\)'
+bfsd="\(-f${ws}[^ 	]*\)"
+acpd="\(-s${ws}[^ 	]*\)"
+
+prebfsfield='\(.*-f[ 	]\)'
+preacpfield='\(.*-s[ 	]\)'
+field2='\([^ 	]*\)'
+postfield='\(.*\)'
+erpcd_string=$direxec/erpcd
+sed_erpcd_string=`echo $erpcd_string | sed -e 's:/:\\\\\\/:g'`
+address1="/.*$sed_erpcd_string/,/[^\\\\]$/"
+address2="/if.*$sed_erpcd_string/,/^[ 	]*fi/"
+
+
+# Actually edit the file.  This changes the erpcd execute directory name
+# (the "eval" command) and also changes the bfs and acp directory names
+# following -f or -s options.  It does this on single lines (using address1)
+# or in appropriate if-fi lines (using address2).
+#
+# Explanations of the sed commands are at the bottom of the file.
+
+cat $saved | eval "sed $change_name_cmd" | sed 				\
+-e "${address2}s:\(-[^  ]\)[    ][      ]*.*/erpcd:\1 JJJ_TEST_ERPCD:"	\
+-e "${address1}s:^[ 	]*.*/erpcd:&${required_options}:"		\
+-e "${address1}s:-\([fs]\)\([^ 	]\):-\1 \2:g" 				\
+-e "${address1}s:${prebfsfield}${field2}${postfield}:\1${newbfs}\3:"	\
+-e "${address1}s:${preacpfield}${field2}${postfield}:\1${newacp}\3:"	\
+-e "${address1}s:${field1}${bfsd}${field1}${bfsd}${field1}:\1\2\3\5:"	\
+-e "${address1}s:${field1}${acpd}${field1}${acpd}${field1}:\1\2\3\5:"	\
+-e "${address1}s:-[fs]${ws}${SUBSTITUTE_DIRNAME}::g"			\
+-e "${address1}s:^[ 	]*\\\\\$:DELETE_THIS_ERPCD_LINE:"		\
+-e "${address2}s:^[ 	]*.*/erpcd:&${required_options}:"		\
+-e "${address2}s:-\([fs]\)\([^ 	]\):-\1 \2:g" 				\
+-e "${address2}s:${prebfsfield}${field2}${postfield}:\1${newbfs}\3:"	\
+-e "${address2}s:${preacpfield}${field2}${postfield}:\1${newacp}\3:"	\
+-e "${address2}s:${field1}${bfsd}${field1}${bfsd}${field1}:\1\2\3\5:"	\
+-e "${address2}s:${field1}${acpd}${field1}${acpd}${field1}:\1\2\3\5:"	\
+-e "${address2}s:-[fs]${ws}${SUBSTITUTE_DIRNAME}::g"			\
+-e "${address2}s:^[ 	]*\\\\\$:DELETE_THIS_ERPCD_LINE:"		\
+-e "/^DELETE_THIS_ERPCD_LINE/d"						\
+-e "s:JJJ_TEST_ERPCD:$direxec/erpcd:g"					\
+> $modified
+
+
+$debug && echo "${dbg_hdr}Exiting script that $DOES_WHAT"
+exit
+
+#############################################################################
+# 
+#	END OF THE SCRIPT		NOTES FOLLOW
+# 
+#############################################################################
+
+
+
+#############################################################################
+# 
+#	NOTES WHEN ADDING A FIRST INVOCATION OF ERPCD INTO THE FILE
+#
+#############################################################################
+# 
+# NOTE: What I really would have liked to do when adding an invocation
+# of erpcd into the file for the first time was to insert some extra
+# comments comments that may have been useful.  I actually implementated
+# this and tested it.  I decided not to put this into the code though
+# because if the comments were added to the file it would be extremely
+# difficult to edit them automatically on future upgrades.  The comments
+# would then be misleading after the upgrade.  It is even likely that
+# prior to the upgrade the system administrator might just have tweaked
+# the text a bit making automatic edits even harder.
+# 
+#     echo " "					>> $modified
+#     echo "# Startup erpc daemon"		>> $modified
+#     echo "# $bfsneeded bfs directory option: -f $dirbfs2" >> $modified
+#     echo "# $acpneeded acp directory option: -s $diracp2" >> $modified
+#     echo "if [ -f $erpcd ]; then"		>> $modified
+#     echo "        echo Starting erpc daemon"	>> $modified
+#     echo "        ${erpcd}${required_options}"	>> $modified
+#     echo "fi"					>> $modified
+# 
+#############################################################################
+
+
+
+
+#############################################################################
+# 
+#	NOTES WHEN EDITING A FILE WITH ERPCD ALREADY IN IT
+#
+#############################################################################
+#
+# The use of the JJJ_TEST_ERPCD -e statement is to prevent required arguments
+# from being tacked onto tests in the file.  For example we do not want
+# "if [ -f /etc/erpcd ]" being changed into "if [ -f /etc/erpcd -s acpdir ]".
+#
+#============================================================================
+# 
+# Explanation of the sed addresses used above:
+# 
+# -------------------------------------------------------------
+# The following is the erpcd directory/file name:
+#
+# erpcd_string=$direxec/erpcd
+# 
+#
+# -------------------------------------------------------------
+# That string has to be converted to escape the slashes:
+#
+# sed_erpcd_string=`echo $erpcd_string | sed -e 's:/:\\\\\\/:g'`
+# 
+#
+# -------------------------------------------------------------
+# The following would get all lines with the erpcd directory/file name:
+#
+# address1="/.*$sed_erpcd_string/"
+# 
+#
+# -------------------------------------------------------------
+# Using this version though gets from there to the current or next line
+# that does not end in the line continuation character:
+#
+# address1="/.*$sed_erpcd_string/,/[^\\\\\]$/"
+# 
+# 
+# 
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# 
+# 
+# 
+# Explanation of the sed commands used above. (Note: When there is a
+# similar command for both bfs and acp then only one is explained).
+# 
+# -------------------------------------------------------------
+# Replace /erpcd as the first token on a line with the same exact first
+# token but followed with any required options.  The new directory names
+# immediately follow the erpcd command and any older -f and -s option
+# will later be stripped off the command line.
+#
+# "${address1}s:^[ 	]*.*/erpcd:&${required_options}:"
+# 
+# 
+# -------------------------------------------------------------
+# Ensure that there is a space following a -f or a -s
+#
+# "${address1}s:-\([fs]\)\([^ 	]\):-\1 \2:g"
+# 
+# 
+# -------------------------------------------------------------
+# Break the line into 3 fields:
+#	everything on the line up to the -f
+#	the bfs directory name
+#	everything following the bfs directory name
+# Then just replace the bfs directory name.
+#
+# "${address1}s:${prebfsfield}${field2}${postfield}:\1${newbfs}\3:"
+# 
+# -------------------------------------------------------------
+# Break the line into 5 fields:
+#	everything on the line up to the -f
+#	the -f and bfs directory name
+#	everything following the above to the next -f
+#	any other -f and bfs directory name
+#	the rest of the line
+# Print everything but the second "-f dir"
+#
+# "${address1}s:${field1}${bfsd}${field1}${bfsd}${field1}:\1\2\3\5:"
+# 
+# 
+# -------------------------------------------------------------
+# If the bfs or acp directory is no longer required any old "-s dir"
+# or "-f dir" has already had the "dir" portion replaced with a special
+# string.  Replace "-f specialdir" or "-s specialdir" with a null string.
+#
+# "${address1}s:-[fs]${ws}${SUBSTITUTE_DIRNAME}::g"
+# 
+# 
+# -------------------------------------------------------------
+# Mark (in the lines we are interested in) any line that is just whitespace
+# followed by a line continuation character:
+# 
+# "${address1}s:^[ 	]*\\\\\$:DELETE_THIS_ERPCD_LINE:"		\
+# 
+# 
+# -------------------------------------------------------------
+# Delete any lines that we marked as an empty continuation line:
+# 
+# "/^DELETE_THIS_ERPCD_LINE/d"
+# 
+# 
+# 
+#############################################################################

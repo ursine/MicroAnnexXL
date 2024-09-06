@@ -1,0 +1,38 @@
+#
+# 3270 keymap (this is built into the Annex image as default)
+#
+vt100 | wy75 | wy85 | ibm3151 {
+   clear = '^z'; 
+   treq = '^a'; 
+   flinp = '^x'; 
+   enter = '^m'; 
+   delete = '^d'| '^?';
+   synch = '^r'; 
+   reshow = '^v';
+   eeof = '^e'; 
+   tab = '^i'; 
+   btab = '^b'; 
+   nl = '^n'; 
+   left = '^h' | '\ED' | '\E[D' | '\EOD';
+   right = '^l' | '\EC' | '\E[C' | '\EOC';
+   up = '^k' | '\EA' | '\E[A' | '\EOA'
+   down = '^j' | '\EB' | '\E[B' | '\EOB'
+   einp = '^w'; 
+   reset = '^t';
+   master_reset = '^g'; 
+   xoff = '^s'; 
+   xon = '^q'; 
+   escape = '^c';
+   ferase = '^u';
+   insrt = '\E ';
+   home = '\Eh';
+   dp = '\Ed';
+   fm = '\Ef';
+   pa1 = '^p1';  pa2 = '^p2'; pa3 = '^p3';
+   pfk1 = '\E1';  pfk2 = '\E2';  pfk3 = '\E3';  pfk4 = '\E4';
+   pfk5 = '\E5';  pfk6 = '\E6';  pfk7 = '\E7';  pfk8 = '\E8';
+   pfk9 = '\E9';  pfk10 = '\E0'; pfk11 = '\E-'; pfk12 = '\E=';
+   pfk13 = '\E!'; pfk14 = '\E@'; pfk15 = '\E#'; pfk16 = '\E$';
+   pfk17 = '\E%'; pfk18 = '\E\^';pfk19 = '\E&'; pfk20 = '\E*';
+   pfk21 = '\E('; pfk22 = '\E)' ;pfk23 = '\E_'; pfk24 = '\E+';
+} 

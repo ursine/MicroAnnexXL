@@ -1,0 +1,34 @@
+# This file contains release information.  There are three sections:
+#    1) User readable product version information
+#    2) Information on how the release was built
+#    3) Variable assignments used by the installation process
+# All lines should start with a "#" except for the lines with variable
+# assignment statements.
+#
+#
+# PRODUCT INFORMATION:
+# 
+# Product: Versalar Software        Release: R8.0
+#
+#
+# BUILD INFORMATION:
+#
+# Date: Sun Feb 20 22:32:52 EST 2000
+# View: /view/R17.0-1
+# Kit:  R8.0
+#
+#
+# VARIABLE ASSIGNMENT STATEMENTS (USED BY INSTALLATION SCRIPTS):
+
+Box="Versalar"
+box=""
+vers=""
+
+HST_TOOLS="Versalar Software"
+HST_SPACES="     "
+HST_REL="R8.0"
+HST_DIR_LEAD="ra_"
+IMG_PLATFORMS="64"
+IMG_VERSIONS="R17.0-1"
+IMG_TOOLS="Versalar hardware platforms"
+HST_REL_DATE="February 20th, 2000"

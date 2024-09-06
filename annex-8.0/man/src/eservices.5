@@ -1,0 +1,79 @@
+'''
+'''	$Header: /annex/common/src/./erpcd/RCS/eservices.5,v 1.3 1993/06/17 09:52:27 bullock Rel $
+'''
+.ig xy
+.TH ESERVICES 4 ANNEX
+.xy
+.ie '\*(sy'V' .TH ESERVICES 4 ANNEX
+.el .TH ESERVICES 5 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+eservices \- erpcd network services database
+.SH SYNOPSIS
+.B /etc/eservices
+.SH DESCRIPTION
+The
+.B /etc/eservices
+file defines the services that the Annex network server 
+.ie '\*(sy'V' .IR erpcd (1M)
+.el .IR erpcd (8)
+offers.
+.PP
+.PP
+Each line of the file consists of four fields separated by tabs or
+spaces.  The fields are:
+.TP 4n
+\*(BU
+a request number identifying the service
+.TP
+\*(BU
+the lowest numbered version supported
+.TP
+\*(BU
+the highest numbered version supported
+.TP
+\*(BU
+the name of the server called to perform the service.
+.PP
+The two standard services are
+.BR bfs ,
+the block file server that downloads Annex operational code and
+uploads Annex crash dumps,
+and
+.BR acp ,
+the Access Control Protocol server that handles security authorization
+requests from an Annex.
+.PP
+Lines beginning with "#" are comment lines.
+The distributed /etc/eservices file is:
+.PP
+.nf
+.ta +9n +8n +7n
+# erpc remote programs
+#
+# prog no.	verlo	verhi	image
+#
+1	0	0	bfs
+#3	0	99	acp
+.fi
+.PP
+Note that the line describing the
+.B acp
+service is commented out.  Be sure
+to read the chapter on security in the
+\f2Annex Network Administrator's Guide\f1
+before removing this comment.
+.SH FILES
+/etc/eservices
+.SH SEE ALSO
+.ie '\*(sy'V' .IR erpcd (1M).
+.el .IR erpcd (8).
+.br
+\f2Annex Network Administrator's Guide\f1.

@@ -1,0 +1,256 @@
+################################################################################
+# annex.dct - Bay Networks Annex Family dictionary
+# 
+# (See README.DCT for more details on the format of this file)
+################################################################################
+# Updated for Annex R16 & Bay RS 13.20 - DJM 1/6/99
+#
+# This file is intended for use with BSAC V2.0 RADIUS Servers ONLY
+#
+# Use the Radius specification attributes
+#
+@radius.dct
+
+#
+# BayDVS usage of Tunnel-Server-Endpoint is an ASCII string of the format:
+#    a.b.c.d <hwtype>:<dlci>
+#  where a.b.c.d is the ip address of the server
+#   <hwtype> is none, slip, ppp, or fr=Frame Relay
+#   :<dlci> is the optional DLCI string in decimal or hex
+#
+# Define tunnel-password attribute from the tunnel extensions draft
+#  Use data=string for L2TP ascii passwords
+#  Use data=hexadecimal for Bay DVS keys
+#
+#  Binary characters can be entered into strings by using "[" as the first char
+#  "]" ends.  Within the brackets, C-style escape sequences are recognized.
+#   Control chars: \n, \r, \t, \b, \f, \0,  \\ for single \
+#   Hex byte: \xnn  ie: \x01\x02
+#
+#
+#ATTRIBUTE Tunnel-Password                69 [fill1=0 data=string]  t  tunnel-pw-encrypt
+ATTRIBUTE Tunnel-Password                69 [fill1=0 data=hexadecimal]  t  tunnel-pw-encrypt
+
+#
+# Define additional Bay Networks Annex Family Attributes
+#
+
+MACRO Bay-VSA(t,s) 26 [vid=1584 type1=%t% len1=+2 data=%s%]
+
+ATTRIBUTE Annex-Filter                      Bay-VSA(28, string)  RO
+ATTRIBUTE Annex-CLI-Command                 Bay-VSA(29, string)  RO
+ATTRIBUTE Annex-CLI-Filter                  Bay-VSA(30, string)  RO
+ATTRIBUTE Annex-Host-Restrict               Bay-VSA(31, string)  RO
+ATTRIBUTE Annex-Host-Allow                  Bay-VSA(32, string)  RO
+ATTRIBUTE Annex-Product-Name                Bay-VSA(33, string)  a
+ATTRIBUTE Annex-SW-Version                  Bay-VSA(34, string)  a
+ATTRIBUTE Annex-Local-IP-Address            Bay-VSA(35, ipaddr)  r
+ATTRIBUTE Annex-Callback-Portlist           Bay-VSA(36, integer) r
+ATTRIBUTE Annex-Sec-Profile-Index           Bay-VSA(37, integer) t
+
+ATTRIBUTE Annex-Tunnel-Authen-Type          Bay-VSA(38, integer) t
+VALUE     Annex-Tunnel-Authen-Type          None            0
+VALUE     Annex-Tunnel-Authen-Type          kmd5-128        1
+
+ATTRIBUTE Annex-Tunnel-Authen-Mode          Bay-VSA(39, integer) t
+VALUE     Annex-Tunnel-Authen-Mode          None            0
+VALUE     Annex-Tunnel-Authen-Mode          prefix-suffix   1
+
+ATTRIBUTE Annex-Authen-Servers              Bay-VSA(40, string)  t
+ATTRIBUTE Annex-Acct-Servers                Bay-VSA(41, string)  t
+
+ATTRIBUTE Annex-User-Server-Location        Bay-VSA(42, integer) t
+VALUE     Annex-User-Server-Location        Local           1
+VALUE     Annex-User-Server-Location        Remote          2
+
+ATTRIBUTE Annex-Local-Username              Bay-VSA(43, string)  t  return-tunnel-user
+ATTRIBUTE Annex-System-Disc-Reason          Bay-VSA(44, integer) a
+VALUE     Annex-System-Disc-Reason          Unknown             0
+VALUE     Annex-System-Disc-Reason          Line-disconnected   1
+VALUE     Annex-System-Disc-Reason          Dial-failed         2
+VALUE     Annex-System-Disc-Reason          WAN-manager-error   3
+VALUE     Annex-System-Disc-Reason          Disconnect-reset    4
+VALUE     Annex-System-Disc-Reason          Error-from-adm_notify 5
+VALUE     Annex-System-Disc-Reason          Modem-down-adm_notify 6
+VALUE     Annex-System-Disc-Reason          PPP-protocol-disconnect 7
+VALUE     Annex-System-Disc-Reason          Inactivity-timer    8
+VALUE     Annex-System-Disc-Reason          CLI-Hangup-command  9
+VALUE     Annex-System-Disc-Reason          CLI-last-job        10
+VALUE     Annex-System-Disc-Reason          Session-timeout     11
+VALUE     Annex-System-Disc-Reason          Slave-termination   12
+VALUE     Annex-System-Disc-Reason          Abnormal-termination   13
+VALUE     Annex-System-Disc-Reason          DCD-wait-failed     14
+VALUE     Annex-System-Disc-Reason          CLI-inactivity      15
+VALUE     Annex-System-Disc-Reason          Admin-port-reset    16
+VALUE     Annex-System-Disc-Reason          CLI-auth-failed     17
+VALUE     Annex-System-Disc-Reason          Slave-auth-failed   18
+VALUE     Annex-System-Disc-Reason          PAP-auth-failed     19
+VALUE     Annex-System-Disc-Reason          CHAP-auth-failed    20
+VALUE     Annex-System-Disc-Reason          Local-modem-reset   21
+VALUE     Annex-System-Disc-Reason          Modem-dead          22
+VALUE     Annex-System-Disc-Reason          PPP-LCP-failure     23
+VALUE     Annex-System-Disc-Reason          PPP-IPCP-failure    24
+VALUE     Annex-System-Disc-Reason          PPP-IPXCP-failure   25
+VALUE     Annex-System-Disc-Reason          PPP-ATCP-failure    26
+VALUE     Annex-System-Disc-Reason          PPP-CCP-failure     27
+VALUE     Annex-System-Disc-Reason          PPP-MP-failure      28
+VALUE     Annex-System-Disc-Reason          PPP-IPCP-timeout    29
+VALUE     Annex-System-Disc-Reason          PPP-IPXCP-timeout   30
+VALUE     Annex-System-Disc-Reason          PPP-ATCP-timeout    31
+VALUE     Annex-System-Disc-Reason          PPP-CCP-timeout     32
+VALUE     Annex-System-Disc-Reason          PPP-MP-timeout      33
+VALUE     Annex-System-Disc-Reason          PPP-init-failure    34
+VALUE     Annex-System-Disc-Reason          PPP-Unknown         35
+VALUE     Annex-System-Disc-Reason          PPP-Dialback-failed 36
+VALUE     Annex-System-Disc-Reason          PPP-Address-In-Use  37
+VALUE     Annex-System-Disc-Reason          PPP-No-device       38
+VALUE     Annex-System-Disc-Reason          PPP-Modem-hangup-rcvd  39
+VALUE     Annex-System-Disc-Reason          PPP-Hangup-rcvd     40
+VALUE     Annex-System-Disc-Reason          PPP-Termination-rcvd 41
+VALUE     Annex-System-Disc-Reason          PPP-Kill-rcvd       42
+VALUE     Annex-System-Disc-Reason          PPP-Time-rcvd       43
+VALUE     Annex-System-Disc-Reason          PPP-No-memory       44
+VALUE     Annex-System-Disc-Reason          PPP-Connection-Abort    45
+VALUE     Annex-System-Disc-Reason          PPP-VPN-LCP-failure 46
+VALUE     Annex-System-Disc-Reason          PPP-VPN-Auth-failure 47
+VALUE     Annex-System-Disc-Reason          PPP-MP-invalid-port 48
+VALUE     Annex-System-Disc-Reason          PPP-Invalid-device  49
+VALUE     Annex-System-Disc-Reason          PPP-MMP-bundle-failure 50
+VALUE     Annex-System-Disc-Reason          DVS-Registration-failure 51
+VALUE     Annex-System-Disc-Reason          DVS-Home-agent-dereg    52
+VALUE     Annex-System-Disc-Reason          DVS-Tunnel-no-renew 53
+VALUE     Annex-System-Disc-Reason          DVS-Tunnel-expired  54
+
+ATTRIBUTE Annex-Modem-Disc-Reason           Bay-VSA(45, integer)   a
+VALUE     Annex-Modem-Disc-Reason           Unknown                 0
+VALUE     Annex-Modem-Disc-Reason           Local-disconnect        1
+VALUE     Annex-Modem-Disc-Reason           CD-Timer-Expired        2
+VALUE     Annex-Modem-Disc-Reason           Remote-protocol-disc    4
+VALUE     Annex-Modem-Disc-Reason           Clear-down              5
+VALUE     Annex-Modem-Disc-Reason           Long-Space-disconnect   6
+VALUE     Annex-Modem-Disc-Reason           Carrier-Lost            7
+VALUE     Annex-Modem-Disc-Reason           Modem-Retrain-Timeout   8
+
+ATTRIBUTE Annex-Disconnect-Reason           Bay-VSA(46, integer) a
+
+ATTRIBUTE Annex-Addr-Resolution-Protocol    Bay-VSA(47, integer) t
+VALUE     Annex-Addr-Resolution-Protocol    None            0
+VALUE     Annex-Addr-Resolution-Protocol    DHCP            1
+
+ATTRIBUTE Annex-Addr-Resolution-Servers     Bay-VSA(48, string)  t
+ATTRIBUTE Annex-Domain-Name                 Bay-VSA(49, string)  t  return-tunnel-name
+ATTRIBUTE Annex-Transmit-Speed              Bay-VSA(50, integer) ca
+ATTRIBUTE Annex-Receive-Speed               Bay-VSA(51, integer) ca
+
+#ATTRIBUTE Annex-Input-Filter               Bay-VSA(52, string) RO
+#ATTRIBUTE Annex-Output-Filter              Bay-VSA(53, string) RO
+
+ATTRIBUTE Annex-Primary-DNS-Server          Bay-VSA(54, ipaddr) r
+ATTRIBUTE Annex-Secondary-DNS-Server        Bay-VSA(55, ipaddr) r
+ATTRIBUTE Annex-Primary-NBNS-Server         Bay-VSA(56, ipaddr) r
+ATTRIBUTE Annex-Secondary-NBNS-Server       Bay-VSA(57, ipaddr) r
+
+#ATTRIBUTE Annex-Syslog-Tap	            Bay-VSA(58, integer) r
+
+ATTRIBUTE Annex-Keypress-Timeout            Bay-VSA(59, integer) r
+ATTRIBUTE Annex-Unauthenticated-Time        Bay-VSA(60, integer) a
+ATTRIBUTE Annex-Re-CHAP-Timeout             Bay-VSA(61, integer) r
+ATTRIBUTE Annex-MRRU			    Bay-VSA(62, integer) a
+ATTRIBUTE Annex-EDO			    Bay-VSA(63, string) a
+
+ATTRIBUTE Annex-PPP-Trace-Level             Bay-VSA(64, integer) r
+
+ATTRIBUTE Annex-Pre-Input-Octets	    Bay-VSA(65, integer) a
+ATTRIBUTE Annex-Pre-Output-Octets	    Bay-VSA(66, integer) a
+ATTRIBUTE Annex-Pre-Input-Packets	    Bay-VSA(67, integer) a
+ATTRIBUTE Annex-Pre-Output-Packets	    Bay-VSA(68, integer) a
+ATTRIBUTE Annex-Connect-Progress	    Bay-VSA(69, integer) a
+VALUE Annex-Connect-Progress	Progress-Unknown		2
+VALUE Annex-Connect-Progress	Call-Is-Up			10
+VALUE Annex-Connect-Progress	CLI-Started			40
+VALUE Annex-Connect-Progress	LAN-Session-Is-Up		60
+VALUE Annex-Connect-Progress	LCP-Negotiations-Allowed	61
+VALUE Annex-Connect-Progress	CCP-Negotiations-Allowed	62
+VALUE Annex-Connect-Progress	IPCP-Negotiations-Allowed	63
+VALUE Annex-Connect-Progress	LCP-Is-In-Open-State		65
+VALUE Annex-Connect-Progress	CCP-Is-In-Open-State		66
+VALUE Annex-Connect-Progress	IPCP-Is-In-Open-State		67
+VALUE Annex-Connect-Progress	LCP-Is-In-Closed-State		71
+VALUE Annex-Connect-Progress	LCP-Is-In-Stopped-State		72
+VALUE Annex-Connect-Progress	LCP-Is-In-Closing-State		73
+VALUE Annex-Connect-Progress	LCP-Is-In-Request-Sent-State	75
+VALUE Annex-Connect-Progress	LCP-Is-In-Ack-Recvd-State	76
+VALUE Annex-Connect-Progress	LCP-Is-In-Ack-Sent-State	77
+VALUE Annex-Connect-Progress	IPXCP-Is-In-Open-State		80
+
+ATTRIBUTE Annex-First-Dest		    Bay-VSA(70, ipaddr) r
+ATTRIBUTE Annex-PPP-Async-Map		    Bay-VSA(71, integer) r
+ATTRIBUTE Annex-Multicast-Client	    Bay-VSA(72, integer) r
+VALUE Annex-Multicast-Client	Multicast-No	0
+VALUE Annex-Multicast-Client	Multicast-Yes	1
+
+ATTRIBUTE Annex-Multicast-Rate-Limit	    Bay-VSA(73, integer) r
+ATTRIBUTE Annex-Maximum-Call-Duration	    Bay-VSA(74, integer) r
+ATTRIBUTE Annex-Multilink-Id		    Bay-VSA(75, integer) a
+ATTRIBUTE Annex-Num-In-Multilink	    Bay-VSA(76, integer) a
+
+ATTRIBUTE Annex-Inbound-Precedence          Bay-VSA(77, integer) r
+VALUE   Annex-Inbound-Precedence        Network-Control           7
+VALUE   Annex-Inbound-Precedence        Internetwork-Control      6
+VALUE   Annex-Inbound-Precedence        CRITIC/ECP                5
+VALUE   Annex-Inbound-Precedence        Flash-Override            4
+VALUE   Annex-Inbound-Precedence        Flash                     3
+VALUE   Annex-Inbound-Precedence        Immediate                 2
+VALUE   Annex-Inbound-Precedence        Priority                  1
+VALUE   Annex-Inbound-Precedence        Routine                   0
+
+ATTRIBUTE Annex-Outbound-Precedence         Bay-VSA(78, integer) r
+VALUE   Annex-Outbound-Precedence       Network-Control           7
+VALUE   Annex-Outbound-Precedence       Internetwork-Control      6
+VALUE   Annex-Outbound-Precedence       CRITIC/ECP                5
+VALUE   Annex-Outbound-Precedence       Flash-Override            4
+VALUE   Annex-Outbound-Precedence       Flash                     3
+VALUE   Annex-Outbound-Precedence       Immediate                 2
+VALUE   Annex-Outbound-Precedence       Priority                  1
+VALUE   Annex-Outbound-Precedence       Routine                   0
+
+ATTRIBUTE Annex-Secondary-Srv-Endpoint      Bay-VSA(79, string) TO
+ATTRIBUTE Annex-Gwy-Selection-Mode          Bay-VSA(80, integer) t
+VALUE Annex-Gwy-Selection-Mode          Normal             0
+VALUE Annex-Gwy-Selection-Mode          Backup             1
+VALUE Annex-Gwy-Selection-Mode          Distribution       2
+
+#
+# Bay Router Specific Attributes
+#
+ATTRIBUTE Bay-User-Level          Bay-VSA(100, integer) r
+ATTRIBUTE Bay-Audit-Level         Bay-VSA(101, integer) r
+
+#
+# Define additional Bay Networks specific values
+#
+
+VALUE   Service-Type        Annex-Authorize-Only       0x06300001
+VALUE   Service-Type        Annex-Framed-Tunnel        0x06300002
+
+VALUE   Acct-Status-Type    Annex-User-Reject          0x06300001   purge-acct-rec
+VALUE   Acct-Status-Type    Annex-Call-Reject          0x06300002
+VALUE   Acct-Status-Type    Annex-IPCP-Start           0x06300003
+VALUE   Acct-Status-Type    Annex-IPXCP-Start          0x06300004
+VALUE   Acct-Status-Type    Annex-ATCP-Start           0x06300005
+VALUE   Acct-Status-Type    Annex-Accounting-Restart   0x06300006
+VALUE   Acct-Status-Type    Annex-Accounting-Shutoff   0x06300007
+VALUE   Acct-Status-Type    Annex-Tunnel-Start         0x06300008
+VALUE   Acct-Status-Type    Annex-Tunnel-Stop          0x06300009
+VALUE   Acct-Status-Type    Annex-Tunnel-Reject        0x0630000a
+VALUE   Acct-Status-Type    Annex-Tunnel-Link-Start    0x0630000b
+VALUE   Acct-Status-Type    Annex-Tunnel-Link-Stop     0x0630000c
+VALUE   Acct-Status-Type    Annex-MP-Start             0x0630000d
+VALUE   Acct-Status-Type    Annex-MP-Stop              0x0630000e
+VALUE   Acct-Status-Type    Annex-Line-Seizure         0x0630000f
+VALUE   Acct-Status-Type    Annex-Rlogin-Start         0x06300010
+VALUE   Acct-Status-Type    Annex-Rlogin-Stop          0x06300011
+
+################################################################################
+# annex.dct - Bay Networks Annex dictionary
+################################################################################

@@ -1,0 +1,69 @@
+This is a replacement for the src/bs_unix.c file in NCD's version 2.3.1
+Xremote daemon.  (See the NCDVERSION parameter in Xremote.mk.)
+
+NOTE:  THIS MODULE IS GIVEN AS AN EXAMPLE ONLY.  BY COMPILING THIS
+ROUTINE, YOU ASSUME ALL RESPONSIBILITY FOR ANY RESULTS.
+
+XYLOGICS DISCLAIMS ALL WARRANTIES FOR THIS PRODUCT, INCLUDING IMPLIED
+WARRANTIES FOR MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE AS
+DEFINED BY THE UNITED STATES UNIFORM COMMERCIAL CODE.
+
+Xylogics has made every attempt to ensure that this module will perform
+as expected, but since it is distributed as an example program, and
+since it relies on code in NCD's Xremote daemon, we cannot assure that
+our testing gives complete coverage for these changes.
+
+Xylogics is in the process of integrating this feature into NCD's
+Xremote distribution.  We welcome comments, complaints and requests.
+
+When Xremote is compiled using this module, it will be configured to use
+transparent TCP connections for X display station I/O rather than
+serial lines.  This allows you to set up connections for remote X
+terminal users through your Annex without forcing the users to log in.
+
+Once compiled, this program should be invoked in one of two forms:
+
+	Xremote [:n -scanbase -scanmax] -line <annexname> -speed <port>
+
+	This form will cause an active TCP connection to be made to the
+	given Annex and port number.  The connection will be made using
+	raw TCP protocol to TCP port 7000+<port> on the Annex whose
+	IP address (or name) is <annexname>.  Note that the "-speed"
+	parameter must be non-zero.  Also note that the last-client-
+	reset function will cause this daemon to exit.
+
+	Xremote [-scanbase -scanmax] -speed 0
+
+	This form will cause the Xremote program to open a TCP listen
+	socket on port 7000 and wait for connections from Annexes.
+	Each new connection will be assigned a new display number
+	according to the standard rules (if possible) and will then
+	enter Xremote mode.  Note that the "-speed" parameter must be
+	zero and must be the last parameter specified.
+
+Either way, once the network connection is correctly established, then
+the Xremote program will emit an informational message and fork off a
+background task to handle the I/O.
+
+When using the second form, you can set up a macro for your users to
+enter Xremote mode directly from the CLI prompt by adding this to your
+/usr/spool/erpcd/bfs/macros file:
+
+	alias "Start Xremote session"
+	keyin /xremote/
+	{
+	>Entering Xremote mode ...
+	<telnet -st myhost 7000
+	}
+
+Where, of course, you should substitute the name of the host running
+the Xremote daemon for "myhost."
+
+To compile this utility (assuming your Xremote sources are in
+/usr/local/src/xremote):
+
+	cp bs_annex.c /usr/local/src/xremote/bs_annex.c
+	cd /usr/local/src/xremote
+	mv bs_unix.c bs_serial.c
+	ln bs_annex.c bs_unix.c
+	make

@@ -1,0 +1,198 @@
+
+
+
+     CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))               AAAANNNNNNNNEEEEXXXX               CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          config.annex - Annex configuration file
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          The default configuration file is ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx.... It resides
+          on the preferred boot host. This file contains all Annex
+          configuration information which previously existed in the
+          _g_a_t_e_w_a_y_s, _r_o_t_a_r_i_e_s or _m_a_c_r_o_s files.
+
+          There are two keywords use in the ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file:
+          _i_n_c_l_u_d_e and _c_a_t_e_g_o_r_y. While the former is the way to
+          incorporate a separate file into the ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file, the
+          latter is the way to organize the entries. The following
+          details these keywords:
+
+     IIIINNNNCCCCLLLLUUUUDDDDEEEE SSSSTTTTAAAATTTTEEEEMMMMEEEENNNNTTTT
+          ssssyyyynnnnttttaaaaxxxx::::   %%%%iiiinnnncccclllluuuuddddeeee <<<<ffffiiiilllleeeennnnaaaammmmeeee>>>>
+
+          The syntax of the include statement is % sign at the first
+          column followed by _i_n_c_l_u_d_e keyword, one or more spaces and
+          then the filename. The filename can be any UNIX legal
+          filename.
+
+          The only restriction in the file is that all the statements
+          in the file should belong to the same ccccaaaatttteeeeggggoooorrrryyyy....
+
+     CCCCAAAATTTTEEEEGGGGOOOORRRRYYYY SSSSTTTTAAAATTTTEEEEMMMMEEEENNNNTTTT
+          ssssyyyynnnnttttaaaaxxxx::::   %%%%kkkkeeeeyyyywwwwoooorrrrdddd
+
+          The ccccaaaatttteeeeggggoooorrrryyyy statement begins with the % sign at the first
+          column followed by the _k_e_y_w_o_r_d. The _k_e_y_w_o_r_d is one of the
+          following:  _g_a_t_e_w_a_y, _m_a_c_r_o, _r_o_t_a_r_y, _m_o_d_e_m, or _s_e_r_v_i_c_e.
+
+          The kkkkeeeeyyyywwwwoooorrrrdddd statement needs to be specified first before
+          defining each category entry.  Failing to do so will result
+          in a format error.
+
+          All the statements under the %%%%kkkkeeeeyyyywwwwoooorrrrdddd should belong to the
+          same _c_a_t_e_g_o_r_y including any statements in an included file.
+
+     EEEEXXXXAAAAMMMMPPPPLLLLEEEE
+          The following is an example of a ccccoooonnnnffffiiiigggg....aaaannnnnnnneeeexxxx file which
+          contains the _i_n_c_l_u_d_e and _c_a_t_e_g_o_r_y statements described
+          above. The pound sign (#) in the first column in a line
+          represents a comment.
+          #
+          # The following are definitions of the gateways entries
+          #
+          %gateway
+          net 129.91.0.0 gateway 132.245.1.1 metric 1 hardwired
+
+          annex 192.9.200.228
+
+
+
+     Page 1                                         (printed 2/20/100)
+
+
+
+
+
+
+     CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))               AAAANNNNNNNNEEEEXXXX               CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))
+
+
+
+               net 129.123.0.0 gateway 132.245.2.1 metric 1 hardwired
+          end
+          #
+          # Configure SNMP
+          #
+          snmp community public
+          snmp traphost 192.9.200.95
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 2                                         (printed 2/20/100)
+
+
+
+
+
+
+     CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))               AAAANNNNNNNNEEEEXXXX               CCCCOOOONNNNFFFFIIIIGGGG....AAAANNNNNNNNEEEEXXXX((((4444))))
+
+
+
+          #
+          # Macro Definition
+          #
+          %macro
+          alias |Show users on the Annex|
+               keyin "3" 1-6,10-16,v@192.9.200.245
+          {
+          <who
+          <pause
+          }
+          menu "ANNEX MENU"
+               keyin "menu1" 1-6,10-16,v@192.9.200.245
+               init_cli 1-6,10-16,v@192.9.200.245
+               cmd_list bg,fg,hosts,jobs,rlogin,3
+          {
+          MY MENU SCREEN
+          Commands: bg,fg,hosts,jobs,rlogin,3
+
+          Enter Command:
+          }
+          #
+          # Rotary Definitions
+          #
+          %rotary
+          titanic_co:    2@192.9.200.232
+
+     CCCCOOOOMMMMPPPPAAAATTTTIIIIBBBBIIIILLLLIIIITTTTYYYY IIIISSSSSSSSUUUUEEEESSSS
+          Since each entry of the new configuration file is identical
+          to those of the old files, the new file parser is able to
+          maintain the backward compatibility.
+
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          erpcd(1M), rotaries(4), gateways(4).
+          _A_n_n_e_x _N_e_t_w_o_r_k _A_d_m_i_n_i_s_t_r_a_t_o_r'_s _G_u_i_d_e.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 3                                         (printed 2/20/100)
+
+
+

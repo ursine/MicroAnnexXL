@@ -1,0 +1,200 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# This is a script that will be run by the installation script to
+# examine and edit a copy of the /etc/services file.
+# 
+# Passed in on the command line is the names of files we use and edit.
+# One file contains a copy of the original /etc/services (or a copy of
+# the NIS services database).  The other is the name of the file that
+# should contain the edited version of this database.
+# 
+# The actual /etc/services file or NIS database is NOT edited.
+# The installation script will handle that.
+# 
+#############################################################################
+
+REQUIRED_FILES=""
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Read command line
+
+if [ $# -lt 2 ]
+then
+    echo "$0: ERROR: Usage: Requires two filenames" 1>&2
+    exit 1
+fi
+$debug && echo "${dbg_hdr}Entering script that edits copy of services"
+origcopy="$1"
+newcopy="$2"
+
+
+# Constant values
+
+erpc="erpc"
+enum="121"
+printer="printer"
+pnum="515"
+
+pt="$printer		$pnum/tcp		spooler         # line printer spooler"
+et="$erpc		$enum/tcp				# new rpc listener"
+eu="$erpc		$enum/udp				# exp. rpc listener"
+
+
+# Cleanup from any prior installations
+
+rm -f $newcopy
+
+
+# If $origcopy is empty then probably using nis+
+
+if [ -f $origcopy ]
+then
+    grep "^[ 	]*$erpc[ 	]" $origcopy >> $newcopy
+    grep "^[ 	]*$printer[ 	]" $origcopy >> $newcopy
+    grep "[ 	]*$enum/[tu][cd]p" $origcopy >> $newcopy
+    grep "[ 	]*$pnum/[tu][cd]p" $origcopy >> $newcopy
+else
+    $debug && echo "${dbg_hdr}No original services file found"
+    echo " " > $newcopy
+fi
+
+
+# We check for the services we would add.
+# First we assume we have them.
+
+havept=true
+haveet=true
+haveeu=true
+
+if [ ! -f $newcopy ]
+then
+#   # A grep could not have found any
+    havept=false
+    haveet=false
+    haveeu=false
+
+else
+
+#   # See if there is a service with erpc's port number that is not "erpc"
+    warning=false
+    service=`grep "[ 	]*$enum/[tu][cd]p" $newcopy | \
+	     grep -v "^[ 	]*$erpc[ 	]" | sed -n -e 1,1p`
+    service=`echo "" $service`
+    if [ -n "$service" ]
+    then
+	echo "WARNING: Already have a service using port $enum"
+	echo "       : $service"
+	warning=true
+    fi
+
+#   # See if the printer service with 515/tcp is there
+    service=`grep "^[ 	]*$printer[ 	]" $newcopy`
+    service=`echo "" $service`
+    if [ -z "$service" ]
+    then
+	havept=false
+    else
+	service=`grep "^[ 	]*$printer[ 	][ 	]*$pnum/tcp" $newcopy`
+	service=`echo "" $service`
+	if [ -z "$service" ]
+	then
+	    havept=false
+	fi
+    fi
+
+#   # See if the erpc service is there at all
+    service=`grep "^[ 	]*$erpc[ 	]" $newcopy`
+    service=`echo "" $service`
+    if [ -z "$service" ]
+    then
+	    haveet=false
+	    haveeu=false
+    else
+
+#	# See if the erpc tcp service is there
+	service=`grep "^[ 	]*$erpc[ 	][ 	]*$enum/tcp" $newcopy`
+	service=`echo "" $service`
+	if [ -z "$service" ]
+	then
+	    haveet=false
+	fi
+
+#	# See if the erpc udp service is there
+	# See if the erpc service with 121/udp is there
+	service=`grep "^[ 	]*$erpc[ 	][ 	]*$enum/udp" $newcopy`
+	service=`echo "" $service`
+	if [ -z "$service" ]
+	then
+	    haveeu=false
+	fi
+    fi
+fi
+
+# Let the user know what was missing.
+
+if $debug
+then
+    if $havept && $haveet && $haveeu
+    then
+	echo "${dbg_hdr}Have all expected services"
+    else
+	(
+	echo "The following services were found to be missing:"
+	$havept || echo "${indent}$pt"
+	$haveet || echo "${indent}$et"
+	$haveeu || echo "${indent}$eu"
+	) | sed -e "s/^/${dbg_hdr}/g" -e "s/[	][	]*/	/g"
+    fi
+fi
+
+
+# Create an output file for what the services should look like.
+# If the original file is not available then remove the file that
+# will contain the new copy (it is presently holding junk).
+
+if [ -f "$origcopy" ]
+then
+    cp $origcopy $newcopy
+else
+    rm -f $newcopy
+    touch $newcopy
+fi
+
+
+# Don't forget to add the missing lines.
+# We simply tack them on to the bottom of the new file.
+
+$havept || echo "$pt" >> $newcopy
+$haveet || echo "$et" >> $newcopy
+$haveeu || echo "$eu" >> $newcopy
+
+$debug && echo "${dbg_hdr}Exiting script that edits copy of services"
+
+exit
+

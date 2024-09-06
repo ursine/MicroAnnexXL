@@ -1,0 +1,262 @@
+#!/bin/sh
+
+# ------------------------------------------------------------------------
+#
+# This script hunts for the pids of processes that are running erpcd (by
+# default) or some other process named in the optional first argument.
+# The argument allows testing.
+# 
+# If one or more processes are found the script prints the pids to stdout
+# and returns a zero exit status.  If no process is found the script returns
+# a non-zero exit status (and prints nothing).
+#
+# ------------------------------------------------------------------------
+# 
+# The pid of the erpcd process is gotten several ways to be independent
+# of the format of the ps output and its options.  We want this to run
+# on a number of machines.
+#
+# Note that after doing a "ps" we run the output through "sed" to remove
+# "$prog/".  This is because the .daemon script can be running with a line of:
+#	sh setup/.daemon /usr/annex /usr/annex /usr/spool/erpcd/bfs
+# and this can get picked up as an erpcd process.  So we strip "erpcd/" from
+# the output.
+# 
+# We generally do not check for strange cases of process that have erpcd
+# (or the named program) in the command line.  We assume that if grep
+# finds it in ps then that/those should be used.  One exception to this
+# is if an argument is used in the call to this script then the pid of
+# the process running this script is likely to appear in the "ps" list.
+# The pid of this process is removed from the list of pids printed.
+# 
+# The code below ***looks*** as if it could be made faster by
+# redirecting the ps output to a file and then using various tries to
+# get the information out of the file.  This will not work as we need
+# the ps command to be called with various options.
+# 
+# ------------------------------------------------------------------------
+
+
+# Initialize variables:
+
+my_pid=$$
+unique_pid_list=""
+pidlist=""
+prog="erpcd"
+
+
+# Search for a different program if we have a command line argument:
+
+if [ $# -gt 0 ]
+then
+    prog="$1"
+fi
+
+
+# These constants are used in sed substitutions:
+ADD_LEADING_BLANK='s/^/ /'
+REMOVE_LEADING_WHITESPACE='s/^[ 	][ 	]*//'
+
+# These constants are also used in sed substitutions.
+# However, these assume that there is no leading whitespace:
+# Note: On BSDI sed did not treat REMOVE_FIRST_FIELD right so
+# REMOVE_FIRST_FIELD2 was created.  There was not enough time
+# to test if REMOVE_FIRST_FIELD2 worked on all platforms so it
+# is being used as a supplement instead of a replacement.
+# When there is time to test on all platforms replace with one.
+REMOVE_FIRST_FIELD='s/.*[ 	]/ /'
+REMOVE_FIRST_FIELD2='s/[^ 	]*[ 	]/ /'
+REMOVE_ALL_BUT_FIRST_FIELD='s/[ 	].*//'
+
+
+# Find the process ids in a number of ways.  Some methods work on some
+# platforms and others work on other platforms.  Since there is sure to
+# be failures we discard stderr.  In case more than one of the methods
+# works we create a list of unique pids prior to printing them out.
+
+# Here we do not hardcode the paths to the commands
+# This sed prints the first field.
+pids=`(
+	ps -e 2>/dev/null | sed -e "s:$prog/::g"	| \
+	    grep $prog					| \
+		grep -v grep				| \
+		    sed	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+# Now we do hardcode the pathnames
+# This sed prints the first field.
+pids=`(
+	/usr/bin/ps -e 2>/dev/null | sed -e "s:$prog/::g"	| \
+	    /usr/bin/grep $prog				| \
+		/usr/bin/grep -v grep			| \
+		    /usr/bin/sed 			  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+# Now try it with the -f option
+# This sed prints the second field.
+pids=`(
+	/bin/ps -ef 2>/dev/null	| sed -e "s:$prog/::g"	| \
+	    /usr/bin/egrep $prog			| \
+		/bin/grep -v grep			| \
+		    /bin/sed				  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_FIRST_FIELD"	  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+# Now try the -u option
+# This sed prints the second field.
+pids=`(
+	ps -ux 2>/dev/null | sed -e "s:$prog/::g"	| \
+	/usr/bin/egrep $prog				| \
+	    /bin/grep -v grep				| \
+		sed	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_FIRST_FIELD"	  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+# Now try the -u option
+# This sed prints the second field.
+pids=`(
+	ps -ux 2>/dev/null | sed -e "s:$prog/::g"	| \
+	egrep $prog					| \
+	    grep -v grep				| \
+		sed	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_FIRST_FIELD2"	  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+# Start: of BSDI fix
+# This is a last minute fix that could not be tested on all systems
+# so we are confining this search to the platform with the problem.
+
+if [ "$hw_type" = "BSDI" ]
+then
+
+# Now try the -x option
+# This sed prints the first field.
+pids=`(
+	ps -x 2>/dev/null | sed -e "s:$prog/::g"	| \
+	egrep $prog					| \
+	    grep -v grep				| \
+		sed	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+fi
+# End: of BSDI fix
+
+
+# Now try the -a option
+# This sed prints the second field.
+pids=`(
+	ps -ax 2>/dev/null | sed -e "s:$prog/::g"	| \
+	    egrep $prog					| \
+		grep -v grep				| \
+		    sed	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_FIRST_FIELD"	  \
+		    	-e "$REMOVE_LEADING_WHITESPACE"	  \
+			-e "$REMOVE_ALL_BUT_FIRST_FIELD"
+     ) 2> /dev/null`
+for pid in $pids
+do
+    case "$pid" in
+	[0-9]*) pidlist="$pidlist $pid" ;;
+    esac
+done
+
+
+
+# Now come up with the list of pids so that each only shows up once.
+#
+# We want to filter out the pid of the process running this program.
+# If the pid of the process running this script shows up then it is
+# because we had called this script with an argument (for test purposes).
+# The ps command shows the call to the script and its argument and the greps
+# are passing the line through.
+
+for pid in $pidlist
+do
+    case "$pid" in
+	$my_pid)
+	    ;;
+	[0-9]*)
+#	    # Check to see if the pid is already in the list.  The method
+#	    # we are using is stupid but we are not trusting that grep returns
+#	    # a correct status.  We use echos to remove leading and trailing
+#	    # blanks and get whitespace between pids down to one blank.
+	    tmp=`echo " $unique_pid_list " | sed -e "s/ $pid / /"`
+	    tmp=`echo $tmp`
+	    if [ "$tmp" = "$unique_pid_list" ]
+	    then
+# 		# The pid is not in list yet.
+#		# This echo is important. See above.
+		unique_pid_list=`echo $unique_pid_list $pid`
+	    fi
+	    ;;
+    esac
+done
+
+
+# Exit with a failure indicator if we did not find any processes.
+# Do not print anything to stdout.
+if [ -z "$unique_pid_list" ]
+then
+    exit 1
+fi
+
+
+# Exit with a success indicator if we found one or more processes.
+# Print pids to stdout first.
+
+echo $unique_pid_list
+exit 0
+

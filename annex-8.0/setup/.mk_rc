@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# This script is used to make two copies of the /etc/rc.local file.  One
+# copy is set aside to be saved and the other copy will be edited.  It
+# takes three optional arguments.  The first and second arguments are the
+# names of the files to hold a copy of the original file and the name of
+# the file to hold a copy that will be edited.  The third is the name of
+# the rc.local file.
+
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+# Initialize
+
+$debug && echo "${dbg_hdr}Entering script that creates copy of rc.local"
+saved=save/original/rc.local
+modified=save/modified/rc.local
+real="/etc/rc.local"
+
+
+# Read the command line.
+# Although normally the file names will be known we want to
+# be able to pass in overriding values to make testing easier.
+
+if [ $# -gt 0 ]
+then
+    saved="$1"
+fi
+if [ $# -gt 1 ]
+then
+    modified="$2"
+fi
+if [ $# -gt 2 ]
+then
+    real="$3"
+fi
+
+
+# Make sure things are clean
+
+rm -f $saved $modified
+
+
+# Get the old file and copy it to both the "save" and the "modify" locations
+
+if [ -n "$real" ]
+then
+    if [ -f $real ]
+    then
+	cp $real $saved
+	cp $real $modified
+	$debug && echo "${dbg_hdr}Copied $real to $saved"
+	$debug && echo "${dbg_hdr}Exiting script that creates copy of rc.local"
+	exit
+    fi
+fi
+
+
+# If the real rc.local file is not there then the file is not needed on
+# this system.  We can exit now.
+
+$debug && echo "${dbg_hdr}No copy of $saved created. Not needed."
+$debug && echo "${dbg_hdr}Exiting script that creates copy of rc.local"
+
+exit

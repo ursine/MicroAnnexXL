@@ -1,0 +1,920 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# This script is used to make two copies each of certain files.  One
+# copy goes into a directory where it should remain protected.  The
+# other copy is placed into a different directory where the files will
+# be edited.  The edited copies will become the the new version of the
+# files if the user wants.  The user is asked to verify the copying of
+# the files into the real locations.
+# 
+#############################################################################
+
+initd=false
+rc_local_file=/etc/rc.local
+startup_dir=/etc/init.d
+our_tempfiles=""
+change_restrict=false
+had_regime=false
+
+
+# Must list annex-initd before rc.local so if annex-initd is to be used
+# we can skip the use of rc.local.  See code near variable "add_to_list".
+LIST_FILES="eservices services annex-initd rc.local"
+
+
+REQUIRED_FILES="./.mkpath ./.myread"
+
+
+#############################################################################
+# 
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+	. ./.vars
+    else
+#	# The following line can be commented out to get test versions running
+	echo "**** $0: No environment is setup" ; exit 1
+	SCRIPT_DIR="setup"
+	MSG_FILE="${SCRIPT_DIR}/.msg_file"
+	indent="    "
+	dbg_hdr="DEBUG: "
+	debug=true
+	n=''
+	c=''
+    fi
+fi
+export SCRIPT_DIR MSG_FILE indent debug dbg_hdr n c
+
+
+tempfiles="$tempfiles $our_tempfiles"
+
+
+#############################################################################
+# Are we root?  If we aren't then some files will not be copied.
+
+notroot=true
+sh ${SCRIPT_DIR}/.am_root
+if [ $? -eq 0 ]
+then
+#   # Yep, we are root
+    notroot=false
+fi
+
+#############################################################################
+
+
+#############################################################################
+# 
+# By setting the "do" variables below equal to false we can do
+# testing/debugging on the portion of code that asks the installer if he
+# wants to apply the edits made.  (The testing of making and editing
+# files can be handled by calling the individual scripts).
+
+# Set realmode=true for real operations and realmode=false for testing 
+realmode=true
+
+domkdir=$realmode
+domakes=$realmode
+doedits=$realmode
+doinstall=$realmode
+
+
+#############################################################################
+# 
+# Initialize
+
+# For proper operation of erpcd are the -f and/or -s options required/
+
+dirbfsreq=true
+diracpreq=true
+
+
+# We may have an indicator of whether we ask the installer if
+# the acp service for erpcd should be configured.  The default will
+# be to ask but possibly the installation could ask this question
+# earlier and pass a value down.  Here are the legal values:
+# 	case $acp_auto_answer in
+# 	    "")  Then will ask installer if acp to be allowed
+# 	    "y") Will NOT ask; will enable acp
+# 	    "n") Will NOT ask; will not enable acp but if already
+#	         enabled we will keep it enabled.
+# 	esac
+
+acp_auto_answer=""
+
+
+edit_rc_local=true
+
+
+#############################################################################
+# 
+# Read the command line
+
+# 
+# We need three directory names:
+# 	The name of the directory containing the erpcd executable.
+# 	The name of the acp directory.
+# 	The name of the bfs directory.
+# 
+
+if [ $# -lt 3 ]
+then
+    echo "$0: Usage: Requires 3 directory names" 1>&2
+    exit 1
+fi
+$debug && echo "${dbg_hdr}Entering script that creates copies of system files"
+if [ $# -gt 0 ]
+then
+    direxec="$1"
+fi
+if [ $# -gt 1 ]
+then
+    diracp="$2"
+fi
+if [ $# -gt 2 ]
+then
+    dirbfs="$3"
+fi
+
+
+# 
+# Now look for the optional arguments
+# 
+
+if [ $# -gt 3 ]
+then
+    startup_dir="$4"
+fi
+if [ $# -gt 4 ]
+then
+    diracpreq="$5"
+fi
+if [ $# -gt 5 ]
+then
+    dirbfsreq="$6"
+fi
+if [ $# -gt 6 ]
+then
+    acp_auto_answer="$7"
+fi
+
+
+#############################################################################
+#
+# Is the services files under NIS?
+
+nis=true
+sh ${SCRIPT_DIR}/.not_nis
+if [ $? -eq 0 ]
+then
+    nis=false
+fi
+
+
+#############################################################################
+# 
+# Create the directories needed to contain the modified and saved system files
+# 
+
+if $domkdir
+then
+
+#   # Cleanout the files in the save/* directories
+    if [ -d save ]
+    then
+	echo "Renaming directory \"save\" to \"OLDsave\""
+	if [ -d OLDsave/save ]
+	then
+	    rm -rf OLDsave/save
+	fi
+	mv save OLDsave 2> /dev/null
+	if [ $? -ne 0 ]
+	then
+	    rm -rf OLDsave
+	    mv save OLDsave
+	fi
+	
+    fi
+
+    err=false
+    for dir in save/original save/modified
+    do
+	if ./.mkpath $dir
+	then
+	    true
+	else
+	    err=true
+	fi
+    done
+    if $err
+    then
+	echo "**** Could not create directory"
+	for dir in save/original save/modified
+	do
+	    if [ ! -d $dir ]
+	    then
+		echo "****     $dir"
+	    fi
+	done
+	exit 1
+    fi
+fi
+
+# See if they are using native Radius. If so, skip acp prompts.
+
+while true
+do
+	dfltans=y
+	native_radius=false
+	rp="Will you be authenticating directly to a Radius server? (y/n) [$dfltans]:"
+	. ./.myread
+if [ -z "$ans" ]
+then
+	ans="$dfltans"
+fi
+	case $ans in
+	Y*|y*)
+	  native_radius=true
+	  had_regime=true
+	  acp_auto_answer="n"
+	  break
+	;;
+	n*|N*)
+	  break
+	;;
+	*)
+	  msgid=ynonly
+	  . $MSG_FILE
+	  continue
+	;;
+	esac
+done
+  
+if [ "$native_radius" = "false" ]
+then
+
+# Check for the acp_regime file and create it if needed
+
+regimefile=$diracp/acp_regime
+if [ -f $regimefile ]
+then
+    had_regime=true
+else
+    $debug && echo "${dbg_hdr}Must create file: $regimefile"
+    sh ${SCRIPT_DIR}/.regime_check $direxec $diracp
+fi
+
+# Check for the acp_userinfo file and create it if needed
+
+userinfofile=$diracp/acp_userinfo
+if [ ! -f $userinfofile ]
+then
+    $debug && echo "${dbg_hdr}Must create file: $userinfofile"
+    cat > $userinfofile << EOF
+user username=*
+end
+EOF
+
+fi
+
+# Check for the RADIUS dictionary file and create it if needed
+
+dictfile=$diracp/dictionary
+if [ ! -f $dictfile ]
+then
+    $debug && echo "${dbg_hdr}Must create file: $dictfile"
+    cp src/erpcd/dictionary $dictfile
+fi
+
+# Check for the TMS database files and create them if needed
+
+tmsdir=$diracp/tms
+tmsdbdir=$tmsdir/tms-database.dir
+tmsdbpag=$tmsdir/tms-database.pag
+
+if [ ! -d $tmsdir ]
+then
+	$debug && echo "${dbg_hdr}Must create directory: $tmsdir"
+	mkdir $tmsdir
+	chmod 755 $tmsdir
+fi
+
+for file in $tmsdbdir $tmsdbpag
+do
+	if [ ! -f $file ]
+	then
+    		$debug && echo "${dbg_hdr}Must create file: $file"
+		touch $file
+		chmod 600 $file
+	fi
+done
+
+fi
+
+#############################################################################
+# 
+# Place copies of the original version of the files into the save/original
+# and save/modified directories.  If the original files do not exist then
+# the save/original version of the file may be created with a reasonable
+# default (or possibly not get created at all).
+
+
+if $domakes
+then
+
+#   # Changing the acp_restrict file is only done once.  This should happen
+#   # only when upgrading from a pre-mckinley2 version of the host tools to
+#   # a mckinley2 version or later.  The way we can tell is by the presence
+#   # of the acp_regime file.  If it existed then we are mckinley2 or later.
+    if $had_regime
+    then
+	: We had an acp_regime file before this installation
+    else
+	change_restrict=true
+	sh ${SCRIPT_DIR}/.mk_restrict save/original/acp_restrict $diracp/acp_restrict
+	tmp=$?
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; exit $tmp ;;
+	esac
+#	# Exit status of 2 or 3 means user exit by trap or
+#	# answering with "quit"
+    fi
+
+
+    sh ${SCRIPT_DIR}/.mk_eservices	save/original/eservices	\
+				save/modified/eservices \
+				$diracp/eservices
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+#   # Exit status of 2 or 3 means user exit by trap or
+#   # answering with "quit"
+
+
+    # The eservices file should definitely be installed if there is no
+    # real one available (erpcd requires it).
+    # Set "tmp" to be the name of the source file.
+    # If the copy fails then $tmp will be used in the message file
+    if [ ! -f ${diracp}/eservices ]
+    then
+	tmp=save/modified/eservices
+	if cp $tmp ${diracp}/eservices 2> /dev/null
+	then
+	    : copy worked
+	else
+	    msgid=uf_eservicescpfails
+	    . $MSG_FILE
+	fi
+    fi
+
+
+    sh ${SCRIPT_DIR}/.mk_services	save/original/services	\
+					save/modified/services	\
+					/etc/services
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+#   # Exit status of 2 or 3 means user exit by trap or
+#   # answering with "quit"
+
+
+#   # If $rc_local_file file not found then try other locations and reset
+#   # rc_local_file to the name of an existing one (e.g., /etc/rc.d/rc.local)
+    if [ ! -f $rc_local_file ]
+    then
+	if [ -f $startup_dir/rc.local ]
+	then
+	    rc_local_file=$startup_dir/rc.local
+	else
+	    if [ -f /etc/rc ]
+	    then
+		rc_local_file=/etc/rc
+	    fi
+	fi
+    fi
+    sh ${SCRIPT_DIR}/.mk_rc	save/original/rc.local	\
+				save/modified/rc.local	\
+				$rc_local_file
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+#   # Exit status of 2 or 3 means user exit by trap or
+#   # answering with "quit"
+
+
+#   # If there was no original rc.local file then any we create would
+#   # be worthless.
+    if [ ! -f save/original/rc.local ]
+    then
+	edit_rc_local=false
+	rm -f save/modified/rc.local
+    fi
+
+    if [ -d $startup_dir ]
+    then
+	sh ${SCRIPT_DIR}/.mk_initd	$startup_dir			\
+					save/original/annex-initd	\
+					save/modified/annex-initd
+	tmp=$?
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; exit $tmp ;;
+	esac
+#	# Exit status of 2 or 3 means user exit by trap or
+#	# answering with "quit"
+
+#	# As opposed to the rc.local file if there were no original
+#	# annex-initd file then the one we create is OK.
+    fi
+fi
+
+#############################################################################
+# 
+# The files in the save/modified directory have to be modified now to
+# reflect the current installation.
+
+
+if $doedits
+then
+
+    for filename in $LIST_FILES
+    do
+	saved=save/original/$filename
+	modified=save/modified/$filename
+	[ -f $saved ]    && chmod 444 $saved
+	[ -f $modified ] && chmod 644 $modified
+    done
+
+
+#   # If erpcd requires the -f and/or -s options due to not having
+#   # the desired directories built into the code then we mark the
+#   # directories as being required by passing some of the scripts
+#   # the directory name preceeded with the needed option.
+
+    if $diracpreq
+    then
+	diracpopt="-s "
+    else
+	diracpopt=""
+    fi
+
+    if $dirbfsreq
+    then
+	dirbfsopt="-f "
+    else
+	dirbfsopt=""
+    fi
+
+
+
+    if $change_restrict
+    then
+	sh ${SCRIPT_DIR}/.ed_restrict save/original/acp_restrict save/modified/acp_restrict
+	tmp=$?
+	case "$tmp" in
+	    0)
+#		# Do not change anything
+		;;
+	    1)
+#		# User wants the file changed and the modified version is ok
+#		# Note that, in this case, we immediately update the real
+#		# file.  This is different from other files where we ask the
+#		# user if the modified file is to be copied to the real file.
+		if cp save/modified/acp_restrict $diracp/acp_restrict
+		then
+		    : Copy is ok
+		else
+		    msgid=restrictnocopy1
+		    . $MSG_FILE
+		fi
+		;;
+	    2|3)
+#		# Exit status of 2 or 3 means user exit by trap or
+#		# answering with "quit"
+		rm -f $tempfiles
+		exit $tmp
+		;;
+	    100)
+#		# User wants the file changed but problem with modified version
+		msgid=restrictnocopy2
+		. $MSG_FILE
+		;;
+	esac
+    fi
+
+    if [ -f save/modified/eservices ]
+    then
+	sh ${SCRIPT_DIR}/.ed_eservices	save/modified/eservices \
+					$acp_auto_answer
+	tmp=$?
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; exit $tmp ;;
+	esac
+#	# Exit status of 2 or 3 means user exit by trap or
+#	# answering with "quit"
+
+    fi
+
+
+    # This will create a modified file even if there were no saved original
+    sh ${SCRIPT_DIR}/.ed_services	save/original/services \
+					save/modified/services
+    tmp=$?
+    case "$tmp" in
+	2|3) rm -f $tempfiles ; exit $tmp ;;
+    esac
+#   # Exit status of 2 or 3 means user exit by trap or
+#   # answering with "quit"
+
+
+
+
+    if $edit_rc_local
+    then
+	sh ${SCRIPT_DIR}/.ed_rc	$direxec		\
+				"${diracpopt}$diracp"	\
+				"${dirbfsopt}$dirbfs"	\
+				save/original/rc.local	\
+				save/modified/rc.local
+	tmp=$?
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; exit $tmp ;;
+	esac
+#	# Exit status of 2 or 3 means user exit by trap or
+#	# answering with "quit"
+
+    fi
+
+    if [ -d $startup_dir ]
+    then
+	remove_tmp=false
+
+#	# If there was not an original version of this file then temporarily
+#	# fake it because ed_rc uses the original to create the modified.
+	if [ ! -f save/original/annex-initd ]
+	then
+	    remove_tmp=true
+	    cp save/modified/annex-initd save/original/annex-initd 2>/dev/null
+#	    # If the copy fails there is no disaster
+	fi
+
+	sh ${SCRIPT_DIR}/.ed_rc	$direxec		\
+				"${diracpopt}$diracp"	\
+				"${dirbfsopt}$dirbfs"	\
+				save/original/annex-initd \
+				save/modified/annex-initd
+
+#	# Save exit status to examine below
+	tmp=$?
+	$remove_tmp && rm -f save/original/annex-initd
+
+	case "$tmp" in
+	    2|3) rm -f $tempfiles ; exit $tmp ;;
+	esac
+#	# Exit status of 2 or 3 means user exit by trap or
+#	# answering with "quit"
+    fi
+
+    for filename in $LIST_FILES
+    do
+	saved=save/original/$filename
+	modified=save/modified/$filename
+	[ -f $saved ]    && chmod 444 $saved
+	[ -f $modified ] && chmod 444 $modified
+    done
+fi
+
+#############################################################################
+# 
+# The following code sections examine the modified files to see if
+# there is actually any difference from the original or is a completely
+# new file (no original available).  If that is the case then it will
+# lead the installer through an update procedure.
+
+
+anynisprob=false
+databases=""
+filelist=""
+detailedlist=""
+have_initd=false
+
+for filename in $LIST_FILES
+do
+    crt_is_rc_local=false
+    saved=save/original/$filename
+    modified=save/modified/$filename
+
+    if [ -f $saved ]
+    then
+	sf=1
+    else
+	sf=0
+    fi
+
+    if [ -f $modified ]
+    then
+	mf=1
+    else
+	mf=0
+    fi
+
+    case "${sf}${mf}" in
+	00)
+#	    # No files to worry about
+	    difftype=0
+	    action=skip
+	    ;;
+	01)
+	    difftype=1
+	    action=Create
+	    ;;
+	10)
+#	    # Should never get here though
+	    difftype=0
+	    action=skip
+	    ;;
+	11)
+	    difftype=2
+	    action=Update
+	    ;;
+    esac
+
+
+#   # If we have two versions of the files but the files
+#   # are the same then we do not have to update.
+
+    if [ "$action" = "Update" ]
+    then
+	if cmp $saved $modified > /dev/null 2>&1
+	then
+	    difftype=0
+	    action=skip
+	fi
+    fi
+
+
+    rootfile=1
+    case $filename in
+	services)
+	    if $nis
+	    then
+		anynisprob=true
+		databases="/databases"
+	    fi
+	    real="/etc/services"
+	    ;;
+	eservices)
+	    real="$diracp/eservices"
+	    rootfile=0
+	    ;;
+	rc.local)
+	    crt_is_rc_local=true
+	    real="$rc_local_file"
+	    ;;
+	annex-initd)
+	    have_initd=true
+	    real="$startup_dir/annex-initd"
+	    ;;
+    esac
+
+#   # Add it to the list if there was a difference (unless we have both an
+#   # rc.local and an annex-initd). Order of statements here is critical.
+    add_to_list=false
+    [ $difftype -ne 0 ] && add_to_list=true
+    [ \( $crt_is_rc_local = true \) -a \( $have_initd = true \) ] && add_to_list=false
+    if $add_to_list
+    then
+	filelist="$filelist $filename"
+	detailedlist="$detailedlist ${filename}:${real}:${difftype}:${action}:${rootfile}:"
+    fi
+done
+
+
+# Exit if we found that we did not create any save/modified files
+
+filelist=`echo "" $filelist`
+$debug && echo "${dbg_hdr}Update these files: $filelist"
+if [ -z "$filelist" ]
+then
+    echo " "
+    echo "No system files to create or update"
+    $debug && echo "${dbg_hdr}Exiting script that creates copies of system files"
+    exit
+fi
+
+
+# Create a list of files that have to be done by hand.
+# This is different from filelist because files are removed from
+# this list whenever this script does a copy for the user.
+dolist=" $filelist "
+
+
+#############################################################################
+# 
+# The preliminary work on the files has been completed.
+# We are not at the point where we have to interact with the installer.
+# Give an introduction to what will happen next and allow an escape from it.
+
+
+# These can be set differently do get a big change in how this script works:
+
+if $doinstall
+then
+    doask=true
+    skipfiles=false
+else
+    doask=false
+    skipfiles=true
+fi
+
+
+# Give introduction
+
+if $doask
+then
+    msgid=uf_updateintro
+    . $MSG_FILE
+fi
+
+
+# Now ask the installer what he wants to do
+
+while $doask
+do
+    dfltans=y
+    rp="Do you want to install any of these files (y/n) [$dfltans]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltans
+    fi
+    case $ans in
+	Y*|y*)
+	    doask=false
+	    skipfiles=false
+	    break
+	    ;;
+	N*|n*)
+	    doask=false
+	    skipfiles=true
+	    break
+	    ;;
+	"?")
+	    msgid=uf_updateintrohelp
+	    . $MSG_FILE
+	    continue
+	    ;;
+	*)
+	    msgid=ynonly
+	    . $MSG_FILE
+	    continue
+	    ;;
+    esac
+done
+
+
+# If we are marked to skip asking about files
+# then cause that to happen below
+
+$skipfiles && detailedlist=""
+
+
+
+#############################################################################
+# 
+# For all of the modified files we are to update ask the user if the new
+# version should be used.
+
+
+# The variable "file" contains information about each file in colon
+# separated fields.  The "expr" calls below are using \(.*\) to extract
+# the particular field of interest (1 through 5, in turn).
+
+bailout=false
+for file in $detailedlist
+do
+    filename=`expr $file : "\(.*\):.*:.*:.*:.*:"`
+    real=`expr $file     : ".*:\(.*\):.*:.*:.*:"`
+    difftype=`expr $file : ".*:.*:\(.*\):.*:.*:"`
+    action=`expr $file   : ".*:.*:.*:\(.*\):.*:"`
+    rootfile=`expr $file : ".*:.*:.*:.*:\(.*\):"`
+    saved=save/original/$filename
+    modified=save/modified/$filename
+    actline="$action $real from $modified"
+
+
+    thisinitdfile=false
+    thisnisfile=false
+    if $anynisprob
+    then
+	if [ "$filename" = "services" ]
+	then
+	    thisnisfile=true
+	    actline="$action $real (or NIS database) from $modified"
+	fi
+    fi
+    if [ "$filename" = "annex-initd" ]
+    then
+	thisinitdfile=true
+    fi
+
+    while true
+    do
+	ans=""
+	if $thisnisfile
+	then
+	    ans="n"
+	    msgid=uf_nisnotice
+	    . $MSG_FILE
+	else
+	    if [ \($rootfile -eq 1\) -a $notroot ]
+	    then
+		ans="n"
+		msgid=uf_notrootcopy
+		. $MSG_FILE
+	    fi
+	fi
+	echo " "
+	if [ -z "$ans" ]
+	then
+	    dfltans=y
+	    rp="Copy file $modified to $real (y/n) [$dfltans]:"
+	    . ./.myread
+	    if [ -z "$ans" ]
+	    then
+		ans=$dfltans
+	    fi
+	fi
+
+	case "$ans" in
+	    Y*|y*)
+		set -x
+		cp $modified $real
+		if [ $? -eq 0 ]
+		then
+			dolist=`echo " $dolist " | sed -e "s: $filename ::"`
+			$thisinitdfile && initd=true
+		else
+			echo "**** Error copying $modified to $real"
+		fi
+		set +x
+		break
+		;;
+	    N*|n*)
+		break
+		;;
+	    "?")
+		msgid=uf_copychoices
+		. $MSG_FILE
+		continue
+		;;
+	    *)
+		msgid=ynonly
+		. $MSG_FILE
+		continue
+		;;
+	esac
+    done
+    $bailout && break
+done
+
+
+if $initd
+then
+    
+    [ -f ../rc2.d/S99annex ] && rm -f ../rc2.d/S99annex
+    [ -f ../rc2.d/K09annex ] && rm -f ../rc2.d/K09annex
+    chmod +x $real
+    echo "Creating links to $real in /etc/rc2.d"
+    ln  $real /etc/rc2.d/S99annex
+    ln  $real /etc/rc2.d/K09annex
+    msgid=uf_copyinitd
+    . $MSG_FILE
+fi
+
+
+dolist=`echo "" $dolist`
+if [ -z "$dolist" ]
+then
+    echo " "
+    echo "No more system files to create or update"
+else
+    echo " "
+    echo "The following files$databases remain to be updated:"
+    echo "${indent}$dolist"
+    echo " "
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that creates copies of system files"
+exit
+

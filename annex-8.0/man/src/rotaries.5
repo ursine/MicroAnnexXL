@@ -1,0 +1,234 @@
+'''
+'''	$Header: /annex/common/src/./mk_rotaries/RCS/rotaries.5,v 1.5 1993/10/07 09:51:10 emond Rel $
+'''
+.ig xy
+.TH ROTARIES 4 ANNEX
+.xy
+.ie '\*(sy'V' .TH ROTARIES 4 ANNEX
+.el .TH ROTARIES 5 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+rotaries \- Annex rotary database
+.SH DESCRIPTION
+The rotaries database contains entries describing the port rotaries
+for any Annexes on the network.  The file, \f3config.annex\f1 is stored in the
+directory
+.B /usr/spool/erpcd/bfs 
+contains all the rotary definition information.
+See the \f2Annex Network Administrator's Guide\f1 for more information on
+the Annex port server and port rotaries.
+.PP
+Entries in the rotaries file follow these conventions:
+.TP 4n
+\*(BU
+Lines beginning with \*Q#\*U are comments.
+.TP
+\*(BU
+Blank lines are ignored.
+.TP
+\*(BU
+Lines in the file have a maximum of 132 characters.
+.TP
+\*(BU
+Entries can be continued on the next line by preceding the newline with
+\*Q\e\*U.
+.TP
+\*(BU
+The following characters have special meanings:
+.B \ \ \ \ :\ \ +\ \ @\ \ /\ \ ,\ \ ;\ \ \e\ \ #
+.TP
+\*(BU
+Any special character except \*Q,\*U can be included in a rotary name by
+quoting it with \*Q\e\*U.
+.TP
+\*(BU
+Space and tab characters can be used anywhere except in a rotary name
+to improve readability. Keywords must be delimited by space or tab characters.
+.PP
+Entries have the following syntax:
+.sp .5
+.RS
+.IB
+.IR rotary_name :
+.B [
+.I keyword ...
+.B ]
+.IR ports @ location
+.B [
+.RI / auxport
+.B ]
+.B [
+.RI + auxipaddr
+.B ]
+.B [
+;
+.IR ports @ location
+.B ]
+.I ... 
+.RE
+.PP
+.I Rotary_name
+is an
+.SM ASCII
+string terminated by a colon
+.RB ( : ).
+The maximum length is 32 characters.
+The string cannot contain space, tab, or
+comma 
+.RB ( , )
+characters. It can contain other special characters if
+they are escaped with a backslash.
+.PP
+.I Ports
+is a list of the serial ports in the rotary.
+It can be a number,
+a comma-separated list of numbers,
+two numbers separated by a dash (indicated an inclusive range),
+or a combination of these three formats.
+.PP
+.I Location
+identifies the Annex that has the given ports as a rotary.
+It can be either a hostname or an Internet address in dot notation.
+The
+.I location
+can be supplemented with an auxiliary
+.SM TCP
+port number separated from the Annex identifier by a slash
+.RB ( / ).
+The Annex will respond to requests to connect at this port in addition
+to responding to the well-known
+.SM TELNET
+port.  The number must be in the range 6000 through 6999.
+Finally, the location can also be given an auxiliary Internet address
+(as a hostname or in dot notation) separated by a plus sign
+.RB ( + ).
+The Annex will listen for requests to connect on this auxiliary
+Internet address at the well-known
+.SM TELNET
+port and automatically connect to the given rotary.
+.PP
+Additional
+.IR ports @ location
+entries can be given separated by a semi-colon
+.RB ( ; )
+to indicate a rotary on another Annex with the same name.
+.PP
+.I Keywords
+is a space separated list of optional features.
+Currently supported are:
+.PP
+.B ps=visible
+.br
+.B ps=invisible
+.RS
+Determines whether the rotary name is displayed by the
+port server when a user is connected to the
+.SM TELNET
+port of the Annex's primary Internet address.
+Rotaries without auxiliary Internet addresses or
+auxiliary
+.SM TCP
+ports are always visible.
+.B ps=visible
+is the default.
+.RE
+.PP
+.B telnet
+.br
+.B raw
+.br
+.B binary
+.RS
+Determines the protocol used with the rotary.
+.B raw
+provides a data stream with no character processing and is intended
+primarily for program access to the rotary.
+.B telnet
+is the default, ti configures
+.B telnet
+as the protocol between the port and the device.
+The setting 
+.B protocol=binary
+configures a binary rotary. The Annex negotiates with the host to
+operate in 
+.B telnet binary
+mode in both directions.
+.RE
+.PP
+.B direct_camp_on=ask
+.br
+.B direct_camp_on=always
+.br
+.B direct_camp_on=never
+.RS
+Determines how port camp-on is handled for rotaries with
+an auxiliary Internet address or auxiliary
+.SM TCP
+port.
+.I Camp-on
+is the process of waiting for the next free port in the
+rotary, if all of its ports are busy when a connection is attempted.
+.B ask
+indicates that the user is asked to camp-on.
+When
+.B always
+is selected, the user will get the message indicating camp-on has occurred.
+If
+.B never
+is used, then the
+.SM TELNET
+connection will be refused when the rotary is full.
+.B direct_camp_on=ask
+is the default except for raw rotaries, in which case
+.B never
+is the default.
+.RE
+.PP
+.B select=first
+.br
+.B select=next
+.RS
+The keyword 
+.B select=
+defines the order in which the rotary selects ports. If 
+.B select=first,
+the rotary selects the first available port in the 
+.I port_set;
+.B select=next
+directs the rotary to keep track of the last port that was
+selected, and to start its search from that point.
+.RE
+.SH EXAMPLES
+.nf
+#
+# sample rotary for 2400 bps modems on the network
+#
+modem_2400: 1,2,3@63.42; 16,1,4 @ annex01; \e
+	15@63.42;	12, 1, 4, 5, 6@ annex02
+#
+# "milking"-machine Annex: a non-networked host's serial ports are
+# connected to Annex 63.38 on ports 1-8 and 16.  An auxiliary IP
+# address 63.104 has been setup so that users can TELNET directly
+# to the rotary.
+#
+milker: 1-8,16@63.38+63.104
+
+HostC: ps=invisible 1,4,6-9@annex01+132.245.6.80
+
+strip-record: protocol=raw direct_camp_on=always \e
+3,8@132.245.6.32/6300
+
+modems: select=next 1-5@annex02
+.fi
+.SH SEE ALSO
+.ie '\*(sy'V' erpcd(1M).
+.el erpcd(8).
+.br
+\f2Annex Network Administrator's Guide\f1.

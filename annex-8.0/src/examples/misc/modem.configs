@@ -1,0 +1,410 @@
+%modem
+#
+# This file contains examples of modem configurations
+# to be used with the Dialback Security and Dynamic Dial features
+# of the Annex Software Revision 8.0.
+#
+# modem side:
+#     If DTR drops, connection hangs up
+#     DCD tracks status of carrier detect signal
+#     enable RTS/CTS local flow control
+#     disable echo
+#
+# Annex side:
+#    set in/out flow control to eia
+#    set control_type to both
+#    set bidirectional_mode to Y
+#
+
+## US Robotics Courier V34
+# &F1 for hardware flow control
+type_of_modem      CourierV34
+ready_status       0
+connect_status     1
+reset_cmd          AT
+modem_setup_cmd    AT &F0 Q2 V1 S0=1 &B1 &C1 &D2 &W
+dialout_setup_cmd  AT V0 S0=0 S6=2 X0 &A0 
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+# US Robotics Worldport V32
+# &F1 for hardware flow control
+type_of_modem      Worldport
+ready_status       0
+connect_status     1 47
+reset_cmd          AT
+modem_setup_cmd    AT &F0 Q2 V1 S0=1 &B1 &C1 &D2 &W
+dialout_setup_cmd  AT V0 S0=0 S6=2 X0 &A0
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+# Pace Linnet
+# NO Q2
+type_of_modem      Linnet
+ready_status       0
+connect_status     1 
+reset_cmd          ATQ0
+modem_setup_cmd    AT &F &K0 S0=1 V1 &D2 &S0 &W Q1
+dialout_setup_cmd  AT Q0 S0=0 V0 X0
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+type_of_modem      Linnet_dialout
+ready_status       0
+connect_status     1 
+reset_cmd          ATQ0
+modem_setup_cmd    AT &F &K0 S0=1 V1 &D2 &S0 &W
+dialout_setup_cmd  AT Q0 S0=0 V0 X0
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+# Psion Dacomm PDM6F
+# NO Q2 So use Q1.
+# S1? simulates the 0 response for the command!
+type_of_modem      PDM6F
+ready_status       0
+connect_status     1
+reset_cmd          ATQ0
+modem_setup_cmd    AT &F E1 S0=1 V1 &C1 &D2 &K0 &S0 &W &Y Q1S1?
+dialout_setup_cmd  AT Q0 S0=0 V0 X0
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+# Hayes Smartmodem 1200
+# NO Q2
+type_of_modem      S1200
+ready_status       0
+connect_status     1
+reset_cmd          ATZ
+modem_setup_cmd    AT E1 V1 Q1 S0=1
+dialout_setup_cmd  AT Q0 S0=0 V0 X0 
+dial_cmd           ATDT
+timeout            40
+retry              2
+reset_delay        0.0
+end
+
+# Hayes Optima 288
+type_of_modem      Optima288
+ready_status       0
+connect_status     1 
+reset_cmd          AT Z 
+modem_setup_cmd    AT &F &K0 Q2 S0=1 V1 &C1 &D2 &W 
+dialout_setup_cmd  AT S0=0 V0 X0
+dial_cmd           ATDT
+timeout            60
+retry              2
+reset_delay        0.0
+end
+
+#
+#################################################
+# These descriptions do not use modem_setup_cmd #
+#################################################
+#
+# Hayes Optima 96
+# profile 0: AT&f  AT&C1  AT&W0
+type_of_modem      Optima96
+ready_status       0
+connect_status     1 5 10 11 12 14 28
+reset_cmd          ATZ
+dialout_setup_cmd  AT V0 &D3 M0 &Q8 S7=90
+dial_cmd           ATDT
+timeout            90
+retry              1
+end
+
+# Hayes Optima 14.4
+# profile 0: AT&f  ATS0=1 AT&C1  AT&D3  ATV0  ATQ2  AT&Q9  ATT AT&W0
+type_of_modem      Optima144
+ready_status       0
+connect_status     1 5 10 11 12 13 14 18 28
+reset_cmd          ATZ
+dialout_setup_cmd  AT E1 V0 &D3 M0 Q2 &C1 &Q9 S7=60
+dial_cmd           ATDT
+timeout            120
+retry              2
+end
+
+# USRobotics Courier V.32 bis with ASL
+type_of_modem      CourierV32
+ready_status       0
+connect_status     1 5 10 13 14 15 16 17 18 19 20 21 25 43
+reset_cmd          AT&F
+dialout_setup_cmd  AT E1 V0 Q2 X1 &B1 &D2 &H1 &K3
+dial_cmd           ATDT
+timeout            90
+retry              2
+end
+
+# USRobotics Courier V.34
+type_of_modem      CourierV34
+ready_status       0
+connect_status     1
+reset_cmd          ATZ
+dialout_setup_cmd  AT E1 Q2 V0 X0 &A0 &B1 &C1 &D2 &H1 &I0 &K1 &R2
+dial_cmd           ATDT
+timeout            60
+retry              3
+end
+
+# Cabletron Modmim V.32 or V.34 internal Modem
+type_of_modem      CTRON-MODMIM
+ready_status       0
+connect_status     1
+reset_cmd          ATZ
+dialout_setup_cmd  AT E1 Q2 V0 X0 &A0 &B1 &C1 &D2 &H1 &I0 &K1 &R2
+dial_cmd           ATDT
+timeout            60
+retry              3
+end
+
+# Multi Tech 224
+type_of_modem      T224
+ready_status       0
+connect_status     1 5 10
+reset_cmd          AT&F
+dialout_setup_cmd  AT E1 V0 Q0 X2 M1
+dial_cmd           ATDT
+timeout            60
+retry              2
+end
+
+# Zyxel U1496
+type_of_modem      U1496
+ready_status       0
+connect_status     1 5 10 11 12 14 15 16 17 18 19 20 21
+reset_cmd          ATZ4
+dialout_setup_cmd  AT V0 M0 S0=1 S7=30
+dial_cmd           ATDT
+timeout            40
+retry              2
+end
+
+# Telebit T2500
+# profile A: AT&F  ATS58=2 ATS131=1  AT&W0
+type_of_modem      T2500
+ready_status       0
+connect_status     1 5 10 11 12 14 40 46 47 48 50
+reset_cmd          ATZ
+dialout_setup_cmd  AT E1 V0 Q8 X1 M0 S0=1 S52=2 S58=2 S66=1 S95=2 S96=1 S131=1
+dial_cmd           ATDT
+timeout            60
+retry              2
+end
+
+# Telebit TrailBlazer
+type_of_modem      TrailBlazer
+ready_status       0
+connect_status     1 5 10 20 22 23 50 61 62 63 70 71 72 73
+reset_cmd          AT&F
+dialout_setup_cmd  AT E1 V0 Q7 X3 M0 S51=255 S52=1 S58=2 S66=1 S95=2 S96=1
+dial_cmd           ATDT
+timeout            40
+retry              2
+end
+
+# Telebit T3000
+# profile A: AT&F  ATS58=2 ATS131=1  AT&W0
+type_of_modem      T3000
+ready_status       0
+connect_status     1 5 10 11 12 13 14 15 16 46 47 48 49
+reset_cmd          ATZ
+dialout_setup_cmd  AT E1 V0 Q2 X1 M0 S0=1  S58=2  
+dial_cmd           ATDT
+timeout            60
+retry              2
+end
+
+# UDS V.3229
+type_of_modem      UDS3229
+ready_status       0
+connect_status     1 5 10 11 12 13 14 15 16 17 18 19 22 23 24 25 26 27 28 29 30 43
+reset_cmd          AT&F
+dialout_setup_cmd  AT E1 V0 Q2 X1 &C1 &D2 &S1 S0=1 
+dial_cmd           ATDT
+timeout            90
+retry              2
+end
+
+#################################################################
+# The following entries are for the ISDN Interface on the Annex #
+#################################################################
+#
+# This profile is for:
+#	EuroISDN
+#	Async transparent mode
+type_of_modem       ISDN
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1000 Z
+modem_setup_cmd     AT &O1 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	EuroISDN
+#	V.120 mode
+type_of_modem       ISDN-V120
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1000 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	EuroISDN
+#	V.120 mode
+#	V.42bis compression
+type_of_modem       ISDN-V42
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1000 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 %C2 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	EuroISDN
+#	V.110 mode
+# Note this is not supported by early firmware.
+type_of_modem       ISDN-V110
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1000 Z
+modem_setup_cmd     AT &O9 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	Deutsch Telecom 1TR6
+#	V.120 mode
+type_of_modem       ISDN-1TR6 ISDN
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=49 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	France Telecom VN6 ISDN
+#	V.120 mode
+type_of_modem       ISDN-VN6
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=33 #ISDN_VERSION=3 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	AT&T 5ESS9 ISDN
+#	V.120 mode
+type_of_modem       ISDN-5ESS9
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1 #ISDN_VERSION=7 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	USA National ISDN-2
+#	V.120 mode
+type_of_modem       ISDN-5ESS9
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=1 #ISDN_VERSION=20 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	Australia Telecom ISDN
+#	V.120 mode
+type_of_modem       ISDN-AU
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=61 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+
+# This profile is for:
+#	NTT INS-64 ISDN
+#	V.120 mode
+type_of_modem       ISDN-INS64
+reset_cmd           AT
+ready_status        0
+powerup_cmd         AT #COUNTRY_CODE=81 #ISDN_VERSION=0 Z
+modem_setup_cmd     AT &O10 E1 V1 Q2 X1 S0=1
+dialout_setup_cmd   AT V0 Q0
+dial_cmd            ATD
+connect_status      1 5 10 11 12 14 18 28 99
+timeout             60
+retry               2
+reset_delay         0.1
+end
+

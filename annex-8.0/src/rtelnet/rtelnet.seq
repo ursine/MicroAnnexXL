@@ -1,0 +1,1643 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1989, 1990, Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use. 
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Description::
+ *
+ * 	Annex Reverse Telnet Daemon
+ *	modified telnetd to provide host-pty/annex-port association
+ *
+ * Original Author: Paul Mattes		Created on: an impulse
+ *
+ * Module Reviewers:
+ *	lint, loverso
+ *
+ * Revision Control Information:
+ * $Id: rtelnet.seq,v 1.1 1991/06/24 14:02:05 emond Rel $
+ *
+ * This file created by RCS from
+ * $Source: /annex/common/src/rtelnet/RCS/rtelnet.seq,v $
+ *
+ * Revision History:
+ * $Log: rtelnet.seq,v $
+ * Revision 1.1  1991/06/24  14:02:05  emond
+ * Initial revision
+ *
+ * Revision 2.7  90/04/18  13:16:08  loverso
+ * Use exponential backoff on delay when connection fails.
+ * Check for !net_errno when out of loop; this means net is ok.
+ * 
+ * 
+ * Revision 2.6  90/04/18  13:07:12  loverso
+ * Re-add lost fix for "-m"
+ * 
+ * Revision 2.5  90/04/09  15:35:09  loverso
+ * All debugging to stderr
+ * 
+ * Revision 2.4  90/04/03  13:37:17  loverso
+ * Be sure to initialize pcc & ncc for hosts which don't signal net failure
+ * 
+ * Revision 2.3  90/03/26  12:00:49  loverso
+ * Added more extensive debugging code.
+ * Added change to make sure all pty buffer data gets sent out network
+ * (fixes SPR.83, "rtelnet drops chars").
+ * 
+ * Revision 2.2  90/01/19  17:56:12  loverso
+ * Corrections and cleanup
+ * 
+ * Revision 2.1  89/12/01  14:03:45  loverso
+ * Fix typo and missing netdb.h
+ * 
+ * Revision 2.0  89/10/16  17:46:00  loverso
+ * `New' rtelnet with many portability changes for SysV-ish hosts
+ * 
+ * This file is currently under revision by: $Locker:  $
+ *
+ *****************************************************************************
+ */
+#ifndef lint
+static char sccsid[] = "based upon @(#)telnetd.c 4.26 (Berkeley) 83/08/06";
+static char rcsid[] =
+    "$Id: rtelnet.seq,v 1.1 1991/06/24 14:02:05 emond Rel $";
+#endif
+
+
+#include "../inc/config.h"
+
+#include <sys/types.h>
+#if TLI
+#include <sys/stream.h>
+#include <sys/tiuser.h>
+#include <sys/tihdr.h>
+#include <sys/poll.h>
+#include <netinet/netinet.h>
+#include <netdb.h>
+#else
+#include <sys/socket.h>
+#endif
+#include <sys/stropts.h>
+#include <netinet/in.h>
+#include <strings.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sgtty.h>
+#include <time.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <errno.h>
+/*#include <netdb.h>*/ /* config.h already has this one */
+#define TELOPTS
+#include <arpa/telnet.h>
+
+#ifdef SYS_V
+#include <sys/termio.h>
+#endif
+
+#define	after(s) (sizeof(s) - 1)
+
+#ifdef SEQUENT_PTX
+/* Sequent PTX uses three levels of variables, with the new third being
+ * called "king", all part of generating upwards of 1000 pty's. The order
+ * of power and range of the variables is:
+ *      king - "ABCD"
+ *      bank - "ABCD"
+ *      unit - "A-Za-z0-9_+"
+ * The format of the device name is:
+ *      / dev / tty[10][ABCD] / [01][ABCD][ABCD][A-Za-z0-9_+]
+ *                  |   |        |   |     |      \
+ *                  |   |        |   |      \       -- units
+ *                  |   |        |    \       -- bank
+ *                  |   |         \     -- king
+ *                  |    \          -- master=1, slave=0
+ *                   \     -- bank
+ *                     -- master=1, slave=0
+ */
+#define KINGS "ABCD"
+#define BANKS "ABCD"
+#define UNITS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_+"
+
+#define MASTERKING  after("/dev/tty1?/1")
+#define MASTERBANK1 after("/dev/tty1")
+#define MASTERBANK2 after("/dev/tty1?/1?")
+#define MASTERUNIT  after("/dev/tty1?/1??")
+#define SLAVEKING   after("/dev/tty1?/1")
+#define SLAVEBANK1  after("/dev/tty1")
+#define SLAVEBANK2  after("/dev/tty1?/1?")
+#define SLAVEUNIT   after("/dev/tty1?/1??")
+char master[] =           "/dev/tty1?/1???";
+char slave[] =            "/dev/tty0?/0???";
+char alias[] =            "/dev/tty1?/1???.rtelnet";
+#else
+#ifdef CONVERGENT
+/*
+ * Convergent uses "virtual terminals"
+ * master="vtXX" slave="ttypXX" units=[00..99]
+ * never-the-less, this code is less than correct.
+ */
+#define BANKS	"0123456789"
+#define UNITS	"0123456789"
+#define MASTERBANK	after("/dev/vt")
+#define MASTERUNIT	after("/dev/vt0")
+#define SLAVEBANK	after("/dev/ttyp")
+#define SLAVEUNIT	after("/dev/ttyp0")
+char	master[] = "/dev/vt00";
+char	slave[] = "/dev/ttyp00";
+char	alias[] = "/dev/vt00.rtelnet";
+#else /* !CONVERGENT */
+/*
+ * Berkeley-style ptys, banks of 16 units
+ * master="ptyBU" slave="ttyBU" banks=[pqrs] units=[0-9a-f]
+ * we avoid unit=0
+ */
+#define BANKS	"srqp"
+#define UNITS	"123456789abcdef"
+#define MASTERBANK	after("/dev/pty")
+#define MASTERUNIT	after("/dev/ptyp")
+#define SLAVEBANK	after("/dev/tty")
+#define SLAVEUNIT	after("/dev/ttyp")
+char	master[] = "/dev/ptyp0";
+char	slave[] = "/dev/ttyp0";
+char	alias[] = "/dev/ptyp0.rtelnet";
+#ifdef SEQUENT
+/*
+ * Sequent uses Berkeley-style ptys but with more units per bank
+ * master="ptyBU" slave="ttyBU" banks=[p] units=[0-9A-Za-z]
+ * we avoid unit=0
+ */
+#undef BANKS
+#define BANKS	"p"
+#undef UNITS
+#define UNITS	"123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#endif /* SEQUENT */
+#endif /* !CONVERGENT */
+#endif /* SEQUENT_PTX */
+
+#ifdef SEQUENT_PTX
+extern t_errno;
+char	kings[] = KINGS;
+#endif
+char	banks[] = BANKS;
+char	units[] = UNITS;
+
+#define SENT	0
+#define RCVD	1
+
+#define	BELL	'\007'
+
+#if SYS_V
+	struct termio tv;
+#else
+	struct sgttyb b;
+	struct tchars tchars;
+#endif
+#if TLIPOLL
+#define NPOLL	2	/* number of file descriptors to poll */
+#endif			/* 0 = net  1 = pty */
+
+char	hisopts[256];
+char	myopts[256];
+
+char	doopt[] = { IAC, DO, '%', 'c', 0 };
+char	dont[] = { IAC, DONT, '%', 'c', 0 };
+char	will[] = { IAC, WILL, '%', 'c', 0 };
+char	wont[] = { IAC, WONT, '%', 'c', 0 };
+
+/*
+ * I/O data buffers, pointers, and counters.
+ */
+char	ptyibuf[BUFSIZ], *ptyip = ptyibuf;
+char	ptyobuf[BUFSIZ], *pfrontp = ptyobuf, *pbackp = ptyobuf;
+char	netibuf[BUFSIZ], *netip = netibuf;
+char	netobuf[BUFSIZ], *nfrontp = netobuf, *nbackp = netobuf;
+
+char	*new_node;
+int	so_debug, drop, rflag;
+
+int	cleanup();
+
+int	pcc, ncc;
+int	options;
+int	port_num;
+int	pty, net;
+int	debug;
+int	binary;
+extern	char **environ;
+extern	int errno;
+int	progress = 0;
+#define	LINKED_TTY	1
+#define RENAMED_PTY	2
+
+struct	sockaddr_in sin = { AF_INET };
+struct	sockaddr_in sin2 = { AF_INET };
+
+int control_c();
+
+static void datadump();
+
+#define PORT_MAP_BASE	5000
+
+/*
+
+    When you use the D[DDD] options to turn on trace debugging, here is the
+    levels you can turn on and what they do:
+        1 - report master, slave, and alias names
+          - backoff value
+          - in the telnet(), when the code exits the telnet() and each time
+            it falls out of the for(;;) loop, it prints the status of:
+                pcc       - count of data read from pty in ptyibuf
+                pty_errno - errno on last error on read|write to pty
+                ncc       - count of data read from net in netibuf
+                net_errno - errno on last error on read|write to net
+          - if the -m option is used, before and after the tcp connection is
+            dropped, a message is printed
+        2 - all of level 1 plus
+          - amount of data read on pty or net with error reporting
+        3 - all of level 2 plus
+          - net and pty file descriptors
+          - what we called select (poll) with
+          - what select (poll) returned with
+          - on writes to pty or net, amount of data written with error reporting
+        4 - all of level 3 plus hex dump of all data read from the net and pty
+
+    The best method of starting rtelnet with tracing information on is:
+        /usr/ats/rtelnet.debug -rDDD XX YY /dev/ZZ >/tmp/atstrace 2>&1 &
+    where:
+        XX is the name of the ATS
+        YY is the port on the ATS
+        ZZ is the name you want to call the rtelnet device
+     
+*/
+
+usage()
+{
+	fprintf(stderr,
+	"usage: rtelnet [-bdmrDDDD] <annex_id> <annex_port> /dev/<new_dev_name>\n");
+	exit(1);
+}
+
+main(argc, argv)
+	char *argv[];
+{
+	struct stat sbuf;
+	int	on=1, backoff=1;
+	char	*bank, *unit, *cp;
+	register struct hostent *host;
+
+#ifdef SEQUENT_PTX
+	char	*king;
+#endif
+
+	argv++, argc--;
+  	while (argc > 0 && argv[0][0] == '-') {
+		for (cp = &argv[0][1]; *cp; cp++)
+			switch(*cp) {
+			case 'b':
+				binary++;	/* try binary mode */
+				break;
+
+			case 'd':
+				so_debug++;	/* turn socket debugging */
+				break;
+
+			case 'm':
+				drop++;		/* drop socket on pty close */
+				break;
+
+			case 'r':
+				rflag++;	/* remove file if it exists */
+				break;
+
+			case 'D':
+				debug++;	/* verbose debug output */
+				break;
+
+			default:
+				fprintf(stderr, "rtelnet: unknown flag '%c'\n",
+						*cp);
+				exit(1);
+
+			}	/* switch(argv[0][1]) */
+
+		argv++;
+		argc--;
+	}
+
+	if (argc != 3)
+		usage();
+
+	sin.sin_addr.s_addr = inet_addr(argv[0]);
+	if (sin.sin_addr.s_addr != -1) {
+		sin.sin_family = AF_INET;
+	} else {
+		host = gethostbyname(argv[0]);
+		if (host) {
+			sin.sin_family = host->h_addrtype;
+			bcopy(host->h_addr,
+			      (caddr_t)&sin.sin_addr,
+			      host->h_length);
+		} else {
+			fprintf(stderr, "rtelnet: %s: unknown host\n", argv[0]);
+			exit(1);
+		}
+	}
+
+	argc--,	argv++;
+
+	port_num = atoi(*argv);
+	if (port_num <= 0)
+		usage();
+
+	if (debug)
+	    fprintf(stderr, "rtelnet using %s port %d\n", *(argv-1) ,port_num);
+
+	sin.sin_port = htons((unsigned short)(PORT_MAP_BASE + port_num));
+
+	argc--, argv++;
+
+	if (stat(argv[0], &sbuf) >= 0) {
+		if (rflag)
+			unlink(argv[0]);
+		else {
+			fprintf(stderr, "rtelnet: File %s already exists\n",
+					argv[0]);
+			exit(1);
+		}
+	}
+
+	new_node = *argv;
+	if (so_debug)
+#if TLI
+		options |= TP_DEBUG;
+#else
+		options |= SO_DEBUG;
+#endif
+
+	/*
+	 * Clean up after previous incarnations of rtelnet
+	 */
+#ifdef SEQUENT_PTX
+	for (king = kings; *king; king++) {
+		alias[MASTERKING] = *king;
+#endif
+		for (bank = banks; *bank; bank++) {
+			struct stat stb;
+
+#ifdef SEQUENT_PTX
+			alias[MASTERBANK1] = *bank;
+			alias[MASTERBANK2] = *bank;
+#else
+			alias[MASTERBANK] = *bank;
+#endif
+			for (unit = units; *unit; unit++) {
+				alias[MASTERUNIT] = *unit;
+				if (stat(alias, &stb) < 0)
+					continue;
+				if ((pty = open(alias, 2)) < 0)
+					continue;
+				else {
+#ifdef SEQUENT_PTX
+					master[MASTERKING] = *king;
+					master[MASTERBANK1] = *bank;
+					master[MASTERBANK2] = *bank;
+#else
+					master[MASTERBANK] = *bank;
+#endif
+					master[MASTERUNIT] = *unit;
+					(void)rename(alias, master);
+					close(pty);
+				}
+			}
+		}
+#ifdef SEQUENT_PTX
+	}
+#endif
+
+	/*
+	 * Open the master pty.  Search backwards, so that the pty we take
+	 * permanently doesn't slow down other pty users.  We may reserve
+	 * the pty by renaming it, so don't use /dev/pty?0, which can't
+	 * ever disappear.
+	 */
+#ifdef SEQUENT_PTX
+	for (king = kings; *king; king++) {
+		master[MASTERKING] = *king;
+		slave[SLAVEKING] = *king;
+		alias[SLAVEKING] = *king;
+#endif
+		for (bank = banks; *bank; bank++) {
+			struct stat stb;
+	
+#ifdef SEQUENT_PTX
+			master[MASTERBANK1] = *bank;
+			master[MASTERBANK2] = *bank;
+			slave[SLAVEBANK1] = *bank;
+			slave[SLAVEBANK2] = *bank;
+#else
+			master[MASTERBANK] = *bank;
+			slave[SLAVEBANK] = *bank;
+#endif
+			master[MASTERUNIT] = units[0];
+			if (stat(master, &stb) < 0)
+				continue;
+			for (unit = units; *unit; unit++) {
+				master[MASTERUNIT] = *unit;
+				if ((pty = open(master, 2)) < 0)
+					continue;
+				slave[SLAVEUNIT] = *unit;
+				if (link(slave, new_node) < 0) {
+					fprintf(stderr,
+						"rtelnet: link to slave device ");
+					perror(slave);
+					continue;
+				}
+				progress |= LINKED_TTY;
+#ifdef SEQUENT_PTX
+				alias[MASTERBANK1] = *bank;
+				alias[MASTERBANK2] = *bank;
+#else
+				alias[MASTERBANK] = *bank;
+#endif
+				alias[MASTERUNIT] = *unit;
+				goto gotpty;
+			}
+		}
+#ifdef SEQUENT_PTX
+	}
+#endif
+	fprintf(stderr, "rtelnet: No host pty's available\n");
+	cleanup();
+	/*NOTREACHED*/
+
+gotpty:
+	if (debug)
+		fprintf(stderr,"using master=%s slave=%s alias=%s\n",
+			master, slave, alias);
+
+	chmod(new_node, 0777);
+
+#if SYS_V
+#else
+	if (ioctl(pty, TIOCGETP, (caddr_t)&b) < 0) {
+		perror("rtelnet:ioctl TIOCGETP failed");
+		cleanup();
+	}
+	b.sg_flags = CRMOD | XTABS | ANYP;
+	if (ioctl(pty, TIOCSETP, (caddr_t)&b) < 0) {
+		perror("rtelnet:ioctl TIOCSETP failed");
+		cleanup();
+	}
+#endif
+
+#if SYS_V
+	if (fcntl(pty, F_SETFL, O_NDELAY) < 0) {
+		perror("rtelnet:fcntl pty O_NDELAY failed");
+		cleanup();
+	}
+#else
+	if (ioctl(pty, FIONBIO, (caddr_t)&on) < 0) {
+		perror("rtelnet:ioctl pty FIONBIO failed");
+		cleanup();
+	}
+#endif
+#ifdef TIOCPKT
+	if (ioctl(pty, TIOCPKT, (caddr_t)&on) < 0) {
+		perror("rtelnet:ioctl TIOCPKT failed");
+		cleanup();
+	}
+#endif
+
+	if (!debug) {
+		int fd;
+
+		if (fork())
+			exit(0);
+		(void) close(0);
+		(void) close(1);
+		(void) close(2);
+
+#ifdef SYS_V
+		fd = open ("/dev/console", O_RDWR);
+		if (fd < 0)
+			fd = open ("/dev/tty", O_RDWR);
+		if (fd < 0)
+			fd = open ("/dev/null", O_RDWR);
+		(void)dup2 (0, 1);
+		(void)dup2 (0, 2);
+#else
+		(void)open("/", 0);
+		(void)dup2 (0, 1);
+		(void)dup2 (0, 2);
+
+		fd = open("/dev/tty", 2);
+		if (fd > 0) {
+			ioctl(fd, TIOCNOTTY, 0);
+			close(fd);
+		}
+#endif
+	}
+
+#ifdef SYS_V
+	(void)setpgrp();
+#endif
+	signal(SIGINT, control_c);
+	signal(SIGTERM, control_c);
+
+	while(1) {
+		if (debug)
+			fprintf(stderr,"\nTop of loop, backoff=%d\n", backoff);
+		if (make_connection()) {
+			sleep(backoff);
+			backoff = backoff > 32 ? 64 : backoff << 1;
+		} else
+			backoff = 1;
+	}
+}
+
+make_connection()
+{
+	int s;
+	int on = 1;
+
+#if TLI
+	struct t_call *tlicall;
+	struct strioctl ioc;
+	struct tcp_options tcpoptbuf;
+
+	if ((s = t_open(TLI_TCP,O_RDWR,(struct t_info *) NULL)) < 0) {
+		t_error("rtelnet:t_open failed");
+		cleanup();
+	}
+	if (t_bind(s, (struct t_bind *) NULL, (struct t_bind *) NULL) < 0) {
+		t_error("rtelnet:t_bind failed");
+		(void)t_close(s);
+		return(-1);
+	}
+
+	tcpoptbuf.pr_options = TP_KEEPALIVE;
+	if (options & TP_DEBUG)
+		tcpoptbuf.pr_options |= TP_DEBUG;
+	tcpoptbuf.ltime = 0;
+	tcpoptbuf.rcv_buf = 0;
+	tcpoptbuf.snd_buf = 0;
+	ioc.ic_cmd = TCP_SETOPT;
+	ioc.ic_timout = 0;
+	ioc.ic_len = sizeof(struct tcp_options);
+	ioc.ic_dp = (char *) &tcpoptbuf;
+	if (ioctl(s, I_STR, &ioc) < 0) {
+		perror("rtelnet:ioctl TCP_SETOPT failed");
+		cleanup();
+	}
+
+	if ((tlicall = (struct t_call *)t_alloc(s,T_CALL,T_ADDR))
+	 == (struct t_call *) NULL) {
+		t_error("rtelnet:t_alloc of tlicall failed");
+		(void)t_close(s);
+		return(-1);
+	}
+
+	bcopy(&sin,tlicall->addr.buf,sizeof(struct sockaddr_in));
+	tlicall->addr.len = sizeof(struct sockaddr_in);
+
+	if (t_connect(s,tlicall,(struct t_call *) NULL) <0) {
+		t_error("rtelnet:t_connect failed");
+		(void)t_close(s);
+		return(-1);
+	}
+	if (t_free(tlicall,T_CALL) <0) {
+		t_error("rtelnet:t_free failed");
+		(void)t_close(s);
+		return(-1);
+	}
+#else
+
+	s = socket(AF_INET, SOCK_STREAM, 0);
+	if (s < 0) {
+		perror("rtelnet: socket failed");
+		cleanup();
+	}
+
+	if (options & SO_DEBUG)
+		if (setsockopt(s, SOL_SOCKET, SO_DEBUG, &on, sizeof(on)) < 0)
+			perror("rtelnet: setsockopt (SO_DEBUG) failed");
+
+	if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) < 0)
+		perror("rtelnet: setsockopt (SO_KEEPALIVE) failed");
+
+	if (bind(s, (struct sockaddr *)&sin2, sizeof (struct sockaddr)) < 0)
+		perror("rtelnet: bind failed");
+
+	if (connect(s, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
+		perror("rtelnet: connect failed");
+		(void)close(s);
+		return -1;
+	}
+#endif
+
+	ptyip = ptyibuf;
+	pfrontp = ptyobuf;
+	pbackp = ptyobuf;
+	netip = netibuf;
+	nfrontp = netobuf;
+	nbackp = netobuf;
+
+	telnet(s);
+#if TLI
+	t_close(s);
+#else
+	(void)close(s);
+#endif
+	return(0);
+}
+
+
+/*
+ * Main loop.  Select from pty and network, and
+ * hand data to telnet receiver finite state machine.
+ */
+telnet(f)
+int f;
+{
+	int on = 1;
+	int net_errno=0, pty_errno=0;
+#if TLIPOLL
+	struct pollfd pollfds[NPOLL];
+#endif
+ 
+	telrcv(1);
+
+#if TLIPOLL
+	pollfds[0].fd=f;	/* tli file desctriptor, net */
+	pollfds[1].fd=pty;	/* linked device name, pty */
+	pollfds[0].events = 0;
+	pollfds[1].events = 0;
+#endif
+	net = f;
+#if SYS_V
+	if (fcntl(net, F_SETFL, O_NDELAY) < 0) {
+		perror("rtelnet:fcntl net O_NDELAY failed");
+		cleanup();
+	}
+#else
+	if (ioctl(net, FIONBIO, (caddr_t)&on) < 0) {
+		perror("rtelnet:ioctl net FIONBIO failed");
+		cleanup();
+	}
+#endif
+#ifdef SIGTSTP
+	signal(SIGTSTP, SIG_IGN);
+#endif
+
+	/*
+	 * Negotiate binary mode, if requested
+	 */
+	if (binary) {
+		dooption(TELOPT_BINARY);
+		myopts[TELOPT_BINARY] = 1;
+		willoption(TELOPT_BINARY);
+	}
+
+restart:
+	pcc = 0; ncc = 0;
+
+	if (debug > 2)
+		fprintf(stderr,"\nfd: net=%d, pty=%d\n", net, pty);
+
+	for (;;) {
+#if TLI
+		int flags=0;
+#else
+		int ibits = 0 , obits = 0;
+#endif
+		register int c;
+		int n_found;
+
+		/*
+		 * Never look for input if there's still
+		 * stuff in the corresponding output buffer
+		 */
+		if (nfrontp - nbackp || pcc > 0)
+#if TLIPOLL
+			pollfds[0].events |= POLLOUT;
+		else
+			pollfds[1].events |= POLLIN;
+#else
+			obits |= (1 << net);
+		else
+			ibits |= (1 << pty);
+#endif
+
+		if (pfrontp - pbackp) {
+#if TLIPOLL
+			ptyflush();
+			if (pfrontp - pbackp)
+				pollfds[1].events |= POLLOUT;
+			else
+				pollfds[0].events |= POLLIN;
+#else
+#if CONVERGENT
+/*  if no process has opened the slave side, we will get
+                  broken pipe. */
+			ptyflush();
+			if (((pfrontp - pbackp) > 0) && (errno == ENXIO)) {
+				pty_errno = errno;
+				net_errno = 0;
+				break;
+			}
+			if (pfrontp - pbackp)
+				obits |= (1 << pty);
+			else
+				ibits |= (1 << net);
+#else
+				obits |= (1 << pty);
+#endif /* CONVERGENT */
+#endif /* TLIPOLL */
+		} else
+#if TLIPOLL
+			pollfds[0].events |= POLLIN;
+#else
+			ibits |= (1 << net);
+#endif
+
+		if (ncc < 0 && pcc < 0)
+			break;
+
+		if (debug > 2) {
+#if TLIPOLL
+			fprintf(stderr, "poll:net=%s%s pty=%s%s|",
+				(pollfds[0].events & POLLIN) ? "i" : " ",
+				(pollfds[0].events & POLLOUT) ? "o" : " ",
+				(pollfds[1].events & POLLIN) ? "i" : " ",
+				(pollfds[1].events & POLLOUT) ? "o" : " ");
+#else
+			fprintf(stderr, "select:i=%s%s o=%s%s|",
+				(ibits & (1 << net)) ? "net" : "   ",
+				(ibits & (1 << pty)) ? "pty" : "   ",
+				(obits & (1 << net)) ? "net" : "   ",
+				(obits & (1 << pty)) ? "pty" : "   ");
+#endif
+		}
+#if TLIPOLL
+		if((n_found = poll(pollfds, NPOLL, -1)) <0) {
+			perror("rtelnet: poll failed");
+			cleanup();
+		}
+		pollfds[0].events = 0;
+		pollfds[1].events = 0;
+#else
+		n_found = select(16, &ibits, &obits, (int *)0,
+				 (struct timeval *)0);
+		if (n_found < 0) {
+			perror("rtelnet: select failed");
+			cleanup();
+		}
+#endif
+		if (debug > 2)
+#if TLIPOLL
+			fprintf(stderr, "%d:net=%s%s pty=%s%s%s|", n_found,
+				(pollfds[0].revents & (POLLIN | POLLPRI)) ? "i" : " ",
+				(pollfds[0].revents & POLLOUT) ? "o" : " ",
+				(pollfds[1].revents & (POLLIN | POLLPRI)) ? "i" : " ",
+				(pollfds[1].revents & POLLOUT) ? "o" : " ",
+				(pollfds[1].revents & POLLERR) ? "ERR" : "");
+#else
+			fprintf(stderr, "%d:i=%s%s o=%s%s|", n_found,
+				(ibits & (1 << net)) ? "net" : "   ",
+				(ibits & (1 << pty)) ? "pty" : "   ",
+				(obits & (1 << net)) ? "net" : "   ",
+				(obits & (1 << pty)) ? "pty" : "   ");
+#endif
+
+#if TLIPOLL
+		if (pollfds[0].revents & ~(POLLIN | POLLPRI | POLLOUT)) {
+			net_errno = EIO;
+			pty_errno = 0;
+			break;
+		}
+		if (pollfds[1].revents & ~(POLLIN | POLLPRI | POLLOUT)) {
+			net_errno = 0;
+			pty_errno = EIO;
+			break;
+		}
+		if (!(pollfds[0].revents |  pollfds[1].revents))
+#else
+		if (ibits == 0 && obits == 0)
+#endif
+		{
+			sleep(5);
+			continue;
+		}
+
+		/*
+		 * Something to read from the network...
+		 */
+#if TLIPOLL
+		if (pollfds[0].revents & (POLLIN | POLLPRI)) 
+#else
+		if (ibits & (1 << net)) 
+#endif
+		{
+
+#if TLIPOLL
+			ncc = t_rcv(net, netibuf, BUFSIZ, &flags);
+			if (debug > 1) {
+				if (ncc < 0)
+					t_error("rtelnet:t_rcv on net failed");
+				fprintf(stderr, "net:rd=%d ", ncc);
+				if (debug > 3)
+					fprintf(stderr, "\n", ncc);
+			}
+			if (t_errno == TSYSERR && errno == EINTR)
+				ncc = 0;
+			else {
+				if (ncc <= 0) {
+					net_errno = ncc<0?t_errno:0;
+#else
+			ncc = read(net, netibuf, BUFSIZ);
+			if (debug > 1) {
+				if (ncc < 0)
+					fprintf(stderr, "net:rd=%d errno=%d\n", ncc, errno);
+				else {
+					fprintf(stderr, "net:rd=%d ", ncc);
+					if (debug > 3)
+						fprintf(stderr, "\n", ncc);
+				}
+			}
+			if (ncc < 0 && errno == EWOULDBLOCK)
+				ncc = 0;
+			else {
+				if (ncc <= 0) {
+					net_errno = ncc<0?errno:0;
+#endif /* TLIPOLL */
+					pty_errno = 0;
+					break;
+				}
+				netip = netibuf;
+			}
+			if (debug > 3 && ncc > 0)
+				datadump(netip, ncc);
+		} /* if something to read from the network */
+
+		/*
+		 * Something to read from the pty...
+		 */
+#if TLIPOLL
+		if (pollfds[1].revents & (POLLIN | POLLPRI))
+#else
+		if (ibits & (1 << pty))
+#endif
+		{
+			pcc = read(pty, ptyibuf, BUFSIZ);
+			if (debug > 1) {
+				if (pcc < 0)
+					fprintf(stderr, "pty:rd=%d errno=%d\n", pcc, errno);
+				else
+					fprintf(stderr, "pty:rd=%d ", pcc);
+				if (debug > 3)
+					fprintf(stderr, "\n");
+			}
+			if (pcc < 0 && errno == EWOULDBLOCK)
+				pcc = 0;
+			else {
+				if (pcc <= 0) {
+					net_errno = 0;
+					pty_errno = pcc<0?errno:0;
+					break;
+				}
+#ifdef TIOCPKT
+				pcc--;
+				ptyip = &ptyibuf[1];
+#else
+				ptyip = &ptyibuf[0];
+#endif
+
+#if SYS_V
+#else
+				if (debug > 2) {
+					fprintf(stderr,"pkt- %x, cnt- %d\n", ptyibuf[0], pcc);
+					if (ptyibuf[0]) {
+						ioctl(pty, TIOCGETP, (caddr_t)&b);
+						fprintf(stderr,
+							"is- %x os- %x er- %x ki- %x flags- %x\n",
+							b.sg_ispeed, b.sg_ospeed,
+							b.sg_erase, b.sg_kill, b.sg_flags);
+					}
+				}
+#endif
+			}
+
+			if (debug > 3 && pcc > 0)
+				datadump(ptyip, pcc);
+		} /* if something to read from pty */
+
+		while (pcc > 0) {
+			if ((&netobuf[BUFSIZ] - nfrontp) < 2)
+				break;
+			c = *ptyip++ & 0377, pcc--;
+			*nfrontp++ = c;
+			if (c == IAC)
+				*nfrontp++ = c;
+			else if (c == '\r' && !myopts[TELOPT_BINARY])
+				*nfrontp++ = '\0';
+		}
+#if defined(CONVERGENT) || defined(SEQUENT_PTX)
+		if ((nfrontp - nbackp) > 0)
+#else
+		if ((obits & (1 << net)) && (nfrontp - nbackp) > 0)
+#endif
+			netflush();
+
+		if (ncc > 0)
+			telrcv(0);
+
+#ifdef SEQUENT_PTX
+		if ((pfrontp - pbackp) > 0)
+			ptyflush();
+#else
+#if CONVERGENT
+		if ((pfrontp - pbackp) > 0) {
+			ptyflush();
+			if (((pfrontp - pbackp) > 0) && (errno == ENXIO)) {
+				pty_errno = errno;
+				net_errno = 0;
+				break;
+			}
+		}
+#else
+		if ((obits & (1 << pty)) && (pfrontp - pbackp) > 0)
+			ptyflush();
+#endif /* CONVERGENT */
+#endif /* TLI */
+
+#if defined(CONVERGENT) || defined(SEQUENT_PTX)
+		if (debug == 2)
+#else
+		if (debug > 2)
+#endif
+			fprintf(stderr, "\n");
+
+	} /* for(;;) */
+
+	if (debug) {
+		fprintf(stderr,
+			"\nout of loop pcc=%d pty_errno=%d ncc=%d net_errno=%d\n",
+			pcc, pty_errno, ncc, net_errno);
+	}
+
+	/*
+	 * I/O error from pty or it looks like somebody closed the slave device.
+	 * Simply start over.
+	 */
+#if CONVERGENT
+/*  handle nobody open on slave when we tried to write to it*/
+	if (pty_errno == EIO || pty_errno == ENXIO || net_errno != 0 ||
+#else
+	if (pty_errno == EIO || net_errno != 0 ||
+#endif
+		(pcc == 0 && pty_errno == 0)) {
+ 
+		/*
+		 * While the master pty is closed, someone could open
+		 * it and effectively steal the remote device from us.
+		 * (Yecch) rename the master pty while it's closed.
+		 */
+		if (rename(master, alias) < 0) {
+			perror("rtelnet: rename to alias failed");
+			cleanup();
+		}
+		progress |= RENAMED_PTY;
+		close(pty);
+		pty = open(alias, 2);
+		while (pty < 0) {
+			int i = 0;
+			sleep(1);
+			pty = open(alias, 2);
+			if (++i > 120) {
+				perror("rtelnet: pty re-open failed");
+				cleanup();
+			}
+		}
+#if TLI
+		pollfds[1].fd = pty;
+#endif
+		if (rename(alias, master) < 0) {
+			perror("rtelnet: rename to normal failed");
+			cleanup();
+		}
+		progress &= ~RENAMED_PTY;
+#if SYS_V
+#else
+		ioctl(pty, TIOCGETP, (caddr_t)&b);
+		b.sg_flags = CRMOD | XTABS | ANYP;
+		if (ioctl(pty, TIOCSETP, (caddr_t)&b) < 0) {
+			perror("rtelnet:ioctl TIOCSETP failed");
+			cleanup();
+		}
+#endif
+
+#if SYS_V
+		if (fcntl(pty, F_SETFL, O_NDELAY) < 0) {
+			perror("rtelnet:fcntl pty O_NDELAY failed");
+			cleanup();
+	}
+#else
+		if (ioctl(pty, FIONBIO, (caddr_t)&on) < 0) {
+			perror("rtelnet:ioctl pty FIONBIO failed");
+			cleanup();
+		}
+#endif
+#ifdef TIOCPKT
+		if (ioctl(pty, TIOCPKT, (caddr_t)&on) < 0) {
+			perror("rtelnet:ioctl TIOCPKT failed");
+			cleanup();
+		}
+#endif
+		if (pty_errno || !net_errno) {
+			if (drop)
+				send_tm(net);
+			else
+				goto restart;
+		}
+#if TLI
+		if(t_sndrel(net) < 0)
+			t_error("rtelnet:t_sndrel failed");
+#else
+		if (shutdown(net, 2) < 0)	/* Telnet connection down */
+			perror("rtelnet: shutdown failed");
+#endif
+		sleep(1);
+		return;
+	}
+
+	fprintf(stderr,"rtelnet:outahere pcc=%d pty_errno=%d ncc=%d net_errno=%d\n",
+		pcc, pty_errno, ncc, net_errno);
+	cleanup();
+}
+
+
+/*
+ * State for recv fsm
+ */
+#define	TS_DATA		0	/* base state */
+#define	TS_IAC		1	/* look for double IAC's */
+#define	TS_CR		2	/* CR-LF ->'s CR */
+#define	TS_BEGINNEG	3	/* throw away begin's... */
+#define	TS_ENDNEG	4	/* ...end's (suboption negotiation) */
+#define	TS_WILL		5	/* will option negotiation */
+#define	TS_WONT		6	/* wont " */
+#define	TS_DO		7	/* do " */
+#define	TS_DONT		8	/* dont " */
+
+telrcv(init_it)
+int init_it;
+{
+	register int c;
+	static int state = TS_DATA;
+
+	if (init_it) {
+		state = TS_DATA;
+		return;
+	}
+
+	while (ncc > 0) {
+		if ((&ptyobuf[BUFSIZ] - pfrontp) < 2)
+			return;
+		c = *netip++ & 0377, ncc--;
+
+		switch (state) {
+
+		case TS_DATA:
+			if (c == IAC) {
+				state = TS_IAC;
+				break;
+			}
+			*pfrontp++ = c;
+			if (!hisopts[TELOPT_BINARY] && c == '\r')
+				state = TS_CR;
+			break;
+
+		case TS_CR:
+			if (c && c != 0)
+				*pfrontp++ = c;
+			state = TS_DATA;
+			break;
+
+		case TS_IAC:
+			switch (c) {
+
+			/*
+			 * Send the process on the pty side an
+			 * interrupt.  Do this with a NULL or
+			 * interrupt char; depending on the tty mode.
+			 */
+			case BREAK:
+			case IP:
+				interrupt();
+				break;
+
+			/*
+			 * Are You There?
+			 */
+			case AYT:
+				*pfrontp++ = BELL;
+				break;
+
+			/*
+			 * Erase Character and
+			 * Erase Line
+			 */
+			case EC:
+			case EL:
+				ptyflush();	/* half-hearted */
+#if SYS_V
+#else
+				ioctl(pty, TIOCGETP, (caddr_t)&b);
+				*pfrontp++ = (c == EC) ?
+					b.sg_erase : b.sg_kill;
+#endif
+				break;
+
+			/*
+			 * Check for urgent data...
+			 */
+			case DM:
+				break;
+
+			/*
+			 * Begin option subnegotiation...
+			 */
+			case SB:
+				state = TS_BEGINNEG;
+				continue;
+
+			case WILL:
+			case WONT:
+			case DO:
+			case DONT:
+				state = TS_WILL + (c - WILL);
+				continue;
+
+			case IAC:
+				*pfrontp++ = c;
+				break;
+			}
+			state = TS_DATA;
+			break;
+
+		case TS_BEGINNEG:
+			if (c == IAC)
+				state = TS_ENDNEG;
+			break;
+
+		case TS_ENDNEG:
+			state = c == SE ? TS_DATA : TS_BEGINNEG;
+			break;
+
+		case TS_WILL:
+			printoption(RCVD, "will", c, !hisopts[c]);
+			if (!hisopts[c])
+				willoption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_WONT:
+			printoption(RCVD, "wont", c, hisopts[c]);
+			if (hisopts[c])
+				wontoption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_DO:
+			printoption(RCVD, "do", c, !myopts[c]);
+			if (!myopts[c])
+				dooption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_DONT:
+			printoption(RCVD, "dont", c, myopts[c]);
+			if (myopts[c]) {
+				myopts[c] = 0;
+				sprintf(nfrontp, wont, c);
+				nfrontp += sizeof (wont) - 2;
+			}
+			state = TS_DATA;
+			continue;
+
+		default:
+			fprintf(stderr,"rtelnet: panic: state=%d\n", state);
+			cleanup();
+		}
+	}
+}
+
+send_tm(f)
+	int f;
+{
+	register int c, cc;
+	int off = 0;
+	int state = TS_DATA;
+	char buff[1024], *p;
+#if TLI
+	int flags = 0;
+#endif
+
+	sprintf(buff, doopt, TELOPT_TM);
+	cc = strlen(buff);
+	if (debug)
+		fprintf(stderr,"sending tm\n");
+	while(cc)
+#if TLI
+		if ((cc -= t_snd(f, buff, cc, &flags)) < 0) {
+			t_error("rtelnet:send_tm t_snd failed");
+			cleanup();
+		}
+#else
+		cc -= write(f, buff, cc);
+#endif
+	if (debug)
+		fprintf(stderr,"sent tm\n");
+#if SYS_V
+	if (fcntl(f, F_SETFL, O_NDELAY) < 0) {
+		perror("rtelnet:fcntl net O_NDELAY failed");
+		cleanup();
+	}
+#else
+	if (ioctl(f, FIONBIO, (caddr_t)&off) < 0) {
+		perror("rtelnet:ioctl net FIONBIO failed");
+		cleanup();
+	}
+#endif
+#if TLI
+	while((cc = t_rcv(f, buff, sizeof(buff), &flags)) > 0) {
+#else
+	while((cc = read(f, buff, sizeof(buff))) > 0) {
+#endif
+		p = buff;
+		while (cc > 0) {
+			c = *p++ & 0377, cc--;
+			switch (state) {
+
+			case TS_DATA:
+				if (c == IAC) {
+					state = TS_IAC;
+					break;
+				}
+				break;
+
+			case TS_IAC:
+				switch (c) {
+				case WILL:
+				case WONT:
+				case DO:
+				case DONT:
+					state = TS_WILL + (c - WILL);
+					continue;
+				}
+				state = TS_DATA;
+				break;
+
+			case TS_WILL:
+			case TS_WONT:
+				if (c == TELOPT_TM)
+				return;
+
+			case TS_DO:
+			case TS_DONT:
+				state = TS_DATA;
+				continue;
+
+			default:
+				fprintf(stderr, "send_tm: panic state=%d\n",
+					state);
+				cleanup();
+			}
+		}
+	}
+}
+
+willoption(option)
+	int option;
+{
+	char *fmt;
+
+	switch (option) {
+
+	case TELOPT_BINARY:
+		mode(RAW, 0);
+		goto common;
+
+	case TELOPT_ECHO:
+		mode(0, ECHO|CRMOD);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		hisopts[option] = 1;
+		fmt = doopt;
+		break;
+
+	case TELOPT_TM:
+		fmt = dont;
+		break;
+
+	default:
+		fmt = dont;
+		break;
+	}
+	printoption(SENT, fmt == doopt ? "do" : "don't", option, 0);
+	sprintf(nfrontp, fmt, option);
+	nfrontp += sizeof (dont) - 2;
+}
+
+wontoption(option)
+	int option;
+{
+	char *fmt;
+
+	switch (option) {
+
+	case TELOPT_ECHO:
+		mode(ECHO|CRMOD, 0);
+		goto common;
+
+	case TELOPT_BINARY:
+		mode(0, RAW);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		hisopts[option] = 0;
+		fmt = dont;
+		break;
+
+	default:
+		fmt = dont;
+	}
+	printoption(SENT, fmt == doopt ? "do" : "don't", option, 0);
+	sprintf(nfrontp, fmt, option);
+	nfrontp += sizeof (doopt) - 2;
+}
+
+dooption(option)
+	int option;
+{
+	char *fmt;
+
+	switch (option) {
+
+	case TELOPT_TM:
+		fmt = wont;
+		break;
+
+	case TELOPT_ECHO:
+		mode(ECHO|CRMOD, 0);
+		goto common;
+
+	case TELOPT_BINARY:
+		mode(RAW, 0);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		fmt = will;
+		break;
+
+	default:
+		fmt = wont;
+		break;
+	}
+	printoption(SENT, fmt == will ? "will" : "won't", option, 0);
+	sprintf(nfrontp, fmt, option);
+	nfrontp += sizeof (doopt) - 2;
+}
+
+mode(on, off)
+	int on, off;
+{
+
+	ptyflush();
+#if SYS_V
+#else
+	ioctl(pty, TIOCGETP, (caddr_t)&b);
+	b.sg_flags |= on;
+	b.sg_flags &= ~off;
+	if (ioctl(pty, TIOCSETP, (caddr_t)&b) < 0) {
+		perror("rtelnet:mode ioctl TIOCSETP failed");
+		cleanup();
+	}
+#endif
+
+}
+
+/*
+ * Send interrupt to process on other side of pty.
+ * If it is in raw mode, just write NULL;
+ * otherwise, write intr char.
+ */
+interrupt()
+{
+
+	ptyflush();	/* half-hearted */
+#if SYS_V
+#else
+	ioctl(pty, TIOCGETP, (caddr_t)&b);
+	if (b.sg_flags & RAW)
+	{
+		*pfrontp++ = '\0';
+		return;
+	}
+	*pfrontp++ = ioctl(pty, TIOCGETC, (caddr_t)&tchars) >= 0
+			? tchars.t_intrc
+			: '\177';
+#endif
+}
+
+ptyflush()
+{
+	int n;
+
+	if ((n = pfrontp - pbackp) > 0)
+		n = write(pty, pbackp, n);
+
+	if (debug > 2) {
+		if (n < 0)
+			fprintf(stderr, "pty:wr=%d errno=%d\n",
+				pfrontp - pbackp, errno);
+		else
+			fprintf(stderr, "pty:wr=%d\n", n);
+	}
+	if (n < 0)
+		return;
+	pbackp += n;
+	if (pbackp == pfrontp)
+		pbackp = pfrontp = ptyobuf;
+}
+
+netflush()
+{
+	int n;
+#if TLI
+	int flags=0;
+#endif
+
+	if ((n = nfrontp - nbackp) > 0) {
+#if TLI
+		n = t_snd(net, nbackp, n, &flags);
+		if (debug > 2) {
+			if (n < 0)
+				if(t_errno == TFLOW)
+					fprintf(stderr, "net:wr=%d t_errno=TFLOW ",
+						nfrontp - nbackp, t_errno);
+				else
+					fprintf(stderr, "net:wr=%d t_errno=%d ",
+						nfrontp - nbackp, t_errno);
+			else
+				fprintf(stderr, "net:wr=%d ", n);
+			if (ncc == 0)
+				fprintf(stderr, "\n");
+		}
+#else
+		n = write(net, nbackp, n);
+		if (debug > 2) {
+			if (n < 0)
+				if (errno == EWOULDBLOCK)
+					fprintf(stderr, "net:wr=%d errno=EWOULDBLOCK ",
+						nfrontp - nbackp, errno);
+				else
+					fprintf(stderr, "net:wr=%d errno=%d ",
+						nfrontp - nbackp, errno);
+			else
+				fprintf(stderr, "net:wr=%d ", n);
+			if (ncc == 0)
+				fprintf(stderr, "\n");
+		}
+#endif /* TLI */
+	}
+	if (n < 0) {
+#if TLI
+		if (t_errno == TFLOW)
+			return;
+		t_error("rtelnet:net write error");
+#else
+		if (errno == EWOULDBLOCK)
+			return;
+		perror("rtelnet:net write error");
+#endif
+		cleanup();
+	}
+	nbackp += n;
+	if (nbackp == nfrontp)
+		nbackp = nfrontp = netobuf;
+}
+
+cleanup()
+{
+	if (debug)
+		fprintf(stderr,"cleanup()\n");
+
+	if (progress & LINKED_TTY)
+		unlink(new_node);
+
+	if (progress & RENAMED_PTY)
+		rename(alias, master);
+
+#ifndef SYS_V
+	if (!debug)
+		vhangup();	/* XXX */
+#endif
+#if TLI
+	if(t_close(net) < 0)
+		if (debug)
+			t_error("rtelnet:t_close failed");
+#else
+	if (shutdown(net, 2) < 0)	/* Telnet connection down */
+		if (debug)
+			perror("rtelnet: shutdown failed");
+#endif
+	exit(1);
+}
+
+int control_c()
+{
+	if (debug)
+		fprintf(stderr,"control_c()\n");
+	cleanup();
+}
+
+printoption(dir, what, which, reply)
+int dir;
+char *what;
+char which;
+int reply;
+{
+	char *s_witch, ssb[32];
+
+	if (debug<2)
+		return;
+
+	sprintf(ssb, "%d", which);
+
+	if (which < 0 || which >= sizeof(telopts) / sizeof(telopts[0]))
+		s_witch = ssb;
+	else
+		s_witch = telopts[which];
+
+	if (dir == SENT)
+		fprintf(stderr,"SENT %s %s\n", what, s_witch);
+	else
+	{
+		if (debug == 2 || debug == 3)
+			fprintf(stderr, "\n");
+		fprintf(stderr,"RCVD %s %s (%sreply)\n",
+			what, s_witch, reply ? "" : "don't ");
+	}
+}
+
+rename(old,new)
+char *old, *new;
+{
+	if(unlink(new) < 0) {
+		if (errno != ENOENT)
+			return(-1);
+	}
+	if(link(old,new) < 0)
+		return(-1);
+	if(unlink(old) < 0)
+		return(-1);
+}
+
+static void
+datadump(p, len)
+unsigned char *p;
+int len;
+{
+	int i;
+	unsigned char *s = (unsigned char *)(~0xf & (unsigned long)p);
+
+	len += p-s;
+	while (len > 0) {
+		unsigned char *s1 = s;
+		fprintf(stderr,s<=p ? "%6x:%-3x" : "%6x:   ",
+			s<=p ? p : s,
+			len - (p-s));
+		for (i = 0; i < 16; i++, s++)
+			fprintf(stderr,s<p||i>=len ? "%s   " : "%s%.2x ",
+				i % 8 ? "" : " ",
+				*s);
+		s = s1;
+		fprintf(stderr," |");
+		for (i = 0; i < 16; i++, s++)
+			fprintf(stderr,"%c", s<p||i>=len ? ' '
+					: *s<' '||*s>'~' ? '.' : *s);
+		len -= 16;
+		fprintf(stderr,"|\n");
+	}
+}

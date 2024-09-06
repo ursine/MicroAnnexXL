@@ -1,0 +1,320 @@
+Copyright (c) 1992, Xylogics, Inc.  ALL RIGHTS RESERVED.
+
+ALL RIGHTS RESERVED.  Licensed Material - Property of Xylogics, Inc.
+This software is made available solely pursuant to the terms of a
+software license agreement which governs its use.  Unauthorized
+duplication, distribution or sale are strictly prohibited.
+
+
+RTELNET (Reverse Telnet)
+User's Guide
+
+DESCRIPTION
+
+	Rtelnet is a modified version of the Berkeley telnetd program.  It will
+	create a pseudo-tty (pty) device on the host that is connected via
+	TELNET or raw TCP to an Annex serial port.  This allows UNIX programs
+	such as tip(1C) and uucp(1C) to access serial devices attached to Annex
+	ports.  Rtelnet works like a telnet daemon program (telnetd) except in a
+	reverse fashion; instead of accepting telnet connections from other
+	network machines, rtelnet makes telnet connections to Annexes.  Rtelnet
+	creates a new file-like device (usually in /dev) that programs can open
+	and use like a normal "/dev/tty" terminal.
+
+
+COMMAND LINE ARGUMENTS
+
+Usage:
+	rtelnet [-abcdfhkmnoprstCDFOPRTV] [-lfile] [-uuser] [-Mmode]
+		<annex_id> <annex_port> /dev/<new_dev_name>
+
+Where:
+
+	-a	Use alternate pty banks.  This option selects use of BSD ptys
+		rather than System V ptys, where applicable.
+
+	-b	Use telnet binary mode -- useful for terminal connections.  This
+		option tells rtelnet to negotiate TELNET BINARY mode, and to not
+		translate CR/LF sequences.  CR will be sent as CR/NUL and
+		translated back to CR by the Annex with this option enabled.
+
+	-c	Default to CBREAK mode on the pty -- avoid cooked line breaks.
+		Use of this option requires that the slave pty be kept open by
+		rtelnet on System V compliant machines.  See discussion of pty
+		modes below.
+
+	-d	Turn on socket-level debugging.  This just sets the SO_DEBUG
+		flag (or equivalent) on the created network connection -- the
+		actual operation of this option depends on the underlying
+		operating system.
+
+	-f	Open network connection when slave pty is opened.  This option
+		causes rtelnet to wait for the pty to open before it attempts to
+		create the connection to the Annex.  This option is incompatible
+		with any option that would keep the pty open.
+
+	-h	Use 'na reset' to hang up port when slave pty is closed.  Since
+		this option is rather primitive, its use is discouraged.  It
+		requires that the Annex either have no "annex password" set, or
+		"annex enable_security" set to "N" -- since there is no way to
+		enter the required password.
+
+	-k	Periodically retry network connection.  This option tests the
+		connection to the Annex by attempting to reopen the same port
+		every 20 seconds, when the connection is quiet.  If this new
+		connection succeeds, then the old connection must have become
+		disconnected -- presumably by a reboot of the Annex -- and a new
+		one is necessary.  This is useful when the traffic is primarily
+		from the Annex to the host and SO_KEEPALIVE is unimplemented,
+		since writes from the host to the Annex will be able to detect
+		a failed connection.
+
+	-lfile	Append log output to given file name.  This option opens the
+		requested file in append mode so that all error and debugging
+		output is placed here once command line parsing is complete.
+		(This may not be useful if debugging.sys is used -- see below.)
+
+	-m	Close network connection when pty is closed.  This can be used
+		to cause a dial-out modem to hang up when a program like tip
+		exits.
+
+	-n	Never open slave side of pty.  This option will prohibit some
+		systems from setting up default I/O modes, but is much cleaner.
+
+	-o	Hold slave side of pty open at all times.  This is a useful
+		option when detecting pty open/close isn't necessary.  Since
+		closing the slave pty causes the master pty to close (on most
+		systems), there is a small timing window where, if the slave pty
+		is closed and then rapidly reopened, the second open will fail
+		because the rtelnet process hasn't had a chance to close and
+		reopen the master pty.  This most often occurs in scripts where
+		one might use:
+
+			echo "Some text" > /dev/mypty
+			echo "Some more text" > /dev/mypty
+
+		The second "echo" command may fail because the shell will open
+		and close the pty too rapidly.  This option will keep the slave
+		open at all times so that the master does not need to be
+		recycled.
+
+	-p	Give process ID of child on standard output.  This is useful for
+		logging the PIDs of all the rtelnets started on a system so that
+		they can be removed quickly.  For example:
+
+			rtelnet -pt myannex 1 /dev/port1 > rtelnetlist
+			rtelnet -pt myannex 2 /dev/port2 >> rtelnetlist
+
+		Now typing "kill `cat rtelnetlist`" will cleanly terminate both
+		connections.
+
+	-r	Overwrite <new_dev_name> if it exists, rather than aborting.
+		This option checks that the specified device is not a data file
+		or a directory, and then removes it if necessary.
+
+	-s	Use a symbolic link instead of a hard link for the slave.  This
+		option allows you to place the slave pty anywhere in your file
+		system.  If this option isn't specified, then a hard link is
+		created by default, and hard links cannot normally span across
+		mounted devices.
+
+	-t	Use a transparent TCP connection, rather than telnet protocol.
+		(If used with -f option, the pty will not default to RAW mode.)
+
+	-uuser	Change UID to <user> before creating pty.  This option is useful
+		for ptys that will be used with cu or tip on System V machines.
+		In this case, you should set "-uuucp" to get the pty owner set
+		to uucp.  If this option is set on a System V machine without
+		the -a option, and autopush is implemented on that machine, then
+		this option will cause rtelnet to fork into two copies -- one
+		remaining as root, the other as the given UID.  This is done
+		because autopush information can be set only by root.
+
+	-C	Don't try to fix cooked-mode pty problems with LF insertion.
+		See discussion of ptys below.
+
+	-D	Enable debugging mode (more D's for higher levels).  See below.
+
+	-F	Force rtelnet to fork into background, even in debug mode.  This
+		is usually used with the -l option (above) when doing long-term
+		testing.
+
+	-Mmode	Set default pty file mode to <mode>, given in octal.  The
+		default file mode is 0666.  Use this option to set another mode.
+
+	-O	Disable out-of-band telnet data (for pre-R7.0 Annexes).  For
+		compatibility with older Annex operational code, the TELNET IAC
+		DM signal, which is used to implement the output flush IOCTL,
+		can be disabled.  The telnetd process on older Annexes did not
+		implement out-of-band signaling, and it would see the IAC DM
+		(hex FF F2) characters as data.  (A symptom of this problem
+		might be the appearance of mysterious r's in the serial data
+		stream -- many devices will strip the eighth bit, resulting in
+		7F 72, which is DEL r in ASCII.)
+
+	-P	Interpret the port number as a TCP port (1-65535 or name).  This
+		can be used to establish a slave pty that links to the Annex
+		Port Server (port 23), the VCLI (port 5000) and to rotaries in
+		the 6000-range.
+
+	-R	Rename the slave pty rather than linking to it.  This is a
+		dangerous option, and should be used only if it is absolutely
+		necessary to have a single file extant with the slave's
+		combination of major/minor numbers.
+
+	-T	Truncate (rather than break) lines that would choke pty.  See
+		below for pty bug discussion.
+
+	-V	Display version information on standard output and exit.  This
+		information is useful for Xylogics technical support so that
+		they can precisely identify the version of software you are
+		using.
+
+	<annex_id>	- is the Inet address or hostname of the Annex
+
+	<annex_port>	- is the Annex port number or TCP port number or TCP
+			  service name (see -P flag above).
+
+	/dev/<new_dev_name>
+			- is the linked file name to be created.
+
+
+EXAMPLE
+
+	You have a dial-out modem attached to port 15 of an Annex named
+	"modem-annex".  You would like users on a SUN workstation to be able to
+	use the modem via 'tip'.
+
+
+	1.  Configure Annex port 15 using "na" or local CLI admin to
+	    "control_lines: modem_control".
+
+	2.  Add an entry to the "/etc/rc" script to create the tip pseudo-device
+	    whenever the workstation is booted.  Entry would be:
+
+		rtelnet -rm modem-annex 15 /dev/modem1
+
+	3.  Create new system definition in "/etc/remote" specifying
+	    "/dev/modem1" as the tip (dv) device.  For example:
+
+		dialer|generic dial-out: \
+			:dv=/dev/modem1:cm=^M^JATe1^M^J:at=hayes:du:
+
+
+PTY MODES
+
+	There are three basic modes used with the pseudo-terminal device -- RAW,
+	CBREAK and COOKED.  RAW mode is the default with the -t switch, unless
+	-n is specified.  In RAW mode, all data is passed through the pty
+	unchanged.  CBREAK mode can be specified as the default with the -c
+	switch.  This is a half-RAW mode in which the interrupt and flow control
+	characters still work, but the line-entry characters are disabled and
+	the new-line character has no special meaning.
+
+	In COOKED mode, the line does normal tty line editing (erase character /
+	word / line, et cetera).  This mode has many bugs that the code attempts
+	to work around.  The worst problem with this mode is that there is a
+	limit to the number of characters that may be written to the master pty
+	by rtelnet between new-line characters.  If more than some arbitrary
+	number are written (134 on Encore umax, 255 on Sequent's DYNIX), then
+	the pty will simply lock up.  Therefore, these lines must either be
+	broken with a new-line character (the default), or truncated at 134
+	characters (using the -T switch).
+
+
+DEBUGGING
+
+	The debugging module "debugging.c" receives all of the output possible
+	from the operation of the rtelnet code.  This file is linked to one of
+	the following:
+
+		debugging.novf	- for systems that are missing the v[fs]printf
+				  library routines.
+		debugging.vf	- for systems with a K&R C compiler and the
+				  v[fs]printf library routines.  This is usually
+				  the default module.
+		debugging.ansi	- for systems with an ANSI C compliant compiler.
+		debugging.sys	- for sending output to syslog(3), rather than a
+				  log file.
+
+	In the first three cases, each line of the output is formatted as
+	follows:
+
+		TYPE:pid:yyyymmddhhmmss: <message>
+
+	Where "TYPE" is one of:
+
+		INIT	- Entry or exit message.
+		INFO	- Informational message (from debugging code).
+		WARN	- Warning message.
+		ERR 	- Error message.
+		FATL	- Fatal error message -- rtelnet aborted.
+
+	These tags indicate the severity and content of the message -- they are
+	not necessarily tied to the debug level flag.  (Although "ERR " and
+	"FATL" messages are usually sent out at debug level zero, i.e. always.)
+
+	Using the -D switch, one may specify the debug level on start-up.  This
+	number filters the output sent to the log file -- the higher the level,
+	the more verbose the output that is sent to the file.  Setting level 2,
+	for example, is accomplished by specifying '-DD'.  The levels and what
+	they show are roughly defined as:
+
+		0	- Unexpected system errors and fatal errors only.
+		1	- Exceptional conditions and entry / exit.
+		2	- I/O statistics and verbose TELNET protocol data.
+		3	- Flow control upcalls and system library call data.
+		4	- I/O selection and testing verification.
+		5	- Raw I/O dump (can be used to reconstruct a session).
+
+	While rtelnet is running, you may change these levels by issuing a
+	SIGUSR1 to increase the debug level, or SIGURG2 to set it back to zero.
+	For example, if the pid of the rtelnet process is 9654:
+
+		kill -USR2 9654
+
+	This would disable debugging on that copy of rtelnet without aborting
+	any current data transfer.
+
+	If operating system routines write to standard error (descriptor 2),
+	then this output will pass directly into the output file without the
+	debug line headers, except in the case of debugging.sys.  This has not
+	been observed to be a problem.
+
+
+NOTES
+
+	Turning off debug with "#define NO_DEBUG" in rtelnet.h saves about 7K
+	bytes of storage per image.  It also disables the -dDF command line
+	switches.
+
+	If -r is specified, the linked file may change from one slave pty to
+	another if an error occurs while reopening the master after the slave
+	closes.  Otherwise, without this flag, only one pty pair will ever be
+	used, and an error will cause an exit, since rtelnet will be unable to
+	remove and reassign the link.
+
+	The document INTERN describes the internal procedure interfaces.  This
+	document should be consulted before attempting to port any of the
+	"machdep.c" modules to a new system.
+
+Original Author:  Unknown		Created on:  Unknown
+
+Revision Control Information:
+$Id: README,v 1.3 1993/02/04 17:08:19 carlson Rel $
+
+This file created by RCS from
+$Source: /annex/common/src/./newrtelnet/RCS/README,v $
+
+Revision History:
+$Log: README,v $
+Revision 1.3  1993/02/04  17:08:19  carlson
+Added -a, -u and -M flags.
+
+Revision 1.2  92/08/13  17:13:50  carlson
+Added -C and -R flags.
+
+Revision 1.1  92/08/05  15:40:22  carlson
+Initial revision
+
+This file is currently under revision by: $Locker:  $

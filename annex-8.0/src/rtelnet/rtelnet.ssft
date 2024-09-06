@@ -1,0 +1,2332 @@
+/*
+ *****************************************************************************
+ *
+ *        Copyright 1989, 1990, Xylogics, Inc.  ALL RIGHTS RESERVED.
+ *
+ * ALL RIGHTS RESERVED. Licensed Material - Property of Xylogics, Inc.
+ * This software is made available solely pursuant to the terms of a
+ * software license agreement which governs its use. 
+ * Unauthorized duplication, distribution or sale are strictly prohibited.
+ *
+ * Module Description::
+ *
+ * 	Annex Reverse Telnet Daemon
+ *	modified telnetd to provide host-pty/annex-port association
+ *
+ * Original Author: Paul Mattes		Created on: an impulse
+ *
+ * Module Reviewers:
+ *	lint, loverso
+ *
+ * Revision Control Information:
+ * $Id: rtelnet.ssft,v 1.1 1992/07/01 10:01:42 emond Rel $
+ *
+ * This file created by RCS from
+ * $Source: /annex/common/src/rtelnet/RCS/rtelnet.ssft,v $
+ *
+ * Revision History:
+ * $Log: rtelnet.ssft,v $
+Revision 1.1  1992/07/01  10:01:42  emond
+Initial revision
+
+ * Revision 1.11  92/04/01  09:07:45  emond
+ * When putting in Alan's change for AIX forgot to change "slave" definition.
+ * 
+ * Revision 1.10  92/03/16  08:53:13  emond
+ * Propogate AIX fix to SNI's rtelnet also.
+ * 
+ * Revision 1.9  92/03/10  13:36:19  emond
+ * Onthefly needs drop to work - added more debug for onthefly, per Alan
+ * Barnett.
+ * 
+ * Revision 3.11  92/01/24  15:26:20  carlson
+ * SPR 513 -- fixed to work with ../inc/config.h (I hope!)
+ * 
+ * Revision 3.10  92/01/23  09:31:15  carlson
+ * SPR 482 -- don't remove inappropriate files with -r option!
+ * 
+ * Revision 3.9  91/11/21  18:31:48  carlson
+ * Added transparent mode.
+ * 
+ * Revision 3.8  91/09/16  19:26:00  emond
+ * undef TCGETA for Siemens MX300 machine (per Alan Barnett)
+ * Alan Barnett, February 1992.
+ * Merged in changes from rtelnet.smns and rtelnet.c from SNI Paderborn:
+ * 1) Always perform cleanup() before exiting after creating pty link.
+ * 2) Pass reason code to cleanup() - used for exit status.
+ * 3) Always return exit status code (added #defines).
+ * 4) Fixes to debug messages for ibits, obits.
+ * 5) Add DBUG macros.
+ * 6) Add sig_catch() handler and messages.
+ * 7) Allow SIGUSR1/2 signals to change debug level on live rtelnet.
+ * 8) Check for EINTR errors from select() due to above.
+ * 9) Move SYS_V setpgrp() so we only do it if we really fork to fix
+ *    problems catching ^C when running in the foreground.
+ * 10) Add -k keepalive option, with timeout on select and associated
+ *    code to allow EINTR and lost net detection and recovery.
+ * 11) Attempt to send SIGHUP to pty and rename/reopen/unlink to
+ *    force getty/login/sh to really quit.
+ * 12) Changes for portability (SVR3, SunOS).
+ * 13) Ignore all SIGHUPs - sometimes we get one or two when we send
+ *     SIGHUP to the pty.
+ * 14) Don't catch signals we want to ignore - it's not safe. - UNDONE
+ * 15) Remove "outahere" exit at end of telnet() - always try to recover.
+ * 16) Added more checking from library calls in openslave() and openmaster().
+ * 17) Always use 70xx for can_connect().
+ * 18) Push "ttcompat" on slave stream.
+ * 19) Don't do TIOCGETA/TIOCSETA on master side of pty for SVR4 - they
+ *    do not work - do them on the slave (if the slave_pty is open).
+ * 20) Close slave after first read from pty only if using -m option.
+ * 21) Do the reopen_pty on any net error, not just EIO.
+ * 22) Check error status from calls in openmaster -if bad then fatal.
+ * 23) Merge in SCO UNIX support code (untested).
+ * 24) Add R61OPTIONS conditional code for SNI - but I don't like it.
+ * 
+ * Revision 3.7  91/09/07  15:29:38  russ
+ * Added A. Barnett changes for FD_ZERO of ibits and xbits before use.
+ * 
+ * Revision 3.6  91/08/01  17:33:52  emond
+ * Scott Griffiths' new rtelnet which runs on many more machines now!
+ * 
+ * Revision 3.5  91/03/01  13:49:52  pjc
+ * Made DPTG mods conditional
+ * 
+ * Revision 3.4  91/03/01  13:37:15  pjc
+ * Modified to optionally use DPTG port numbering
+ * 
+ * Revision 3.3  90/10/25  13:22:55  emond
+ * ANSI-ized an #endif; removed argument following #endif.
+ * This won't compile on an ANSI C compiler.
+ * 
+ * Revision 3.2  90/09/18  17:28:07  raison
+ * removed "#define DEBUG" to remove printfs.
+ * 
+ * Revision 3.1  90/06/12  19:30:13  loverso
+ * rtelnet with connect-on-the-fly
+ * 
+ * Revision 2.8  90/04/19  16:07:20  loverso
+ * Allow BANKS and UNITS to be overridden by the compiler with
+ * -DBANKS=\"abcdef\", etc.
+ * 
+ * Revision 2.7  90/04/18  13:16:08  loverso
+ * Use exponential backoff on delay when connection fails.
+ * Check for !net_errno when out of loop; this means net is ok.
+ * 
+ * Revision 2.6  90/04/18  13:07:12  loverso
+ * Re-add lost fix for "-m"
+ * 
+ * Revision 2.5  90/04/09  15:35:09  loverso
+ * All debugging to stderr
+ * 
+ * Revision 2.4  90/04/03  13:37:17  loverso
+ * Be sure to initialize pcc & ncc for hosts which don't signal net failure
+ * 
+ * Revision 2.3  90/03/26  12:00:49  loverso
+ * Added more extensive debugging code.
+ * Added change to make sure all pty buffer data gets sent out network
+ * (fixes SPR.83, "rtelnet drops chars").
+ * 
+ * Revision 2.2  90/01/19  17:56:12  loverso
+ * Corrections and cleanup
+ * 
+ * Revision 2.1  89/12/01  14:03:45  loverso
+ * Fix typo and missing netdb.h
+ * 
+ * Revision 2.0  89/10/16  17:46:00  loverso
+ * `New' rtelnet with many portability changes for SysV-ish hosts
+ * 
+ * This file is currently under revision by: $Locker:  $
+ *
+ *****************************************************************************
+ */
+#ifndef lint
+static char sccsid[] = "based upon @(#)telnetd.c 4.26 (Berkeley) 83/08/06";
+static char rcsid[] =
+    "$Id: rtelnet.ssft,v 1.1 1992/07/01 10:01:42 emond Rel $";
+#endif
+
+
+#define have_sockdefs	1
+#define have_msghdr	1
+#include "../inc/config.h"
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <strings.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <sys/time.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <errno.h>
+#include <netdb.h>
+#define TELOPTS
+#include <arpa/telnet.h>
+
+#ifdef MIPS
+#undef TIOCPKT
+#endif /* MIPS */
+
+#ifdef SSFT
+#include <sys/termio.h>
+#include <sys/sysmacros.h>
+#include <sys/stropts.h>
+#endif /* SSFT */
+
+#ifdef SVR4
+#include <sys/stropts.h>
+#ifndef SYS_V
+#define SYS_V		/* SVR4 includes SYS_V changes */
+#endif
+#define LINGER		/* SVR4 requires Lachmann linger option */
+#ifdef TIOCPKT
+#undef TIOCPKT		/* We don't use packet mode for SVR4 */
+#endif
+#endif /* SVR4 */
+
+#ifdef AIX
+#ifndef SYS_V
+#define SYS_V		/* AIX includes SYS_V changes */
+#define LINGER		/* AIX requires Lachmann linger option */
+#endif
+#endif /* AIX */
+
+#ifdef FD_ISSET
+/* SUNOS 4.1 and SVR4 compatible - now have fd_set struct and FD_ macros
+** used by select() system call.
+** We just define a macro to extract bits for debug and testing.
+*/
+#define FD_BITVAL(x)	(x.fds_bits[0])
+#else
+/* Old-style systems - define local macros here for backwards
+** compatibility.
+*/
+#define FD_SET(n, p)	(*(p) |= (1 << n))
+#define FD_ISSET(n, p)	(*(p) & (1 << n))
+#define FD_ZERO(p)	(*(p) = 0)
+#define FD_BITVAL(x)	(x)
+#define fd_set		int
+#endif
+
+#include <sgtty.h>
+#if defined (SYS_V) || defined (ULTRIX)
+#include <sys/termio.h>
+#endif
+
+#ifdef LITOUT
+#define REALLYRAW	(RAW | LITOUT)
+#else
+#define REALLYRAW	(RAW)
+#endif
+
+#ifdef MX300
+#undef TCGETA
+#endif
+
+#include "../inc/erpc/netadmp.h"
+
+#define	after(s) (sizeof(s) - 1)
+
+
+#define	LINKED_TTY	1
+#define RENAMED_PTY	2
+
+#define PORT_MAP_BASE	5000
+#define RAW_MAP_BASE	7000
+
+#define SENT	0
+#define RCVD	1
+#define	BELL	'\007'
+
+/* 
+ *  Timeout values in secs - used to check a silent connection
+ *  if -k "keepalive" option selected.
+ *
+ *  NOTE: The keepalive option is only required if the process attaching
+ *  to the slave will block on a read() forever. For printing or any other
+ *  output function using rtelnet this is not needed, since a write() will
+ *  fail if the net connection is lost, and rtelnet will recover the link.
+ */
+#define TIMEOUT_BEG 20L    /* start off at this interval */
+#define TIMEOUT_END 180L   /* max timeout interval */
+#define TIMEOUT_INC 20L    /* increment by this much each timeout */
+
+
+/*
+ * Debug macros. Usage in the code is like this example:
+ *
+ *     DWARN((logfp,"Couldn't open %s error %d", filename, errno))
+ *
+ * 1) The double parentheses (( )) around the macro argument are
+ *    mandatory. The outside pair get stripped off by the preprocessor,
+ *    the inside pair form the body of the fprintf statement.
+ *
+ * 2) Do NOT add a trailing semi-colon ';' as this will become a null
+ *    statement when the macro is expanded, and could cause "dangling
+ *    else" problems for those "if" statements without braces.
+ */
+
+#define DBUG(LEVEL, FUNC)    if(debug >= LEVEL) { \
+	fprintf(logfp, "%d-%ld:%s: ", pid, logseq++, dbugltxt[LEVEL]); \
+	FUNC ; fflush(logfp); }
+
+#define DFATAL( x )	DBUG(0, fprintf x )
+#define DWARN( x )	DBUG(1, fprintf x )
+#define DINFO( x )	DBUG(2, fprintf x )
+#define DWORK( x )	DBUG(3, fprintf x )
+#define DVERB( x )	DBUG(4, fprintf x )
+#define DDATA( x )	DBUG(5, fprintf x )
+
+
+/*
+ * Exit codes - used as argument to cleanup()
+ */
+#define E_BADARGS	1
+#define E_LOGOPEN	2
+#define E_BADDEV	3
+#define E_GETHOST	4
+#define E_NOPORTS	5
+#define E_DEVALR	6
+#define E_OPENPTY	7
+#define E_RENPTY	8
+#define E_OPENSLAVE	9
+#define E_LINK		10
+#define E_UNLINK	11
+#define E_RELINK	12
+#define E_SELECT1	13
+#define E_NOSOCK	14
+#define E_SELECT2	15
+#define E_GETSIG	16
+#define E_TELRCV	17
+#define E_SENDTM	18
+
+/*
+ * Conditional code to handle the many different ways pseudo-ttys
+ * (ptys) are implemented in assorted UNIX variants...
+ */
+
+#ifdef CONVERGENT
+
+/*
+ * Convergent uses "virtual terminals"
+ * master="vtXX" slave="ttypXX" units=[0..31]
+ * we avoid unit=00
+ * never-the-less, this code is less than correct.
+ */
+#define BANKS	"3210"
+#define UNITS	"0123456789"
+#define MASTERBANK	after("/dev/vt")
+#define MASTERUNIT	after("/dev/vt0")
+#define SLAVEBANK	after("/dev/ttyp")
+#define SLAVEUNIT	after("/dev/ttyp0")
+char	master[] = "/dev/vt00";
+char	slave[] = "/dev/ttyp00";
+char	alias[] = "/dev/vt00.rtelnet";
+
+#else /* !CONVERGENT */
+
+#ifdef SEQUENT
+
+/*
+ * Sequent uses Berkeley-style ptys but with more units per bank
+ * master="ptyBU" slave="ttyBU" banks=[p] units=[0-9A-Za-z]
+ * we avoid unit=0
+ */
+#define BANKS   "p"
+#define UNITS	"123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+#define MASTERBANK	after("/dev/pty")
+#define MASTERUNIT	after("/dev/ptyp")
+#define SLAVEBANK	after("/dev/tty")
+#define SLAVEUNIT	after("/dev/ttyp")
+char	master[] = "/dev/ptyp0";
+char	slave[] = "/dev/ttyp0";
+char	alias[] = "/dev/ptyp0.rtelnet";
+
+#else /* !SEQUENT */
+
+#ifdef AIX
+
+/*
+ * AIX uses a multiplexed master device. An open on this device allocates
+ * a channel with an assigned slave device. 
+ */
+#define BANKS ""	/* We don't have banks of ptys or units. */
+#define UNITS ""	/* These definitions included for completeness */
+#define MASTERBANK ""
+#define MASTERUNIT ""
+#define SLAVEBANK ""
+#define SLAVEUNIT ""
+
+char	master[] = "/dev/ptc";
+char 	slave[20] = "/dev/pts/999";
+char	alias[]	= "/dev/ptc.rtelnet";
+extern	char *ttyname();
+
+#else /* !AIX */
+
+#ifdef SVR4
+
+/*
+ * SVR4 uses a multiplexed master device. An open on this device allocates
+ * an unused channel with an assigned slave device.
+ */
+
+#define BANKS ""	/* We don't have banks of ptys or units. */
+#define UNITS ""	/* These definitions included for completeness */
+#define MASTERBANK ""
+#define MASTERUNIT ""
+#define SLAVEBANK ""
+#define SLAVEUNIT ""
+
+char	master[] = "/dev/ptmx";
+char 	*slave;
+int	slave_pty = -1;
+int	slave_opened = 0;
+char	alias[]	= "/dev/ptmx.rtelnet";
+extern	char *ptsname();
+
+#else /* !SVR4 */ /* Fall through to Berkeley style ptys */
+
+/*
+ * Berkeley-style ptys, banks of 16 units
+ * master="ptyBU" slave="ttyBU" banks=[pqrs] units=[0-9a-f]
+ * we avoid unit=0
+ */
+
+#define BANKS	"srqp"
+#define UNITS	"123456789abcdef"
+
+#ifdef SCO
+/* SCO UNIX has different names for the ptys we need.. */
+#define MASTERBANK	after("/dev/pty")
+#define MASTERUNIT	after("/dev/ptyp0")
+#define SLAVEBANK	after("/dev/tty")
+#define SLAVEUNIT	after("/dev/ttyp0")
+char	master[] = "/dev/ptyp00";
+char	slave[] = "/dev/ttyp00";
+char	alias[] = "/dev/ptyp00.rtelnet";
+int	slave_opened = 0;
+int	slave_pty = -1;
+
+#else
+
+#ifdef SSFT
+
+#define MASTERBANK ""
+#define MASTERUNIT ""
+#define SLAVEBANK after("/dev/tty")
+#define SLAVEUNIT after("/dev/ttyq")
+
+char master[] = "/dev/ptc";
+char slave[] = "/dev/ttyq12345";
+char alias[] = "/dev/ptc.rtelnet";
+int slave_opened = 0;
+int slave_pty = -1;
+
+#else
+/* Standard BSD naming for ptys.. */
+#define MASTERBANK	after("/dev/pty")
+#define MASTERUNIT	after("/dev/ptyp")
+#define SLAVEBANK	after("/dev/tty")
+#define SLAVEUNIT	after("/dev/ttyp")
+char	master[] = "/dev/ptyp0";
+char	slave[] = "/dev/ttyp0";
+char	alias[] = "/dev/ptyp0.rtelnet";
+
+#endif  /* SCO */
+#endif  /* SVR4 */
+#endif  /* AIX */
+#endif  /* SEQUENT */
+#endif  /* CONVERGENT */
+#endif  /* SSFT */
+
+/*
+ * Externals
+ */
+extern	int errno;
+extern	char *sys_errlist[];
+
+/*
+ * Global variables and storage: I/O data buffers, pointers, and counters.
+ */
+
+char	banks[] = BANKS;
+char	units[] = UNITS;
+
+unsigned char	doopt[] = { IAC, DO, '%', 'c', 0 };
+unsigned char	dont[] = { IAC, DONT, '%', 'c', 0 };
+unsigned char	will[] = { IAC, WILL, '%', 'c', 0 };
+unsigned char	wont[] = { IAC, WONT, '%', 'c', 0 };
+
+char	hisopts[256];
+char	myopts[256];
+
+unsigned char	ptyibuf[BUFSIZ], *ptyip = ptyibuf;
+unsigned char	ptyobuf[BUFSIZ], *pfrontp = ptyobuf, *pbackp = ptyobuf;
+unsigned char	netibuf[BUFSIZ], *netip = netibuf;
+unsigned char	netobuf[BUFSIZ], *nfrontp = netobuf, *nbackp = netobuf;
+
+char	*new_node;
+char	*myname;
+char	*logfile;
+char	*dbugltxt[] = { "FATAL", "WARN", "INFO", "WORK", "VERB", "DDUMP" };
+
+FILE	*logfp;
+
+int	so_debug, drop, rflag;
+int	debug, dlevel, binary;
+int	onthefly, hangup;
+#ifdef R61OPTIONS
+int	transparent = 1; /* force transparent */
+int	keepalive = 1;   /* force keepalive */
+#else
+int	transparent;
+int	keepalive;
+#endif
+int	logging;
+long	logseq;
+
+int	pcc, ncc;
+int	options;
+int	port_num;
+int	pty = -1, net = -1;
+int	saved_errno;
+int	progress = 0;
+int	pid;
+
+struct	sockaddr_in sin = { AF_INET };
+struct	sockaddr_in testsin = { AF_INET };
+
+/*
+ * Function declarations
+ */
+
+static void cleanup();
+static int can_connect();
+static void sig_catch();
+static char *get_time();
+static void datadump();
+
+usage()
+{
+    fprintf(stderr,"usage: rtelnet %s\n",
+#ifdef R61OPTIONS
+        "[-bdfhmrD] <annex> <port> /dev/<new_name>");
+#else
+        "[-bdfhkmrtD] [-l logfile] <annex> <port> /dev/<new_name>");
+#endif
+    fprintf(stderr,"rtelnet: options are as follows:\n");
+    fprintf(stderr,"  [-b]\tattempt telnet binary mode\n");
+    fprintf(stderr,"  [-d]\tturn on socket debugging\n");
+    fprintf(stderr,"  [-f]\t\"on the fly\" connection\n");
+    fprintf(stderr,"  [-h]\thangup - reset annex port on pty close\n");
+#ifndef R61OPTIONS
+    fprintf(stderr,"  [-k]\tkeepalive - try reconnect on silent connection\n");
+#endif
+    fprintf(stderr,"  [-m]\tdrop network connection on pty close\n");
+    fprintf(stderr,"  [-r]\tremove /dev/<new_name> if it exists\n");
+#ifndef R61OPTIONS
+    fprintf(stderr,"  [-t]\ttransparent - no telnet protocol (raw)\n");
+#endif
+    fprintf(stderr,"  [-D]\tdebug (eg: use -DDD for debug level 3)\n");
+#ifndef R61OPTIONS
+    fprintf(stderr,"  [-l logfile]\tlog messages to named file\n");
+#endif
+    exit(E_BADARGS);
+}
+
+main(argc, argv)
+	char *argv[];
+{
+	struct stat sbuf;
+	int	backoff=1;
+	char	*cp, *bank, *unit;
+	register struct hostent *host;
+	int oargc = argc;
+	char **oargv = argv;
+
+	logfp = stderr; /* default "log file" if none given */
+	pid = getpid(); /* get main process ID for log messages */
+
+	myname = *argv++;
+	argc--;
+  	while (argc > 0 && argv[0][0] == '-') {
+		for (cp = &argv[0][1]; *cp; cp++) {
+			switch(*cp) {
+			case 'b':
+				binary++;	/* try binary mode */
+				break;
+
+			case 'd':
+				so_debug++;	/* turn socket debugging */
+				break;
+
+			case 'f':
+				onthefly++;	/* open connection on the fly */
+				drop++;		/* onthefly needs drop */
+				break;
+
+			case 'h':
+				hangup++;	/* reset annex port */
+				drop++;		/* hangup needs drop */
+				break;
+#ifndef R61OPTIONS
+			case 'k':
+				keepalive++;	/* keepalive a silent link */
+				break;
+#endif
+			case 'l':
+				/* -l option has logfile arg */
+				if (*(cp+1)) { 
+					/* filename is adjacent in this arg */
+					logfile = cp+1;
+					logging++; /* enable logging */
+				} else if (argc >1) {
+					/* filename is next arg */
+					logfile = argv[1];
+					logging++; /* enable logging */
+					argc--;    /* skip next arg.. */
+					argv++;
+				} else {
+					usage();
+					/*NOTREACHED*/
+				}
+				break;
+
+			case 'm':
+				drop++;		/* drop socket on pty close */
+				break;
+
+			case 'r':
+				rflag++;	/* remove file if it exists */
+				break;
+#ifndef R61OPTIONS
+			case 't':
+				transparent++;	/* transparent connection */
+				break;
+#endif
+			case 'D':
+				debug++;	/* verbose debug output */
+				break;
+
+			default:
+				fprintf(stderr,"%s: unknown flag '%c'\n",
+					 myname,*cp);
+				usage();
+				/*NOTREACHED*/
+
+			}	/* switch(argv[0][1]) */
+		}
+		argv++;
+		argc--;
+	}
+
+	if (argc != 3) {
+		fprintf(stderr,"%s: bad arg count\n", myname);
+		usage();
+		/*NOTREACHED*/
+	}
+
+	if (logging) {
+		if((logfp = fopen(logfile, "a+")) == NULL) {
+		    fprintf(stderr,"%s: can't open logfile \"%s\"\n",
+					 myname, logfile);
+		    exit(E_LOGOPEN);
+		}
+	}
+
+ 
+	if(debug) {
+		int x;
+		char argbuff[256];
+		argbuff[0] = '\0';
+		for(x=0;x<oargc;x++) {
+		   strcat(argbuff, *(oargv + x) );
+		   strcat(argbuff, " " );
+		} 
+		DWARN((logfp,"Command line: %s\n", argbuff))
+	}
+
+	sin.sin_addr.s_addr = inet_addr(argv[0]);
+	if (sin.sin_addr.s_addr != -1) {
+		sin.sin_family = AF_INET;
+	} else {
+		host = gethostbyname(argv[0]);
+		if (host) {
+			sin.sin_family = host->h_addrtype;
+			bcopy(host->h_addr,
+			      (caddr_t)&sin.sin_addr,
+			      host->h_length);
+		} else {
+			DFATAL((logfp, "%s: %s: unknown host\n",
+				 myname, argv[0]))
+			exit(E_GETHOST);
+		}
+	}
+
+	argc--,	argv++;
+
+#if NDPTG > 0
+	port_num = name_to_unit(*argv);
+	if (port_num == -1)
+		usage();
+#else
+	port_num = atoi(*argv);
+	if (port_num <= 0)
+		usage();
+#endif
+
+	DWORK((logfp, "req port %d\n", port_num))
+
+	if (transparent)
+		sin.sin_port = htons((u_short)(RAW_MAP_BASE + port_num));
+	else
+		sin.sin_port = htons((u_short)(PORT_MAP_BASE + port_num));
+
+
+	/*
+	 *  Init test socket address for function can_connect():
+	 */
+	bzero((char *)&testsin, sizeof(testsin));
+	testsin.sin_addr.s_addr = sin.sin_addr.s_addr;
+	testsin.sin_family = sin.sin_family;
+	testsin.sin_port = htons((u_short)(RAW_MAP_BASE + port_num));
+
+
+	argc--, argv++;
+
+	if (stat(argv[0], &sbuf) >= 0) {
+		if (rflag)
+			switch (sbuf.st_mode&S_IFMT) {
+				case S_IFCHR:
+#ifdef S_IFLNK
+				case S_IFLNK:
+#endif
+#ifdef S_IFSOCK
+				case S_IFSOCK:
+#endif
+					if (unlink(argv[0])) {
+						perror(argv[0]);
+						exit(E_BADDEV);
+						}
+					break;
+				default:
+					DFATAL((logfp,
+				"%s: File \"%s\" is not the right type\n",
+						myname,argv[0]))
+					exit(E_BADDEV);
+				}
+		else {
+			DFATAL((logfp, "%s: File \"%s\" already exists\n",
+					myname,argv[0]))
+			exit(E_BADDEV);
+		}
+	}
+
+	new_node = *argv;
+
+	if (so_debug)
+		options |= SO_DEBUG;
+
+#ifndef SVR4		/* We don't have to do this for SVR4 */
+#ifndef AIX		/* or AIX */
+#ifndef SSFT
+
+	/*
+	 * Clean up after previous incarnations of rtelnet
+	 */
+	for (bank = banks; *bank; bank++) {
+		struct stat stb;
+
+		alias[MASTERBANK] = *bank;
+		for (unit = units; *unit; unit++) {
+			alias[MASTERUNIT] = *unit;
+			if (stat(alias, &stb) < 0)
+				continue;
+			if ((pty = open(alias, 2)) < 0)
+				continue;
+			else {
+				master[MASTERBANK] = *bank;
+				master[MASTERUNIT] = *unit;
+				(void)rename(alias, master);
+				(void)close(pty);
+			}
+		}
+	}
+#endif /* SSFT */
+#endif /* AIX */
+#endif /* SVR4 */
+
+	/*
+	 * Due to the differences in pty implementations, we call a routine to 
+	 * open the master and allocate a slave device.
+         */
+
+	 if ((pty = openmaster()) < 0) {
+		DFATAL((logfp, "%s: All network ports in use\n", myname))
+		cleanup(E_NOPORTS);
+		/*NOTREACHED*/
+	}
+	DWARN((logfp, "using master=%s slave=%s alias=%s\n",
+			 master, slave, alias))
+
+	/*
+	 * Fork to become a daemon process if we are logging to a file,
+	 * or if we are running with no debug..
+	 */
+	if (logging || !debug) {
+		int fd;
+
+		if (fork())
+			exit(0);
+		(void) close(0);
+		(void) close(1);
+		(void) close(2);
+
+#ifdef SYS_V
+		fd = open ("/dev/console", O_RDWR);
+		if (fd < 0)
+			fd = open ("/dev/tty", O_RDWR);
+		if (fd < 0)
+			fd = open ("/dev/null", O_RDWR);
+		(void)dup2 (0, 1);
+		(void)dup2 (0, 2);
+		(void)setpgrp();
+#else
+		(void)open("/", 0);
+		(void)dup2 (0, 1);
+		(void)dup2 (0, 2);
+
+		fd = open("/dev/tty", 2);
+		if (fd > 0) {
+			(void)ioctl(fd, TIOCNOTTY, 0);
+			(void)close(fd);
+		}
+#endif
+		pid = getpid();
+		DWARN((logfp, "Child started at %s\n", get_time() ))
+	} else {
+		DWARN((logfp, "Running in foreground at %s\n", get_time() ))
+	}
+
+	signal(SIGINT,  sig_catch);
+	signal(SIGTERM, sig_catch);
+	signal(SIGPIPE, sig_catch);  /* ignore? */
+	signal(SIGHUP,  sig_catch);  /* ignore? */
+	signal(SIGALRM, sig_catch);
+	signal(SIGPOLL, sig_catch);
+	signal(SIGQUIT, sig_catch);  /* ignore? */
+	signal(SIGABRT, sig_catch);
+	signal(SIGUSR1, sig_catch);
+	signal(SIGUSR2, sig_catch);
+#ifdef SIGSTOP
+	signal(SIGSTOP, sig_catch);
+	signal(SIGTSTP, sig_catch);  /* ignore? */
+	signal(SIGTTIN, sig_catch);
+	signal(SIGTTOU, sig_catch);
+#endif
+
+	while(1) {
+
+		DINFO((logfp, "Top of main loop, backoff=%d, onthefly=%d\n",
+					 backoff, onthefly ))
+
+		if (onthefly && backoff==1) {
+			int n_found;
+			fd_set ibits, xbits;
+
+			FD_ZERO(&ibits);
+			FD_ZERO(&xbits);
+			FD_SET(pty, &ibits);
+			FD_SET(pty, &xbits);
+
+			DINFO((logfp, "onthefly: doing the select\n"))
+			n_found = select(16, &ibits, (fd_set *)0, &xbits,
+							(struct timeval *)0);
+			if (n_found < 0) {
+				if (errno == EINTR) continue; /* signal */
+				DFATAL((logfp,"select error %d\n", errno))
+				cleanup(E_SELECT1);
+				/*NOTREACHED*/
+			}
+			DINFO((logfp, "onthefly: %d found: i=%#x, x=%#x\n",
+				 n_found, FD_BITVAL(ibits), FD_BITVAL(xbits) ))
+		}
+		if (telnet()) {
+			sleep(backoff);
+			backoff = backoff > 32 ? 64 : backoff << 1;
+		} else
+			backoff = 1;
+	}
+}
+
+
+#ifdef SCO
+/*
+ * SCO UNIX and XENIX require ICANON to be turned off on the slave
+ * side of the pty. For this to be effective, we must hold the
+ * slave open until the user opens it..
+ */
+void
+openslave()
+{
+	struct termio term;
+
+	if(slave_opened) {
+		close(slave_pty);
+		slave_opened = 0;
+	}
+
+	if((slave_pty = open(slave, O_RDWR)) < 0) {
+		DWARN((logfp, "cannot open slave %d\n", errno))
+	} else {
+		slave_opened = 1;
+		if( ioctl(slave_pty, TCGETA, &term) < 0) {
+			DWARN((logfp, "cannot TCGETA on slave %d\n", errno))
+		} else {
+			term.c_lflag &= ~ICANON;
+			ioctl(slave_pty, TCSETA, &term);
+		}
+	}
+}
+#endif /* SCO */
+
+#ifdef SSFT
+int
+openmaster()
+{
+struct stat stb;
+	pty = open("/dev/ptc", O_RDWR | O_NDELAY);
+	if (pty < 0 || fstat(pty, &stb) < 0) {
+	DFATAL((logfp, "openmaster: All network ports in use\n"))
+	cleanup(E_OPENPTY);
+	}
+	sprintf(&slave[0], "/dev/ttyq%d", minor(stb.st_rdev));
+	if (link(slave, new_node) < 0) {
+	DFATAL((logfp, "openmaster: link to slave device\n"))
+	cleanup(E_UNLINK);
+	}
+	progress |= LINKED_TTY;
+	return(pty);
+}
+#endif /*SSFT*/
+
+#ifdef SVR4
+/*
+ * SVR4 requires some streams modules to be placed on the slave to provide
+ * the same functionality of Berkely style ptys. Unfortunately, since we
+ * open the slave, we have no indication of when an application closes the
+ * device. For the modem hangup procedure to work correctly, we have to
+ * close the device the first time we see an application use it. Then 
+ * when they close, we get a message and need to re-open.
+ */
+void 
+openslave()
+{
+char *ptem      = "ptem";
+char *ldterm    = "ldterm";
+char *ttcompat  = "ttcompat";
+
+
+	if ((slave_pty = open(slave, O_RDWR)) < 0) {
+		DFATAL((logfp, "openslave: can't open slave %s, %d\n",
+			slave, errno))
+		cleanup(E_OPENSLAVE);
+		/*NOTREACHED*/
+	}
+
+	/*
+	 * It is possible that some modules may be left on the
+	 * stream, so we make sure we pop them off..
+	 */
+
+	while (ioctl(slave_pty, I_POP, 0) >= 0)
+		;
+
+	/*
+	 * Now push those modules that we require..
+	 */
+	if((ioctl(slave_pty, I_PUSH, ptem)) == -1) {
+	    DWARN((logfp, "can't push %s\n", ptem))
+	}
+	if((ioctl(slave_pty, I_PUSH, ldterm)) == -1) {
+	    DWARN((logfp, "can't push %s\n", ldterm))
+	}
+	if((ioctl(slave_pty, I_PUSH, ttcompat)) == -1) {
+	    DWARN((logfp, "can't push %s\n", ttcompat))
+	}
+	slave_opened = 1;
+
+}
+#endif /* SVR4 */
+
+#ifdef SVR4
+/*
+ * Function to open to generic master device, then obtain name of
+ * slave device if open successful. Call openslave to push appropriate
+ * streams modules. Link the new node name to the slave device.
+ */
+int 
+openmaster()
+{
+	int pty;
+        int i;
+	/*
+	 *  System V Release 4 has multiplexed special master
+         *  and extra system calls as follows...
+	 */
+        if ((pty = open( master, O_RDWR )) >= 0 ) {
+            if ((i = grantpt(pty)) <0) {
+		DFATAL((logfp, "grantpt failed %d\n", errno))
+		cleanup(E_OPENPTY);
+	 	/*NOTREACHED*/
+	    }
+            if ((i = unlockpt(pty)) <0) {
+		DFATAL((logfp, "unlockpt failed %d\n", errno))
+		cleanup(E_OPENPTY);
+	 	/*NOTREACHED*/
+	    }
+            if ((slave = ptsname(pty)) == (char *)0) {
+		DFATAL((logfp, "ptsname failed %d\n", errno))
+		cleanup(E_OPENPTY);
+	 	/*NOTREACHED*/
+	    }
+	    DINFO((logfp, "ptsname returns %s\n", slave))
+
+	    openslave();
+
+	    if ((i = link(slave,new_node)) < 0) {
+		DFATAL((logfp, "cannot link to slave device \"%s\" %d\n",
+				new_node, errno))
+		cleanup(E_LINK);
+	 	/*NOTREACHED*/
+	    }
+	    chmod(new_node, 0777);
+	    progress |= LINKED_TTY;
+	    (void)fcntl(pty, F_SETFL, O_NDELAY);
+        }
+        return(pty);
+}
+
+
+/*
+ *  The reopen_pty() function tries to get a new master slave pair
+ *  and returns 1 if it gets one, otherwise it returns 0.
+ */
+static void reopen_pty()
+{
+	int old_pty, old_slave_pty, old_slave_opened;
+
+	old_pty = pty;
+	old_slave_pty = slave_pty;
+	old_slave_opened = slave_opened;
+
+	DINFO((logfp, "reopen pty\n"))
+
+
+	/*
+	 * First unlink the "named link"..
+	 */
+	if ((unlink(new_node) < 0)) {
+		DFATAL((logfp, "can't unlink %s %d\n", new_node, errno))
+		cleanup(E_UNLINK);
+		/*NOTREACHED*/
+	}
+	progress=0;
+
+	/*
+	 * Now try to allocate a new pty..
+	 */
+	if ((pty = openmaster()) >= 0) {
+
+	/*
+	 *  We got one. Now, if we don't send the following hangup before
+	 *  closing the old pty, a 'getty' which is waiting on the old pty
+	 *  will *sometimes* respawn with a wrong PTS after the close on SNI
+	 *  SVR4 mashines. Note: we have to ignore SIGHUPs since we might
+	 *  receive one after the following ioctl..
+	 */
+
+		if (ioctl(old_pty, TIOCSIGNAL, SIGHUP) < 0) {
+			DINFO((logfp, "can't send SIGHUP to old_pty\n"))
+		} else {
+			DINFO((logfp, "sent SIGHUP to old_pty\n"))
+		}
+		if (old_slave_opened) {
+			(void)close(old_slave_pty);
+		}
+		(void)close(old_pty);
+
+	} else {
+
+	/*
+	 *  We couldn't get another pty. This is ugly, but could happen
+	 *  if the system runs out of ptys. We try to go back to using
+	 *  the old one ..
+	 */
+		DWARN((logfp, "can't get new pty, send SIGHUP\n"))
+		pty = old_pty;
+		(void)ioctl(pty, TIOCSIGNAL, SIGHUP);
+		if (link(slave, new_node) < 0) {
+			DFATAL((logfp,"can't re-link %s %d\n",
+					 new_node, errno))
+			cleanup(E_RELINK);
+			/*NOTREACHED*/
+		}
+	    	progress |= LINKED_TTY;
+		if(slave_opened) {
+			slave_pty = old_slave_pty;
+		} else {
+			openslave();
+		}
+	}
+}
+#else  /* !SVR4 */
+
+#ifdef AIX
+
+/*
+ * AIX also has a multi-channel master device. We open the master and use
+ * ttyname() to find the allocated slave device. Link to the new_node (using
+ * symlink) and set the pty to a useable state.
+ */
+int
+openmaster()
+{
+	int pty;
+	struct sgttyb b;
+	int on=1;
+
+	if ((pty = open(master, O_RDWR)) >= 0) {
+  	    strcpy(slave, ttyname(pty));
+	    if (symlink(slave,new_node) < 0) {
+		DFATAL((logfp, "cannot link to slave device \"%s\" =%d\n",
+			new_node, errno))
+		cleanup(E_LINK);
+		/*NOTREACHED*/
+	    }
+	    progress |= LINKED_TTY;
+	    chmod(new_node, 0777);
+	    (void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+	    if (transparent)
+		b.sg_flags = REALLYRAW ;
+	    else
+		b.sg_flags = CRMOD | XTABS | ANYP;
+	    (void)ioctl(pty, TIOCSETP, (caddr_t)&b);
+	    (void)fcntl(pty, F_SETFL, O_NDELAY);
+#ifdef TIOCPKT
+	    (void)ioctl(pty, TIOCPKT, (caddr_t)&on);
+#endif
+	}
+
+	return(pty);
+}
+#else /* !AIX */
+#ifndef SSFT
+/*
+ * Berkeley style ptys.
+ * Open the master pty.  Search backwards, so that the pty we take
+ * permanently doesn't slow down other pty users.  We may reserve
+ * the pty by renaming it, so don't use /dev/pty?0, which can't
+ * ever disappear.
+ */
+int
+openmaster()
+{
+	int pty;
+	char	*bank, *unit;
+	struct stat stb;
+	struct sgttyb b;
+	int on=1;
+
+	for (bank = banks; *bank; bank++) {
+		master[MASTERBANK] = *bank;
+		slave[SLAVEBANK] = *bank;
+		master[MASTERUNIT] = units[0];
+		if (stat(master, &stb) < 0) {
+			DWARN((logfp, "missing pty bank %c\n", *bank))
+			continue;
+		}
+		for (unit = units; *unit; unit++) {
+			master[MASTERUNIT] = *unit;
+			if ((pty = open(master, O_RDWR)) < 0)
+				continue;
+			slave[SLAVEUNIT] = *unit;
+			if (link(slave, new_node) < 0) {
+				DWARN((logfp,
+				 "cannot link to slave device %s %d\n",
+				 new_node, errno))
+				continue;
+			}
+	    		progress |= LINKED_TTY;
+			alias[MASTERBANK] = *bank;
+			alias[MASTERUNIT] = *unit;
+#ifdef SCO
+			openslave();
+#endif
+			goto gotpty;
+		}
+	}
+	return(-1);
+
+gotpty:
+
+	chmod(new_node, 0777);
+
+	(void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+	if (transparent)
+		b.sg_flags = REALLYRAW ;
+	else
+		b.sg_flags = CRMOD | XTABS | ANYP;
+	(void)ioctl(pty, TIOCSETP, (caddr_t)&b);
+#ifdef SYS_V
+	(void)fcntl(pty, F_SETFL, O_NDELAY);
+#else
+	(void)ioctl(pty, FIONBIO, (caddr_t)&on);
+#endif
+#ifdef TIOCPKT
+	(void)ioctl(pty, TIOCPKT, (caddr_t)&on);
+#endif
+	return(pty);
+}
+#endif /* AIX */
+#endif /* SVR4 */
+#endif /* SSFT */
+	    
+make_connection()
+{
+	int s;
+	int on = 1;
+#ifdef	LINGER
+	struct linger linger;
+#endif
+
+	s = socket(AF_INET, SOCK_STREAM, 0);
+	if (s < 0) {
+		DFATAL((logfp,"socket error %d\n", errno))
+		cleanup(E_NOSOCK);
+		/*NOTREACHED*/
+	}
+
+	if (options & SO_DEBUG) {
+		if (setsockopt(s, SOL_SOCKET, SO_DEBUG, &on, sizeof(on)) < 0) {
+			DWARN((logfp,"setsockopt (SO_DEBUG) error %d\n",
+				errno))
+		}
+	}
+
+	if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) < 0) {
+		DWARN((logfp,"setsockopt (SO_KEEPALIVE) error %d\n", errno))
+	}
+
+#ifdef LINGER
+	/*
+	 * Set up linger option to block on a close if unsent messages
+	 * are still queued on the socket 
+	 */
+	linger.l_onoff = 1;
+	linger.l_linger = 60;
+	if (setsockopt(s, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger)) < 0) {
+		DWARN((logfp,"setsockopt (SO_LINGER) error %d\n", errno))
+	}
+#endif
+
+	if (connect(s, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
+		DWARN((logfp,"connect error %d\n", errno))
+		(void)close(s);
+		return -1;
+	}
+
+#ifdef SYS_V
+	(void)fcntl(s, F_SETFL, O_NDELAY);
+#else
+	(void)ioctl(s, FIONBIO, (caddr_t)&on);
+#endif
+
+	ptyip = ptyibuf;
+	pfrontp = ptyobuf;
+	pbackp = ptyobuf;
+
+	netip = netibuf;
+	nfrontp = netobuf;
+	nbackp = netobuf;
+
+	return s;
+}
+
+
+/*
+ *  CAN_CONNECT attempts to create a second network connection between
+ *  "rtelnet" and the Annex slave port. It returns 1 if the second
+ *  connection succeeded (which implies our primary connection is
+ *  broken).
+ */
+static int can_connect()
+{
+	int sockfd;
+
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		DWARN((logfp, "can_connect: socket error %d\n", errno))
+		return(0);
+	}
+
+	/*
+	 * We expect this connect to fail if our existing connection is OK,
+	 * since the Annex only allows 1 connection per slave port.
+	 */
+	if (connect(sockfd, (struct sockaddr *)&testsin, sizeof(testsin)) < 0) {
+		DINFO((logfp, "can_connect: didn't connect %d\n", errno))
+		(void)close(sockfd);
+		return(0);
+	}
+
+	/*
+	 * If we DID get another connection, then our first connection
+	 * must have gone away - ie: the Annex probably rebooted.
+	 */
+	DWARN((logfp, "can_connect: did connect!\n"))
+	(void)close(sockfd);
+	return(1);
+}
+
+/*
+ * Main loop.  Select from pty and network, and
+ * hand data to telnet receiver finite state machine.
+ */
+int telnet()
+{
+	int on = 1;
+	struct sgttyb b;
+#ifdef SSFT
+	struct stat stb;
+#endif
+	int net_errno, pty_errno;
+	long timeout;
+	struct timeval tout;
+
+
+	if ((net = make_connection()) < 0) {
+		DINFO((logfp,"telnet() can't make connection\n"))
+		return -1;
+	}
+	DINFO((logfp,"telnet() made connection at %s\n", get_time() ))
+
+	timeout = keepalive ? TIMEOUT_BEG : 0 ;
+	tout.tv_sec = timeout;
+	tout.tv_usec = 0L;
+
+	telrcv(1);
+
+	/*
+	 * Negotiate binary mode, if requested
+	 */
+	if (!transparent && binary) {
+		dooption(TELOPT_BINARY);
+		myopts[TELOPT_BINARY] = 1;
+		willoption(TELOPT_BINARY);
+	}
+
+restart:
+	pcc = 0; ncc = 0;
+
+	DINFO((logfp, "Top of telnet loop - fd: net=%d, pty=%d\n", net, pty))
+
+	for (;;) {
+		fd_set ibits, obits;
+#ifdef MIPS
+		fd_set ebits;
+#endif
+		register int c;
+		int n_found;
+
+		FD_ZERO(&ibits);
+		FD_ZERO(&obits);
+#ifdef MIPS
+		FD_ZERO(&ebits);
+#endif
+
+		/*
+		 * Never look for input if there's still
+		 * stuff in the corresponding output buffer
+		 */
+		if (nfrontp - nbackp || pcc > 0)
+			FD_SET(net, &obits);
+		else
+			FD_SET(pty, &ibits);
+
+		if (pfrontp - pbackp) {
+#ifndef CONVERGENT
+			FD_SET(pty, &obits);
+			
+#else
+			/* always possible for write on VT */
+			ptyflush();
+#endif
+		} else
+			FD_SET(net, &ibits);
+
+		if (ncc < 0 || pcc < 0)
+			break;
+#ifdef MIPS
+		FD_SET(pty, &ebits);
+		DVERB((logfp, "selecting: i %#x, o %#x, e %#x\n",
+			FD_BITVAL(ibits), FD_BITVAL(obits), FD_BITVAL(ebits) ))
+#else
+		DVERB((logfp, "selecting: i %#x, o %#x\n",
+				FD_BITVAL(ibits), FD_BITVAL(obits) ))
+#endif
+		tout.tv_sec = timeout;
+		DVERB((logfp, "timeout=%ld\n", timeout))
+#ifdef MIPS
+		n_found = select(16, &ibits, &obits, &ebits,
+#else
+		n_found = select(16, &ibits, &obits, (fd_set *)0,
+#endif
+				 keepalive ? &tout : (struct timeval *)0);
+
+		/*
+		 * If select returned < 0 then there was an error:
+		 */
+		if (n_found < 0) {
+			if(errno == EINTR) {
+				continue;  /* OK - it was a signal */
+			} else {
+				/* any other select error is fatal.. */
+				DFATAL((logfp,"select2 error %d\n", errno))
+				cleanup(E_SELECT2);
+				/*NOTREACHED*/
+			}
+		}
+
+		/*
+		 *  If timeout, then no data transmission, so raise timeout:
+		 */
+		if (n_found == 0) {
+			if ((timeout += TIMEOUT_INC) > TIMEOUT_END)
+				timeout = TIMEOUT_END;
+			/*
+			 *  If we can connect to the port, the connection
+			 *  we thought we had must have been lost...
+			 */
+			if (can_connect()) {
+				pty_errno = 0;
+				net_errno = EIO; /* fake net EOF */
+				break;
+			}
+			continue;
+		}
+
+		/*
+		 * Any data on the connection causes the keepalive
+		 * time to go back to it's initial value..
+		 */
+		if (n_found > 0) timeout = keepalive ? TIMEOUT_BEG : 0 ;
+
+#ifdef MIPS
+		DVERB((logfp, "%d found: i=%#x, o=%#x, e=%#x\n",
+				n_found, FD_BITVAL(ibits), FD_BITVAL(obits),
+				FD_BITVAL(ebits) ))
+#else
+		DVERB((logfp, "%d found: i=%#x, o=%#x\n",
+				n_found, FD_BITVAL(ibits), FD_BITVAL(obits) ))
+#endif
+#ifdef MIPS
+		if (FD_BITVAL(ibits) == 0 && FD_BITVAL(obits) == 0 &&
+		    FD_BITVAL(ebits) == 0) {
+			sleep(5);
+			continue;
+		}
+#else
+		if (FD_BITVAL(ibits) == 0 && FD_BITVAL(obits) == 0) {
+			sleep(5);
+			continue;
+		}
+#endif
+
+		/*
+		 * Something to read from the network...
+		 */
+		if (FD_ISSET(net, &ibits)) {
+			ncc = read(net, netibuf, BUFSIZ);
+			if(debug >= 2) {
+				saved_errno = errno;
+				if(ncc <= 0) {
+				    DINFO((logfp,
+					"net: read() returns %d errno %d\n",
+					ncc, errno))
+				} else {
+				    DWORK((logfp,
+					"net: read() returns %d\n", ncc))
+				}
+				errno = saved_errno;
+			}
+			if (ncc < 0 && errno == EWOULDBLOCK) {
+				ncc = 0;
+			} else {
+				if (ncc <= 0) {
+#if defined( SVR4 ) || defined( AIX )
+				/*
+				 * SVR4 indicates net close by sending 0
+				 * length message. We indicate same via EIO
+				 */
+					net_errno = ncc<0?errno:EIO;
+#else
+					net_errno = ncc<0?errno:0;
+#endif
+					pty_errno = 0;
+					DINFO((logfp, "break in net read\n"))
+					break;
+				}
+				netip = netibuf;
+			}
+			if (debug > 4 && ncc > 0)
+				datadump(netip, ncc);
+		}
+
+		/*
+		 * Something to read from the pty...
+		 */
+		if ((pty != -1) && (FD_ISSET(pty, &ibits))) {
+#if defined( SVR4 ) || defined( SCO )
+		/*
+		 * We check for our open of the slave device. Since we are
+		 * here, we think someone has opened the slave device. We
+		 * close so we will be notified when the application closes.
+		 */
+			if (drop && slave_opened) {
+				close(slave_pty);
+				slave_opened = 0;
+				DINFO((logfp, "close slave\n"))
+			}
+#endif
+#ifdef SET_RAW_EVERY_READ
+			if (transparent) mode(RAW,0);
+#endif
+			pcc = read(pty, ptyibuf, BUFSIZ);
+			if (debug >= 2) {
+				saved_errno = errno;
+				if(pcc <=0) {
+				    DINFO((logfp,
+					"pty: read() returns %d errno %d\n",
+					pcc, errno))
+				} else {
+				    DWORK((logfp,
+					"pty: read() returns %d\n", pcc))
+				}
+				errno = saved_errno;
+			}
+			if (pcc < 0 && errno == EWOULDBLOCK)
+				pcc = 0;
+			else {
+				if (pcc <= 0) {
+					net_errno = 0;
+#if defined( SVR4 ) || defined( AIX )
+				/*
+				 * SVR4 indicates last close on slave by
+				 * sending 0 length message. We indicate
+				 * same via EIO
+				 */
+					pty_errno = pcc<0?errno:EIO;
+#else
+					pty_errno = pcc<0?errno:0;
+#endif
+					break;
+				}
+#ifdef TIOCPKT
+				pcc--;
+				ptyip = &ptyibuf[1];
+#else
+				ptyip = &ptyibuf[0];
+#endif
+
+			}
+			if (debug > 4 && pcc > 0)
+				datadump(ptyip, pcc);
+		}
+		
+#ifdef MIPS
+		/*
+		 * MIPS OS reports a close on the slave pty by setting
+		 * the exception bit. We check it here and set EIO if
+		 * it is closed
+		 */
+		if (FD_ISSET(pty, &ebits)) {
+			pcc = 0;
+			pty_errno = EIO;
+			break;
+		}
+#endif
+
+		while (pcc > 0) {
+			if ((&netobuf[BUFSIZ] - nfrontp) < 2)
+				break;
+			c = *ptyip++ & 0377, pcc--;
+			*nfrontp++ = c;
+			if (transparent)
+				continue;
+			if (c == IAC)
+				*nfrontp++ = c;
+			else if (c == '\r' && !myopts[TELOPT_BINARY])
+				*nfrontp++ = '\0';
+		}
+
+		if (FD_ISSET(net, &obits) && (nfrontp - nbackp) > 0)
+			netflush();
+		if (ncc > 0)
+			telrcv(0);
+		if ((pfrontp - pbackp) > 0)
+			ptyflush();
+		if (FD_ISSET(pty, &obits) && (pfrontp - pbackp) > 0)
+			ptyflush();
+
+	} /* END of telnet() main for(;;) loop */
+
+	/*
+	 * If we got here because a signal interrupted the select(),
+	 * then just go round again..
+	 */
+	if(pty_errno == EINTR || net_errno == EINTR) goto restart;
+
+	DWARN((logfp, "Out of loop pcc=%d pty_errno=%d ncc=%d net_errno=%d\n",
+			pcc, pty_errno, ncc, net_errno ))
+
+	/*
+	 * I/O error from pty or it looks like somebody closed the slave device.
+	 * Simply start over.
+	 */
+#ifdef SVR4
+	/*
+	 * In SVR4, closing the slave device does not sever the 
+	 * connection between the allocated slave channel and the
+	 * opened master. All we have to do is re-open the slave and
+	 * set the stream up again.
+	 */
+
+	if (pty_errno) {
+		if (pty_errno == EIO) {
+			DINFO((logfp, "EOF on pty - reopen slave at %s\n",
+					get_time() ))
+			if(slave_opened) {
+				close(slave_pty);
+				slave_opened = 0;
+			}
+			openslave(); /* just re-open slave */
+		} else {
+			DINFO((logfp, "Error on pty - reopen pty at %s\n",
+					get_time() ))
+			reopen_pty(); 
+		}
+	}
+
+	if (net_errno) {
+		if (net_errno == EIO) {
+			DINFO((logfp, "EOF on net - reopen pty at %s\n",
+					get_time() ))
+		} else {
+			DWARN((logfp, "Error on net - reopen pty at %s\n",
+					get_time() ))
+		}
+		reopen_pty();
+	}
+#else  /* !SVR4 */
+#ifdef AIX
+	/* For AIX, we close the master side and start over */
+	(void)close(pty);
+	unlink(new_node);
+	if ((pty = openmaster()) < 0) {
+		DFATAL((logfp, "reopen of master device failed\n"))
+		cleanup(E_OPENPTY);
+		/*NOTREACHED*/
+	}
+#else /* !AIX */
+	/*
+	 * Berkeley style ptys.
+	 */
+	if (pty_errno == EIO || net_errno != 0 ||
+	    (pcc == 0 && pty_errno == 0 && ncc == 0 && net_errno == 0)) {
+		/*
+		 * While the master pty is closed, someone could open
+		 * it and effectively steal the remote device from us.
+		 * (Yecch) rename the master pty while it's closed.
+		 */
+#ifndef SSFT
+		if (rename(master, alias) < 0) {
+			DFATAL((logfp,"rename to alias error %d\n", errno))
+			cleanup(E_RENPTY);
+			/*NOTREACHED*/
+		}
+		progress |= RENAMED_PTY;
+		(void)close(pty);
+		pty = open(alias, 2);
+		if (rename(alias, master) < 0) {
+			DFATAL((logfp,"rename to normal error %d\n", errno))
+			cleanup(E_RENPTY);
+			/*NOTREACHED*/
+		}
+#endif /* SSFT */
+#ifdef SSFT
+		progress |= RENAMED_PTY;
+		close(pty);
+		if (unlink(new_node) < 0) {
+			fprintf(stderr, "rtelnet: unlink of %s failed\n ", new_node);
+			cleanup();
+		}
+		pty = open("/dev/ptc", O_RDWR | O_NDELAY);
+		if (pty < 0 || fstat(pty, &stb) < 0) {
+			fprintf(stderr, "Reopen of master failed\n");
+			cleanup();
+		}
+		sprintf(&slave[0], "/dev/ttyq%d", minor(stb.st_rdev));
+		if (link(slave, new_node) < 0) {
+			fprintf(stderr, "rtelnet: link to slave device ");
+			perror(slave);
+		}
+#endif /*SSFT */
+		progress &= ~RENAMED_PTY;
+#ifdef SCO
+		if (drop) {
+			openslave(); /* reopen the slave */
+		}
+#endif
+		(void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+		if (transparent)
+			b.sg_flags = REALLYRAW ;
+		else
+			b.sg_flags = CRMOD | XTABS | ANYP;
+		(void)ioctl(pty, TIOCSETP, (caddr_t)&b);
+#ifdef SYS_V
+		(void)fcntl(pty, F_SETFL, O_NDELAY);
+#else
+		(void)ioctl(pty, FIONBIO, (caddr_t)&on);
+#endif
+#ifdef TIOCPKT
+		(void)ioctl(pty, TIOCPKT, (caddr_t)&on);
+#endif
+	}
+
+#endif /* !AIX */
+#endif /* !SVR4 */
+
+		if (pty_errno
+#ifdef BROKEN_NET
+/*
+ * some systems don't correctly indicate close of the connection!
+ */
+		    || !net_errno
+#endif
+		) {
+			if (drop) {
+		                DWARN((logfp,"drop net\n" ))
+				if(!transparent) send_tm(net);
+				if (hangup)
+		                	DWARN((logfp,"hangup\n" ))
+					/*we also need to set_global_passwd*/
+					(void)reset_line(
+						(struct sockaddr_in *)&sin,
+						(u_short)SERIAL_DEV,
+						(u_short)port_num);
+			} else
+				goto restart;
+		}
+		DWARN((logfp,"shutdown net\n" ))
+		if (shutdown(net, 2) == -1) {  /* take net connection down */
+			DWARN((logfp,"shutdown error %d\n", errno))
+		}
+		(void)close(net);
+		return 0;
+
+}
+
+static void cleanup(why)
+int why;
+{
+	DFATAL((logfp, "cleanup(%d) EXIT at %s\n", why, get_time() ))
+
+	if (progress & LINKED_TTY)
+		if (unlink(new_node) < 0) {
+			DFATAL((logfp, "Can't unlink %s %d\n", slave, errno))
+		}
+#ifndef SSFT
+	if (progress & RENAMED_PTY)
+		if (rename(alias, master) < 0) {
+			DFATAL((logfp, "Can't rename master %s %s %d\n",
+				alias, master, errno))
+		}
+#endif /* SSFT */
+	if (net >= 0)
+		(void)shutdown(net, 2);
+	exit(why);
+}
+
+static void sig_catch(sig)
+int sig;
+{
+	signal(sig, sig_catch);
+	switch(sig) {
+		case SIGINT:
+			DWARN((logfp, "Caught SIGINT - exit\n"))
+			break;
+		case SIGTERM:
+			DWARN((logfp, "Caught SIGTERM - exit\n"))
+			break;
+		case SIGPIPE:
+			DWARN((logfp, "Caught SIGPIPE - ignore\n"))
+			return;
+		case SIGHUP:
+			DWARN((logfp, "Caught SIGHUP - ignore\n"))
+			return;
+		case SIGALRM:
+			DWARN((logfp, "Caught SIGALRM - exit\n"))
+			break;
+		case SIGPOLL:
+			DWARN((logfp, "Caught SIGPOLL - exit\n"))
+			break;
+		case SIGQUIT:
+			DWARN((logfp, "Caught SIGQUIT - ignore\n"))
+			return;
+		case SIGABRT:
+			DWARN((logfp, "Caught SIGABRT - exit\n"))
+			break;
+		case SIGUSR1:
+			debug++;
+			DWARN((logfp, "Caught SIGUSR1 - set debug level to %d\n",
+				debug))
+			return;
+		case SIGUSR2:
+			DWARN((logfp, "Caught SIGUSR2 - switch off debuging\n"))
+			debug = 0;
+			return;
+#ifdef SIGSTOP
+		case SIGSTOP:
+			DWARN((logfp, "Caught SIGSTOP - exit\n"))
+			break;
+		case SIGTSTP:
+			DWARN((logfp, "Caught SIGTSTP - ignore\n"))
+			return;
+		case SIGTTIN:
+			DWARN((logfp, "Caught SIGTTIN - exit\n"))
+			break;
+		case SIGTTOU:
+			DWARN((logfp, "Caught SIGTTOU - exit\n"))
+			break;
+#endif
+		}
+	cleanup(E_GETSIG);
+	/*NOTREACHED*/
+}
+
+/*
+ * State for recv fsm
+ */
+#define	TS_DATA		0	/* base state */
+#define	TS_IAC		1	/* look for double IAC's */
+#define	TS_CR		2	/* CR-LF ->'s CR */
+#define	TS_BEGINNEG	3	/* throw away begin's... */
+#define	TS_ENDNEG	4	/* ...end's (suboption negotiation) */
+#define	TS_WILL		5	/* will option negotiation */
+#define	TS_WONT		6	/* wont " */
+#define	TS_DO		7	/* do " */
+#define	TS_DONT		8	/* dont " */
+
+telrcv(init_it)
+int init_it;
+{
+	register int c;
+	static int state = TS_DATA;
+	struct sgttyb b;
+
+	if (init_it) {
+		state = TS_DATA;
+		return;
+	}
+
+	while (ncc > 0) {
+		if ((&ptyobuf[BUFSIZ] - pfrontp) < 2)
+			return;
+		c = *netip++ & 0377, ncc--;
+
+		if (transparent) {
+			*pfrontp++ = c;
+			continue;
+			}
+
+		switch (state) {
+
+		case TS_DATA:
+			if (c == IAC) {
+				state = TS_IAC;
+				break;
+			}
+			*pfrontp++ = c;
+			if (!hisopts[TELOPT_BINARY] && c == '\r')
+				state = TS_CR;
+			break;
+
+		case TS_CR:
+			if (c && c != 0)
+				*pfrontp++ = c;
+			state = TS_DATA;
+			break;
+
+		case TS_IAC:
+			switch (c) {
+
+			/*
+			 * Send the process on the pty side an
+			 * interrupt.  Do this with a NULL or
+			 * interrupt char; depending on the tty mode.
+			 */
+			case BREAK:
+			case IP:
+				interrupt();
+				break;
+
+			/*
+			 * Are You There?
+			 */
+			case AYT:
+				*pfrontp++ = BELL;
+				break;
+
+			/*
+			 * Erase Character and
+			 * Erase Line
+			 */
+			case EC:
+			case EL:
+				ptyflush();	/* half-hearted */
+#ifdef SVR4
+				if(slave_opened) {
+					(void)ioctl(slave_pty, TIOCGETP,
+							(caddr_t)&b);
+				}
+#else
+				(void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+#endif
+				*pfrontp++ = (c == EC) ?
+					b.sg_erase : b.sg_kill;
+				break;
+
+			/*
+			 * Check for urgent data...
+			 */
+			case DM:
+				break;
+
+			/*
+			 * Begin option subnegotiation...
+			 */
+			case SB:
+				state = TS_BEGINNEG;
+				continue;
+
+			case WILL:
+			case WONT:
+			case DO:
+			case DONT:
+				state = TS_WILL + (c - WILL);
+				continue;
+
+			case IAC:
+				*pfrontp++ = c;
+				break;
+			}
+			state = TS_DATA;
+			break;
+
+		case TS_BEGINNEG:
+			if (c == IAC)
+				state = TS_ENDNEG;
+			break;
+
+		case TS_ENDNEG:
+			state = c == SE ? TS_DATA : TS_BEGINNEG;
+			break;
+
+		case TS_WILL:
+			printoption(RCVD, "will", c, !hisopts[c]);
+			if (!hisopts[c])
+				willoption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_WONT:
+			printoption(RCVD, "wont", c, hisopts[c]);
+			if (hisopts[c])
+				wontoption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_DO:
+			printoption(RCVD, "do", c, !myopts[c]);
+			if (!myopts[c])
+				dooption(c);
+			state = TS_DATA;
+			continue;
+
+		case TS_DONT:
+			printoption(RCVD, "dont", c, myopts[c]);
+			if (myopts[c]) {
+				myopts[c] = 0;
+				sprintf((char *)nfrontp, (char *)wont, c);
+				nfrontp += sizeof (wont) - 2;
+			}
+			state = TS_DATA;
+			continue;
+
+		default:
+			DFATAL((logfp, "telrcv panic: state=%d\n",state))
+			cleanup(E_TELRCV);
+			/*NOTREACHED*/
+		}
+	}
+}
+
+send_tm(f)
+	int f;
+{
+	register int c, cc;
+	int off = 0;
+	int state = TS_DATA;
+	char buff[1024], *p;
+
+	sprintf((char *)buff, (char *)doopt, TELOPT_TM);
+	cc = strlen(buff);
+	while(cc)
+		cc -= write(f, buff, cc);
+	DINFO((logfp, "sent tm\n"))
+#ifdef SYS_V
+	(void)fcntl(f, F_SETFL, O_NDELAY);
+#else
+	(void)ioctl(f, FIONBIO, (caddr_t)&off);
+#endif
+	while ((cc = read(f, buff, sizeof(buff))) > 0) {
+		p = buff;
+		while (cc > 0) {
+			c = *p++ & 0377, cc--;
+			switch (state) {
+
+			case TS_DATA:
+				if (c == IAC) {
+					state = TS_IAC;
+					break;
+				}
+				break;
+
+			case TS_IAC:
+				switch (c) {
+				case WILL:
+				case WONT:
+				case DO:
+				case DONT:
+					state = TS_WILL + (c - WILL);
+					continue;
+				}
+				state = TS_DATA;
+				break;
+
+			case TS_WILL:
+			case TS_WONT:
+				if (c == TELOPT_TM)
+				return;
+
+			case TS_DO:
+			case TS_DONT:
+				state = TS_DATA;
+				continue;
+
+			default:
+				DFATAL((logfp, "send_tm panic: state=%d\n",
+						 state))
+				cleanup(E_SENDTM);
+				/*NOTREACHED*/
+			}
+		}
+	}
+}
+
+willoption(option)
+	int option;
+{
+	unsigned char *fmt;
+
+	switch (option) {
+
+	case TELOPT_BINARY:
+		mode(RAW, 0);
+		goto common;
+
+	case TELOPT_ECHO:
+		mode(0, ECHO|CRMOD);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		hisopts[option] = 1;
+		fmt = doopt;
+		break;
+
+	case TELOPT_TM:
+		fmt = dont;
+		break;
+
+	default:
+		fmt = dont;
+		break;
+	}
+	printoption(SENT, fmt == doopt ? "do" : "don't", option, 0);
+	sprintf((char *)nfrontp, (char *)fmt, option);
+	nfrontp += sizeof (dont) - 2;
+}
+
+wontoption(option)
+	int option;
+{
+	unsigned char *fmt;
+
+	switch (option) {
+
+	case TELOPT_ECHO:
+		mode(ECHO|CRMOD, 0);
+		goto common;
+
+	case TELOPT_BINARY:
+		mode(0, RAW);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		hisopts[option] = 0;
+		fmt = dont;
+		break;
+
+	default:
+		fmt = dont;
+	}
+	printoption(SENT, fmt == doopt ? "do" : "don't", option, 0);
+	sprintf((char *)nfrontp, (char *)fmt, option);
+	nfrontp += sizeof (doopt) - 2;
+}
+
+dooption(option)
+	int option;
+{
+	unsigned char *fmt;
+
+	switch (option) {
+
+	case TELOPT_TM:
+		fmt = wont;
+		break;
+
+	case TELOPT_ECHO:
+		mode(ECHO|CRMOD, 0);
+		goto common;
+
+	case TELOPT_BINARY:
+		mode(RAW, 0);
+		/*FALL THRU*/
+
+	case TELOPT_SGA:
+	common:
+		fmt = will;
+		break;
+
+	default:
+		fmt = wont;
+		break;
+	}
+	printoption(SENT, fmt == will ? "will" : "won't", option, 0);
+	sprintf((char *)nfrontp, (char *)fmt, option);
+	nfrontp += sizeof (doopt) - 2;
+}
+
+mode(on, off)
+int on, off;
+{
+	struct sgttyb b;
+
+	ptyflush();
+
+#ifdef SVR4
+	if (slave_opened) {
+		(void)ioctl(slave_pty, TIOCGETP, (caddr_t)&b);
+		if ((b.sg_flags&on)!=on || (b.sg_flags&off)!=0) {
+			b.sg_flags |= on;
+			b.sg_flags &= ~off;
+			(void)ioctl(slave_pty, TIOCSETP, (caddr_t)&b);
+		}
+	}
+#else
+	(void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+	if ((b.sg_flags&on)!=on || (b.sg_flags&off)!=0) {
+		b.sg_flags |= on;
+		b.sg_flags &= ~off;
+		(void)ioctl(pty, TIOCSETP, (caddr_t)&b);
+	}
+#endif
+}
+
+/*
+ * Send interrupt to process on other side of pty.
+ * If it is in raw mode, just write NULL;
+ * otherwise, write intr char.
+ */
+interrupt()
+{
+#ifdef TCGETA
+	struct termio tv;
+#else
+	struct sgttyb b;
+	struct tchars tchars;
+#endif
+
+	ptyflush();	/* half-hearted */
+	if (transparent)
+		return;
+#ifdef TCGETA
+	(void)ioctl(pty, TCGETA, &tv);
+	if (!(tv.c_lflag & ISIG) )
+#else
+	(void)ioctl(pty, TIOCGETP, (caddr_t)&b);
+	if (b.sg_flags & RAW)
+#endif
+	{
+		*pfrontp++ = '\0';
+		return;
+	}
+#ifdef TCGETA
+	*pfrontp++ = tv.c_cc[VQUIT];
+#else
+	*pfrontp++ = ioctl(pty, TIOCGETC, (caddr_t)&tchars) >= 0
+			? tchars.t_intrc
+			: '\177';
+#endif
+}
+
+ptyflush()
+{
+	int n;
+
+	if ((n = pfrontp - pbackp) > 0)
+		n = write(pty, pbackp, n);
+
+	if (n < 0)
+		return;
+	pbackp += n;
+	if (pbackp == pfrontp)
+		pbackp = pfrontp = ptyobuf;
+}
+
+netflush()
+{
+	int n;
+
+	if ((n = nfrontp - nbackp) > 0) {
+		n = write(net, nbackp, n);
+	}
+	if (n < 0) {
+		if (errno == EWOULDBLOCK)
+			return;
+		/* should blow this guy away... */
+		return;
+	}
+	nbackp += n;
+	if (nbackp == nfrontp)
+		nbackp = nfrontp = netobuf;
+}
+
+printoption(dir, what, which, reply)
+int dir;
+char *what;
+char which;
+int reply;
+{
+	char *s_witch, ssb[32];
+
+	if (debug<2)
+		return;
+
+	sprintf(ssb, "%d", which);
+
+	if (which < 0 || which >= sizeof(telopts) / sizeof(telopts[0]))
+		s_witch = ssb;
+	else
+		s_witch = telopts[which];
+
+	if (dir == SENT) {
+		DINFO((logfp, "SENT %s %s\n", what, s_witch))
+	} else {
+		DINFO((logfp, "RCVD %s %s (%sreply)\n",
+			what, s_witch, reply ? "" : "don't "))
+	}
+}
+
+#ifdef SYS_V
+#ifndef SVR4
+int rename(old,new)
+char *old, *new;
+{
+	if(unlink(new) < 0) {
+		if (errno != ENOENT)
+			return(-1);
+	}
+	if(link(old,new) < 0)
+		return(-1);
+	if(unlink(old) < 0)
+		return(-1);
+}
+#endif
+#endif
+
+/*
+ *  Gets the actual time and returns a pointer to a string with contains
+ *  the time information.
+ */
+static char *get_time()
+{
+	static char tbuff[25];
+	long tloc;
+	
+	if (time(&tloc) == -1)
+		strcpy(tbuff,"Can't get time");
+	else {
+		strncpy(tbuff, ctime(&tloc), 24);
+		tbuff[24] = '\0';
+	}
+	return (tbuff);
+}
+
+static void
+datadump(p, len)
+u_char *p;
+int len;
+{
+	int i;
+	u_char *s = (u_char *)(~0xf & (u_long)p);
+
+	len += p-s;
+	while (len > 0) {
+		u_char *s1 = s;
+		fprintf(logfp,s<=p ? "%6x:%-3x" : "%6x:   ",
+			s<=p ? p : s,
+			len - (p-s));
+		for (i = 0; i < 16; i++, s++)
+			fprintf(logfp,s<p||i>=len ? "%s   " : "%s%.2x ",
+				i % 8 ? "" : " ",
+				*s);
+		s = s1;
+		fprintf(logfp," |");
+		for (i = 0; i < 16; i++, s++)
+			fprintf(logfp,"%c", s<p||i>=len ? ' '
+					: *s<' '||*s>'~' ? '.' : *s);
+		len -= 16;
+		fprintf(logfp,"|\n");
+	}
+}
+

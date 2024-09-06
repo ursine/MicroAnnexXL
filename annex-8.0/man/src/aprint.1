@@ -1,0 +1,191 @@
+'''
+'''	$Id: aprint.1,v 1.9 1993/10/07 09:32:48 emond Rel $
+'''
+.ig xy
+.TH APRINT 1M ANNEX
+.xy
+.ie '\*(sy'V' .TH APRINT 1M ANNEX
+.el .TH APRINT 1 ANNEX
+'''
+.if'\*(BU''\{
+.ift .ds BU \\s-2\\(bu\\s0
+.ifn .ds BU o\}
+.if'\*Q''\{
+.ds Q \&``
+.ds U \&''\}
+'''
+.SH NAME
+aprint \- Annex remote print command
+.SH SYNOPSIS
+.B aprint
+.BI \-A annex
+[
+.BI \-L line
+] | [
+.BI \-p port
+] [
+.B \-\^fD
+] [
+.BI \-F string
+] [
+.IR files ...
+]
+.br
+.B aprint
+[
+.BI \-P printer
+] [
+.B \-\^f
+] [
+.BI \-F string
+] [
+.IR files ...
+]
+.SH ARGUMENTS
+.TP 12n
+.BI \-A \ annex
+The host name string or
+Internet address (in standard Internet dot-separated notation)
+of the Annex on which to print.
+.TP
+.BI \-L \ line
+The serial port line number to use for printing on the Annex specified
+by
+.BR \-A .
+If neither this option nor the
+.BR \-p
+option are specified, or if a value of 0 is given as the line number,
+then the parallel port is used.  A value greater than zero specifies a
+serial port.  This option cannot be used at the same time as the
+.BR \-p
+option.
+.TP
+.BI \-p \ port
+The parallel port line number to use for printing on the Annex specified
+by
+.BR \-A .
+This option cannot be used with the
+.BR \-L
+option.
+.TP
+.BI \-f
+Prevent
+.I aprint
+from supplying extra form-feeds.
+.TP
+.BI \-D
+Specifies that debug output should be sent to standard output. This option
+may be repeated for more detailed information. Level 1: Connect acknowledge
+and per file messages. Level 2: Connect setup details.
+.TP
+.BI \-F \ string
+Use
+.I string
+to produce a form-feed instead of the default string of a single
+.BR ^L .
+This will override an
+.B ff=
+capability read from
+.IR /etc/printcap .
+No form-feeds are produced if the
+.B \-f
+flag has been given.
+.TP
+.BR files ...
+The file(s) to print; if none are specified, then the standard input
+is used.
+.TP
+.BI \-P \ printer
+Use
+.I printer
+as the printer name to look up in
+.IR /etc/printcap .
+(OBSOLETE)
+.SH DESCRIPTION
+The
+.I aprint
+utility is intended for sites that either
+do not have or cannot modify the
+Berkeley printer spooler.
+It sends files directly to a printer attached to an Annex,
+without the use of a spooling mechanism.
+.I Aprint
+supports printers connected to either a parallel port
+or any of an Annex's serial ports.
+The name of the Annex and port to be printed on are specified by the
+.B \-A
+and
+.B \-L
+arguments, respectively.
+To be backward-compatible with old versions of
+.IR aprint ,
+it also supports a
+.B \-P
+argument specifying a printer name to be looked up in the
+.I /etc/printcap
+file.  The
+.B \-A
+and
+.B \-P
+arguments are mutually exclusive.
+If neither is given,
+.I aprint
+will look up in
+.IR /etc/printcap
+the printer named by either
+the value of the
+.SM PRINTER
+environment variable
+or, if that is not set,
+the default printer named
+.IR lp .
+.PP
+By default,
+.I aprint
+will print a form-feed at the start of every file
+and at the end of all specified files.
+Versions of the Annex operational code previous to R3.0
+produced these form-feeds without a means of disabling them.
+Since this function should now be produced by host resident software,
+.I aprint
+will provide them for backward compatibility.
+The
+.B \-f
+flag will prevent
+.I aprint
+from generating these form-feeds.
+.SH FILES
+/etc/printcap	printer capabilities data-base
+.SH SEE ALSO
+.I Annex Network Administrator's Guide
+.SH DIAGNOSTICS
+Most messages are self-explanatory, if not overly verbose.
+.br
+.SH RESTRICTIONS
+Some ports of the Berkeley networking software to System V systems
+do not support out-of-band data (MSG_OOB) on sockets.
+Since OOB is used in the close handshake of the Annex LPD protocol,
+this handshake will not be used on such hosts.
+The implication of this is that with two back-to-back invocations of
+.I aprint ,
+the second can fail because the Annex port will still be busy
+from the first print job.
+This should not be a problem if
+.I aprint
+is invoked from within a spooling system
+(such as System V lp or Berkeley LPD).
+.PP
+Revision R7.0 and later of
+.I aprint
+cannot be used with Annex operational code before revision R3.0,
+because the later Annex operational code revisions
+use a more elaborate Annex LPD protocol
+that provides for acknowledgements
+from the Annex to the host
+(indicating that the Annex is ready to receive data)
+and from the host to the Annex
+(marking EOF, among other things).
+This makes it possible for
+.I aprint
+to determine that the Annex has opened the requested
+serial or parallel line sucessfully.

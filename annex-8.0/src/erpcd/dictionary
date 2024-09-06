@@ -1,0 +1,556 @@
+#
+#	dictionary - RADIUS message data dictionary
+#	11/18/99 - Updated to R17.0 Release
+#	
+#	NOTE: This file contains Vendor Specific Attribute (VSA) definitions 
+#	that may not be supported by some older RADIUS servers.  The structure
+#	of VSAs is documented in the RADIUS RFC.  Check with your server's 
+#       documentation for details of it's support.
+#
+#	This file contains dictionary definitions used by some servers for 
+#	parsing messages, and the user authorization file as well as generating
+#       text accounting records.
+#  
+#	All RADIUS messages are composed of Attribute/Length/Value triplets.  
+#	The format of each attribute value is specified as one of 4 data types. 
+#
+#	The valid data types are:
+#	   string  - 0-253 octets
+#	   ipaddr  - 4 octets in network byte order
+#	   integer - 32-bit value in network byte order 
+#	   date    - 32-bit value in network byte order 
+#			of seconds since 00:00:00 GMT, Jan. 1, 1970
+#
+#	Enumerated integer values are also stored in this dictionary as 
+#	VALUE definitions for easier use.
+#
+#	Syntax -
+#	Attribute definition: 	ATTRIBUTE  keyword 	value	type
+#	Value definition:	VALUE	   attribute	keyword	value	
+#
+# Names for backwards compatibility with previous Bay Networks version
+# These names must be first for aliasing.  If you wish to use the older names, 
+# then comment out the later definition. If you don't have an older users file 
+# that you're still using, you can delete or ignore this section.
+#
+ATTRIBUTE	Password	2	        string
+
+VALUE		Service-Type	Login-User		1
+VALUE		Service-Type	Framed-User		2
+VALUE		Service-Type	Callback-Login-User	3
+VALUE		Service-Type	Callback-Framed-User	4
+VALUE		Service-Type	Outbound-User		5
+VALUE		Service-Type	Administrative-User	6
+
+VALUE		Framed-Protocol		Gandalf-SL/MLP		4
+VALUE		Framed-Protocol		IPX/SLIP		5
+
+VALUE		Framed-Routing		Broadcast		1
+VALUE		Framed-Routing		Listen			2
+VALUE		Framed-Routing		Broadcast-Listen	3
+
+VALUE		Framed-Compression	Van-Jacobson-TCP-IP	1
+VALUE		Framed-Compression	Van-Jacobsen-TCP-IP	1
+VALUE		Framed-Compression	IPX-Header		2
+#
+# END of obsolete names for backwards compatibility
+#
+#
+# Beginning of current names
+#
+ATTRIBUTE	User-Name		1	string
+ATTRIBUTE	User-Password		2	string
+ATTRIBUTE	CHAP-Password		3	string
+ATTRIBUTE	NAS-IP-Address		4	ipaddr
+ATTRIBUTE	NAS-Port		5	integer
+ATTRIBUTE	Service-Type		6	integer
+ATTRIBUTE	Framed-Protocol		7	integer
+ATTRIBUTE	Framed-IP-Address	8	ipaddr
+ATTRIBUTE	Framed-IP-Netmask	9	ipaddr
+ATTRIBUTE	Framed-Routing		10	integer
+ATTRIBUTE	Filter-Id		11	string
+ATTRIBUTE	Framed-MTU		12	integer
+ATTRIBUTE	Framed-Compression	13	integer
+ATTRIBUTE	Login-IP-Host		14	ipaddr
+ATTRIBUTE	Login-Service		15	integer
+ATTRIBUTE	Login-TCP-Port		16	integer
+ATTRIBUTE	Old-Password		17	string	### non-std
+ATTRIBUTE	Reply-Message		18	string
+ATTRIBUTE	Callback-Number		19	string
+ATTRIBUTE	Callback-Id		20	string
+ATTRIBUTE	Expiration		21	date	### non-std
+ATTRIBUTE	Framed-Route		22	string
+ATTRIBUTE	Framed-IPX-Network	23	ipaddr
+ATTRIBUTE	State			24	string
+ATTRIBUTE	Class			25	string
+ATTRIBUTE	Vendor-Specific		26	string
+ATTRIBUTE	Session-Timeout		27	integer
+ATTRIBUTE	Idle-Timeout		28	integer
+ATTRIBUTE	Termination-Action	29	integer
+ATTRIBUTE	Called-Station-Id	30	string
+ATTRIBUTE	Calling-Station-Id	31	string
+ATTRIBUTE	NAS-Identifier		32	string
+ATTRIBUTE	Proxy-State		33	string
+ATTRIBUTE	Login-LAT-Service	34	string
+ATTRIBUTE	Login-LAT-Node		35	string
+ATTRIBUTE	Login-LAT-Group		36	string
+ATTRIBUTE	Framed-AppleTalk-Link	37	integer
+ATTRIBUTE	Framed-AppleTalk-Network 38	integer
+ATTRIBUTE	Framed-AppleTalk-Zone	39	string
+ATTRIBUTE	Acct-Status-Type	40	integer
+ATTRIBUTE	Acct-Delay-Time		41	integer
+ATTRIBUTE	Acct-Input-Octets	42	integer
+ATTRIBUTE	Acct-Output-Octets	43	integer
+ATTRIBUTE	Acct-Session-Id		44	string
+ATTRIBUTE	Acct-Authentic		45	integer
+ATTRIBUTE	Acct-Session-Time	46	integer
+ATTRIBUTE	Acct-Input-Packets	47	integer
+ATTRIBUTE	Acct-Output-Packets	48	integer
+ATTRIBUTE	Acct-Terminate-Cause	49	integer
+ATTRIBUTE	Acct-Multi-Session-Id	50	string
+ATTRIBUTE	Acct-Link-Count 	51	integer
+ATTRIBUTE	CHAP-Challenge		60	string
+ATTRIBUTE	NAS-Port-Type		61	integer
+ATTRIBUTE	Port-Limit		62	integer
+ATTRIBUTE	Login-LAT-Port		63	string
+
+# NOTE: the the following can be compound attributes with leading tags
+ATTRIBUTE	Tunnel-Type		64	integer
+ATTRIBUTE	Tunnel-Medium-Type	65	integer
+ATTRIBUTE	Tunnel-Client-Endpoint	66	string
+ATTRIBUTE	Tunnel-Server-Endpoint	67	string
+ATTRIBUTE	Acct-Tunnel-Connect-Id	68	string
+ATTRIBUTE	Tunnel-Password		69	string  # encrypted
+
+#
+# Extension Attributes
+#
+ATTRIBUTE ARAP-Password                  70    string
+ATTRIBUTE ARAP-Features                  71    string
+ATTRIBUTE ARAP-Zone-Access               72    integer
+ATTRIBUTE ARAP-Security                  73    integer
+ATTRIBUTE ARAP-Security-Data             74    string
+
+ATTRIBUTE Password-Retry                 75    integer		
+ATTRIBUTE Prompt                         76    integer	
+ATTRIBUTE Connect-Info                   77    string		
+ATTRIBUTE Configuration-Token            78    string
+ATTRIBUTE EAP-Message                    79    string
+ATTRIBUTE Signature                      80    string
+
+#
+# More Tunnel Attributes
+#
+ATTRIBUTE Tunnel-Private-Group-ID        81   string    # tagged 
+ATTRIBUTE Tunnel-Assignment-ID           82   string    # tagged 
+ATTRIBUTE Tunnel-Preference              83   integer   # tagged 
+
+#
+# Attribute Ranges:
+#	192-223	Reserved for Experimental use
+#	224-240 Reserved for Implementation specific use
+#	245-255 Reserved for future protocol, Do not use
+#
+
+#
+#	Integer Translations
+# NOTE: All names must be unique or overloading will occur
+#
+
+#	User Service Types
+
+VALUE		Service-Type	Login		        1
+VALUE		Service-Type	Framed		        2
+VALUE		Service-Type	Callback-Login	        3
+VALUE		Service-Type	Callback-Framed	        4
+VALUE		Service-Type	Outbound		5
+VALUE		Service-Type	Administrative	        6
+VALUE		Service-Type	NAS-Prompt		7
+VALUE		Service-Type	Authenticate-Only	8
+VALUE		Service-Type	Callback-NAS-Prompt	9
+VALUE	        Service-Type	Annex-Authorize-Only    0x06300001
+
+
+#	Framed Protocols
+
+VALUE		Framed-Protocol		PPP			1
+VALUE		Framed-Protocol		SLIP			2
+VALUE		Framed-Protocol		ARAP			3
+VALUE		Framed-Protocol		Gandalf-SL/MLP		4
+VALUE		Framed-Protocol		Xylogics-IPX/SLIP	5
+
+#	Framed Routing Values
+
+VALUE		Framed-Routing		None			0
+VALUE		Framed-Routing		Send-routing-packets	1
+VALUE		Framed-Routing		Listen-for-routing-packets 2
+VALUE		Framed-Routing		Send-and-Listen	        3
+
+#	Framed Compression Types
+
+VALUE		Framed-Compression	None			0
+VALUE		Framed-Compression	VJ-TCP/IP-header-compression 1
+VALUE		Framed-Compression	IPX-header-compression	2
+
+#	Login Services
+
+VALUE		Login-Service		Telnet			0
+VALUE		Login-Service		Rlogin			1
+VALUE		Login-Service		TCP-Clear		2
+VALUE		Login-Service		PortMaster		3
+VALUE		Login-Service		LAT			4
+
+#	Accounting Status Types
+
+VALUE		Acct-Status-Type	Start			1
+VALUE		Acct-Status-Type	Stop			2
+VALUE		Acct-Status-Type	Alive			3
+VALUE		Acct-Status-Type	Modem-Start		4
+VALUE		Acct-Status-Type	Modem-Stop		5
+VALUE		Acct-Status-Type	Cancel			6
+VALUE		Acct-Status-Type	Accounting-On		7
+VALUE		Acct-Status-Type	Accounting-Off		8
+
+#
+# Define Bay Networks VSE values for Acct-Status-Type
+#
+VALUE   Acct-Status-Type        Annex-User-Reject          0x06300001
+VALUE   Acct-Status-Type        Annex-Call-Reject          0x06300002
+VALUE   Acct-Status-Type        Annex-IPCP-Start           0x06300003
+VALUE   Acct-Status-Type        Annex-IPXCP-Start          0x06300004
+VALUE   Acct-Status-Type        Annex-ATCP-Start           0x06300005
+VALUE   Acct-Status-Type        Annex-Accounting-Restart   0x06300006
+VALUE   Acct-Status-Type        Annex-Accounting-Shutoff   0x06300007
+VALUE   Acct-Status-Type        Annex-Tunnel-Start         0x06300008
+VALUE   Acct-Status-Type        Annex-Tunnel-Stop          0x06300009
+VALUE   Acct-Status-Type        Annex-Tunnel-Reject        0x0630000a
+VALUE   Acct-Status-Type        Annex-Tunnel-Link-Start    0x0630000b
+VALUE   Acct-Status-Type        Annex-Tunnel-Link-Stop     0x0630000c
+VALUE   Acct-Status-Type        Annex-MP-Start             0x0630000d
+VALUE   Acct-Status-Type        Annex-MP-Stop              0x0630000e
+VALUE   Acct-Status-Type        Annex-Line-Seizure         0x0630000f
+VALUE   Acct-Status-Type        Annex-Rlogin-Start         0x06300010
+VALUE   Acct-Status-Type        Annex-Rlogin-Stop          0x06300011
+
+
+#	Authentication Types
+
+VALUE		Acct-Authentic		None			0
+VALUE		Acct-Authentic		RADIUS			1
+VALUE		Acct-Authentic		Local			2
+
+#	Termination Options
+
+VALUE		Termination-Action	Default			0
+VALUE		Termination-Action	RADIUS-Request		1
+
+#	Termination Cause
+
+VALUE           Acct-Terminate-Cause    User-Request            1
+VALUE           Acct-Terminate-Cause    Lost-Carrier            2
+VALUE           Acct-Terminate-Cause    Lost-Service            3
+VALUE           Acct-Terminate-Cause    Idle-Timeout            4
+VALUE           Acct-Terminate-Cause    Session-Timeout         5
+VALUE           Acct-Terminate-Cause    Admin-Reset             6
+VALUE           Acct-Terminate-Cause    Admin-Reboot            7
+VALUE           Acct-Terminate-Cause    Port-Error              8
+VALUE           Acct-Terminate-Cause    NAS-Error               9
+VALUE           Acct-Terminate-Cause    NAS-Request             10
+VALUE           Acct-Terminate-Cause    NAS-Reboot              11
+VALUE           Acct-Terminate-Cause    Port-Unneeded           12
+VALUE           Acct-Terminate-Cause    Port-Preempted          13
+VALUE           Acct-Terminate-Cause    Port-Suspended          14
+VALUE           Acct-Terminate-Cause    Service-Unavailable     15
+VALUE           Acct-Terminate-Cause    Callback                16
+VALUE		Acct-Terminate-Cause	User-Error		17
+VALUE		Acct-Terminate-Cause	Host-Request		18
+
+
+#	NAS Port Types
+
+VALUE		NAS-Port-Type	Async			0
+VALUE		NAS-Port-Type	Sync			1
+VALUE		NAS-Port-Type	ISDN-Sync		2
+VALUE		NAS-Port-Type	ISDN-Async-V.120	3
+VALUE		NAS-Port-Type	ISDN-Async-V.110	4
+VALUE		NAS-Port-Type	Virtual			5
+
+#       Tunnel Type values.
+
+VALUE           Tunnel-Type      PPTP            1
+VALUE           Tunnel-Type      L2F             2
+VALUE           Tunnel-Type      L2TP            3
+VALUE           Tunnel-Type      ATMP            4
+VALUE           Tunnel-Type      VTP             5
+VALUE           Tunnel-Type      AH              6
+VALUE           Tunnel-Type      IP-IP           7
+VALUE           Tunnel-Type      MIN-IP-IP       8
+VALUE           Tunnel-Type      ESP             9
+VALUE           Tunnel-Type      GRE             10
+VALUE           Tunnel-Type      DVS             11
+
+#       Tunnel Medium Types
+
+VALUE           Tunnel-Medium-Type      IP              1
+VALUE           Tunnel-Medium-Type      X.25            2
+VALUE           Tunnel-Medium-Type      ATM             3
+VALUE           Tunnel-Medium-Type      Frame-Relay     4
+
+#       ARAP Zones
+VALUE     ARAP-Zone-Access               Access-Default-Zone             1
+VALUE     ARAP-Zone-Access               Use-Zone-Filter-Inclusively     2
+VALUE     ARAP-Zone-Access               Use-Zone-Filter-Exclusively     4
+
+#       Challenge Prompt
+VALUE     Prompt                         No-Echo                         0
+VALUE     Prompt                         Echo                            1
+
+                                                      
+#	Vendor Types
+
+VALUE		Vendor-Specific	Cisco			9
+VALUE		Vendor-Specific	Xylogics		15
+VALUE		Vendor-Specific	Wellfleet		18
+VALUE		Vendor-Specific	Digital-Equipment	36
+VALUE		Vendor-Specific 3Com			43
+VALUE		Vendor-Specific MERIT			61
+VALUE		Vendor-Specific	Shiva			166
+VALUE		Vendor-Specific	Livingston		307
+VALUE		Vendor-Specific	Scorpion		905
+VALUE		Vendor-Specific	US-Robotics		429
+VALUE		Vendor-Specific	Ascend			529
+VALUE		Vendor-Specific	Scorpion		905
+VALUE		Vendor-Specific	Infinite-Networks	541
+VALUE		Vendor-Specific	Bay-Networks		1584
+
+#	Vendor Specific Attributes
+# Vendor Type value must be declared for Vendor Specific attribute 
+#
+# format:
+# VENDORATTR	vendorcode  name  value  type
+# 
+#
+# Bay Networks Vendor Specific Attributes and Values
+#
+VENDORATTR	1584	Annex-Filter	 	28	string
+VENDORATTR	1584	Annex-CLI-Command	29	string
+VENDORATTR	1584	Annex-CLI-Filter	30	string
+VENDORATTR	1584	Annex-Host-Restrict 	31	string
+VENDORATTR	1584	Annex-Host-Allow	32	string
+VENDORATTR	1584	Annex-Product-Name	33	string
+VENDORATTR	1584	Annex-SW-Version 	34	string
+VENDORATTR	1584	Annex-Local-IP-Address  35	ipaddr
+VENDORATTR	1584	Annex-Callback-Portlist 36	integer
+VENDORATTR	1584	Annex-Sec-Profile-Index 37	integer
+VENDORATTR      1584	Annex-Tunnel-Authen-Type 38	integer
+VENDORATTR      1584	Annex-Tunnel-Authen-Mode 39	integer
+VENDORATTR      1584	Annex-Authen-Servers	40	string
+VENDORATTR      1584	Annex-Acct-Servers	41	string
+VENDORATTR      1584	Annex-User-Server-Location 42	integer
+VENDORATTR      1584	Annex-Local-Username    43      string
+VENDORATTR      1584	Annex-System-Disc-Reason   44   integer
+VENDORATTR      1584	Annex-Modem-Disc-Reason    45   integer
+VENDORATTR      1584	Annex-Disconnect-Reason    46   integer
+VENDORATTR      1584    Annex-Addr-Resolution-Protocol  47 integer
+VENDORATTR      1584    Annex-Addr-Resolution-Servers	48 string
+VENDORATTR      1584    Annex-Domain-Name	        49 string
+VENDORATTR	1584	Annex-Transmit-Speed		50 integer
+VENDORATTR	1584	Annex-Receive-Speed		51 integer
+
+VENDORATTR	1584	Annex-Input-Filter              52  string
+VENDORATTR	1584	Annex-Output-Filter             53  string
+
+VENDORATTR	1584	Annex-Primary-DNS-Server        54 ipaddr
+VENDORATTR	1584	Annex-Secondary-DNS-Server      55 ipaddr
+VENDORATTR	1584	Annex-Primary-NBNS-Server       56 ipaddr
+VENDORATTR	1584	Annex-Secondary-NBNS-Server     57 ipaddr
+
+VENDORATTR	1584	Annex-Keypress-Timeout          59 integer
+VENDORATTR	1584	Annex-Unauthenticated-Time      60 integer 
+VENDORATTR	1584	Annex-Re-CHAP-Timeout           61 integer
+VENDORATTR	1584	Annex-MRRU			62 integer
+VENDORATTR	1584	Annex-EDO			63 string
+
+VENDORATTR	1584	Annex-Pre-Input-Octets		65 integer
+VENDORATTR	1584	Annex-Pre-Output-Octets		66 integer
+VENDORATTR	1584	Annex-Pre-Input-Packets		67 integer
+VENDORATTR	1584	Annex-Pre-Output-Packets	68 integer
+VENDORATTR	1584	Annex-Connect-Progress		69 integer
+VENDORATTR	1584	Annex-First-Dest		70 ipaddr
+VENDORATTR	1584	Annex-PPP-Async-Map		71 integer
+VENDORATTR	1584	Annex-Multicast-Client		72 integer
+VENDORATTR	1584	Annex-Multicast-Rate-Limit	73 integer
+VENDORATTR	1584	Annex-Maximum-Call-Duration	74 integer
+VENDORATTR	1584	Annex-Multilink-Id		75 integer
+VENDORATTR	1584	Annex-Num-In-Multilink		76 integer
+
+VENDORATTR      1584    Annex-Inbound-Precedence        77 integer
+VENDORATTR      1584    Annex-Outbound-Precedence       78 integer
+
+VENDORATTR      1584    Annex-Secondary-Srv-Endpoint    79 string
+VENDORATTR      1584    Annex-Gwy-Selection-Mode        80 integer
+VENDORATTR	1584	Annex-Logical-Channel-Number	81 integer
+VENDORATTR	1584	Annex-Wan-Number		82 integer
+VENDORATTR	1584	Annex-Port                      83 integer
+
+VENDORATTR      1584    Annex-Pool-Id			85 integer
+VENDORATTR      1584    Annex-Compression-Protocol	86 string
+VENDORATTR      1584    Annex-Transmitted-Packets	87 integer
+VENDORATTR      1584    Annex-Retransmitted-Packets	88 integer
+VENDORATTR      1584    Annex-Signal-to-Noise-Ratio	89 integer
+VENDORATTR      1584    Annex-Retrain-Requests-Sent	90 integer
+VENDORATTR      1584    Annex-Retrain-Requests-Rcvd	91 integer
+VENDORATTR      1584    Annex-Rate-Reneg-Req-Sent	92 integer
+VENDORATTR      1584    Annex-Rate-Reneg-Req-Rcvd	93 integer
+VENDORATTR      1584    Annex-Begin-Receive-Line-Level	94 integer
+VENDORATTR      1584    Annex-End-Receive-Line-Level	95 integer
+VENDORATTR      1584    Annex-Begin-Modulation		96 string
+VENDORATTR      1584    Annex-Error-Correction-Prot	97 string
+VENDORATTR      1584    Annex-End-Modulation		98 string
+
+
+VALUE Annex-Tunnel-Authen-Type	None		0
+VALUE Annex-Tunnel-Authen-Type	kmd5-128	1
+
+VALUE Annex-Tunnel-Authen-Mode	None		0
+VALUE Annex-Tunnel-Authen-Mode	prefix-suffix	1
+
+VALUE Annex-User-Server-Location Local		1
+VALUE Annex-User-Server-Location Remote		2
+
+VALUE Annex-Addr-Resolution-Protocol	None	0
+VALUE Annex-Addr-Resolution-Protocol	DHCP	1
+
+VALUE Annex-Gwy-Selection-Mode      Normal  0
+VALUE Annex-Gwy-Selection-Mode      Backup  1
+VALUE Annex-Gwy-Selection-Mode      Distribution 2
+
+VALUE Annex-Connect-Progress	Progress-Unknown		2
+VALUE Annex-Connect-Progress	Call-Is-Up			10
+VALUE Annex-Connect-Progress	CLI-Started			40
+VALUE Annex-Connect-Progress	LAN-Session-Is-Up		60
+VALUE Annex-Connect-Progress	LCP-Negotiations-Allowed	61
+VALUE Annex-Connect-Progress	CCP-Negotiations-Allowed	62
+VALUE Annex-Connect-Progress	IPCP-Negotiations-Allowed	63
+VALUE Annex-Connect-Progress	LCP-Is-In-Open-State		65
+VALUE Annex-Connect-Progress	CCP-Is-In-Open-State		66
+VALUE Annex-Connect-Progress	IPCP-Is-In-Open-State		67
+VALUE Annex-Connect-Progress	LCP-Is-In-Closed-State		71
+VALUE Annex-Connect-Progress	LCP-Is-In-Stopped-State		72
+VALUE Annex-Connect-Progress	LCP-Is-In-Closing-State		73
+VALUE Annex-Connect-Progress	LCP-Is-In-Request-Sent-State	75
+VALUE Annex-Connect-Progress	LCP-Is-In-Ack-Recvd-State	76
+VALUE Annex-Connect-Progress	LCP-Is-In-Ack-Sent-State	77
+VALUE Annex-Connect-Progress	IPXCP-Is-In-Open-State		80
+
+VALUE Annex-Multicast-Client	Multicast-No	0
+VALUE Annex-Multicast-Client	Multicast-Yes	1
+
+VALUE   Annex-Inbound-Precedence        Network-Control           7
+VALUE   Annex-Inbound-Precedence        Internetwork-Control      6
+VALUE   Annex-Inbound-Precedence        CRITIC/ECP                5
+VALUE   Annex-Inbound-Precedence        Flash-Override            4
+VALUE   Annex-Inbound-Precedence        Flash                     3
+VALUE   Annex-Inbound-Precedence        Immediate                 2
+VALUE   Annex-Inbound-Precedence        Priority                  1
+VALUE   Annex-Inbound-Precedence        Routine                   0
+
+VALUE   Annex-Outbound-Precedence       Network-Control           7
+VALUE   Annex-Outbound-Precedence       Internetwork-Control      6
+VALUE   Annex-Outbound-Precedence       CRITIC/ECP                5
+VALUE   Annex-Outbound-Precedence       Flash-Override            4
+VALUE   Annex-Outbound-Precedence       Flash                     3
+VALUE   Annex-Outbound-Precedence       Immediate                 2
+VALUE   Annex-Outbound-Precedence       Priority                  1
+VALUE   Annex-Outbound-Precedence       Routine                   0
+
+VALUE   Annex-Pool-Id      		Pool-One                  1
+VALUE   Annex-Pool-Id      		Pool-Two                  2
+VALUE   Annex-Pool-Id      		Pool-Three                3
+VALUE   Annex-Pool-Id      		Pool-Four                 4
+VALUE   Annex-Pool-Id      		Pool-Five                 5
+VALUE   Annex-Pool-Id      		Pool-Six                  6
+
+#
+# Bay Router Specific Attributes
+#
+VENDORATTR      1584    Bay-User-Level          100 integer
+VENDORATTR      1584    Bay-Audit-Level         101 integer
+
+
+#
+# US Robotics/3Com Vendor Specific Attributes and Values
+#
+# NOTE: The USR system uses a different format of VSA than the RFC
+#
+#  These are the only USR attributes supported by Bay when the parameter
+#  compatibility_mode is set to USR
+#
+# format:
+# VENDORATTR2	vendorcode  name	value  type
+# 
+
+VENDORATTR2	429	USR-IP-Input-Filter		0x9000	string
+VENDORATTR2	429	USR-IP-Output-Filter		0x9003	string
+VENDORATTR2	429	USR-Primary-DNS-Server		0x900F	ipaddr
+VENDORATTR2	429	USR-Secondary-DNS-Server	0x9010	ipaddr
+VENDORATTR2	429	USR-Primary-NBNS-Server		0x9011	ipaddr
+VENDORATTR2	429	USR-Secondary-NBNS-Server	0x9012	ipaddr
+VENDORATTR2	429	USR-Keypress-Timeout		0x901C	integer
+VENDORATTR2	429	USR-Unauthenticated-Time	0x901D	integer
+VENDORATTR2	429	USR-Re-CHAP-Timeout		0x9020	integer
+
+#
+# Ascend Vendor defined Attribute and Values
+#
+# NOTE: Ascend currently uses standard attribute formats with attributes
+# type codes in the RFC reserved and experimental ranges
+#
+#  These are the only Ascend attributes supported by Bay when the parameter
+#  compatibility_mode is set to Ascend
+#
+#
+ATTRIBUTE	Ascend-Maximum-Call-Duration	125	integer
+
+ATTRIBUTE	Ascend-Client-Primary-DNS	135	ipaddr
+ATTRIBUTE	Ascend-Client-Secondary-DNS	136	ipaddr
+
+#	Support ip address allocation from global pools
+#
+ATTRIBUTE	Ascend-Assign-IP-Client		144	ipaddr
+ATTRIBUTE	Ascend-Assign-IP-Server		145	ipaddr
+ATTRIBUTE	Ascend-Assign-IP-Global-Pool	146	string
+
+ATTRIBUTE	Ascend-Multicast-Rate-Limit	152	integer
+ATTRIBUTE	Ascend-IF-Netmask		153	ipaddr
+
+ATTRIBUTE	Ascend-Multilink-ID		187	integer
+ATTRIBUTE	Ascend-Num-In-Multilink		188	integer
+ATTRIBUTE	Ascend-First-Dest		189	ipaddr
+ATTRIBUTE	Ascend-Pre-Input-Octets		190	integer
+ATTRIBUTE	Ascend-Pre-Output-Octets	191	integer
+ATTRIBUTE	Ascend-Pre-Input-Packets	192	integer
+ATTRIBUTE	Ascend-Pre-Output-Packets	193	integer
+ATTRIBUTE	Ascend-Maximum-Time		194	integer
+ATTRIBUTE	Ascend-Disconnect-Cause		195	integer
+ATTRIBUTE	Ascend-Connect-Progress		196	integer
+ATTRIBUTE	Ascend-Data-Rate		197	integer
+ATTRIBUTE	Ascend-PreSession-Time		198	integer
+
+ATTRIBUTE	Ascend-IP-Direct		209	ipaddr
+
+ATTRIBUTE	Ascend-PPP-Async-Map		212	integer
+
+ATTRIBUTE	Ascend-Data-Filter		242	abinary
+ATTRIBUTE	Ascend-Call-Filter		243	abinary
+ATTRIBUTE	Ascend-Idle-Limit		244	integer
+
+ATTRIBUTE	Ascend-PPP-Address		253	ipaddr
+
+ATTRIBUTE	Ascend-Xmit-Rate		255	integer
+
+#
+# Ascend-Disconnect-Cause
+# Ascend-Connect-Progress
+#       values not in Ascend dictionary
+# 

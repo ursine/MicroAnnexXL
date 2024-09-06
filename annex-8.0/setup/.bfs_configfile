@@ -1,0 +1,40 @@
+# This file contains lines of the format:
+# image:image-type:family-name:user-friendly name
+# the image
+# the actual name of the image file.  
+# image-type
+# "I" for "annex Image", "F" for "Firmware", or "A" for "Always load".
+# "FA" is "Firmware that is Always loaded".
+# family-name
+# The name of the family to which this entry belongs.  Family names are
+# used to group firmware files that should be loaded for a given Annex image.
+# The family-name is extracted from the selected image(s) and is used to
+# present further options to the user.
+# user-friendly name
+# This is the Annex or Firmware support file group name that is displayed 
+# to the user.
+# 
+# The script that parses this file will look for and display
+# Annexes by annex
+# The names can appear in any order, as they are sorted when the
+# file is read.
+# All pathnames should be leaf names of files in the bfs directory.
+afd_list:A:ALL:Firmware File List
+cas_e1t1-1_45:FA:RA8000:CAS Device Support
+config.annex:A:ALL:Annex Configuration File
+digimodem_image:M:RA8000:Penril Modem Firmware
+mod_mic-2_4_81:M:RA6100,RA6300:Microcom Modem Firmware
+modems.annex:A:ALL:modems.annex
+oper.64.enet:I:RA8000:Model 5399 Remote Access Concentrator
+oper.64.enet:I:RA8000:Model 8000 Remote Access Concentrator
+pri_4ess-1_13:F:RA6300,RA8000:US/Canada
+pri_aus-1_42:F:RA6300,RA8000:Australia
+pri_csu-1_238:F:RA6300,RA8000:US/Canada
+pri_dgt-1_4:F:RA6300,RA8000:Taiwan
+pri_e1-1_65-EK7:F:RA6300,RA8000:Europe
+pri_e1-1_80:F:RA6300,RA8000:Europe
+pri_hkt-1_3:F:RA6300,RA8000:Hong Kong
+pri_isr-1_6:F:RA6300,RA8000:Israel
+pri_ntt-1_7:F:RA6300,RA8000:Japan
+pri_sng-1_5:F:RA6300,RA8000:Singapore
+pri_t1-1_128:FA:RA6300,RA8000:Debug Image

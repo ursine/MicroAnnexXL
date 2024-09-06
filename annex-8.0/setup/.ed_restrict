@@ -1,0 +1,175 @@
+#!/bin/sh
+
+#############################################################################
+# 
+# This script makes a modified version of a file that looks like an
+# "acp_restict" file.
+# 
+# Two arguments are required.  The first is the name of a file that
+# looks like the original version of the "acp_restict" file (it is most
+# likely a copy of the "real" file).  The second argument is the name of
+# the file that contains the modified version of the file (it is most
+# likely a copy of the "real" file also).
+# 
+# The modification changes applied are to get the acp_restrict file to
+# specify what connections are legal.  This is due to an enhancement
+# made in McKinley2.  The user is asked if the changes are to be made.
+# 
+#############################################################################
+
+
+REQUIRED_FILES="./.myread"
+
+# This uses variables normally exported by the main installation script.
+# If they are not exported then check for a file that could be be sourced in
+# to assign values.  If that is not found then we can use local versions of
+# these variables without a disaster (but the I/O could look strange though).
+
+if [ -z "${SCRIPT_DIR}" ]
+then
+    if [ -f ./.vars ]
+    then
+        . ./.vars
+    else
+#       # The following line can be commented out to get test versions running
+        echo "**** $0: No environment is setup" ; exit 1
+        SCRIPT_DIR="setup"
+        MSG_FILE="${SCRIPT_DIR}/.msg_file"
+        indent="    "
+        dbg_hdr="DEBUG: "
+        debug=true
+        n=''
+        c=''
+    fi
+fi
+
+
+err=false
+for file in $REQUIRED_FILES $MSG_FILE
+do
+    if [ ! -f $file ]
+    then
+	echo " "
+	echo "PROGRAMMER ERROR: A required file is missing: $file"
+	echo "                  This error should never happen."
+	echo " "
+    fi
+done
+if $err
+then
+    exit 1
+fi
+
+
+
+# Local constants
+
+EXIT_SIGNAL_NO_CHANGE=0
+EXIT_SIGNAL_DO_CHANGE=1
+EXIT_SIGNAL_BAD_CHANGE=100
+
+LEADING_WHITE='^[ 	]*'
+PROTO='protocol={clitelnet,clirlogin},annex='
+
+
+
+# Assign default values
+
+exit_stat=$EXIT_SIGNAL_NO_CHANGE
+old=save/original/acp_restrict
+new=save/modified/acp_restrict
+change=false
+
+
+# Read command line
+
+if [ $# -lt 2 ]
+then
+    echo
+    echo "ERROR: $0: Usage: Requires two file names" 1>&2
+    echo
+    exit 1
+fi
+
+if [ $# -gt 0 ]
+then
+    old="$1"
+fi
+if [ $# -gt 1 ]
+then
+    new="$2"
+fi
+
+
+
+
+#############################################################################
+#
+# 			NOW FOR THE CODING
+#
+#############################################################################
+
+
+$debug && echo "${dbg_hdr}Entering script that edits copy of acp_restrict"
+
+
+# Make sure things are clean
+
+rm -f $new
+
+
+# Ask user if the editing is to be done
+
+while true
+do
+
+    msgid=restrictintro
+    . $MSG_FILE
+    dfltans=n
+    rp="Do you want the restrictions to apply to PPP and SLIP? [$dfltans]:"
+    . ./.myread
+    if [ -z "$ans" ]
+    then
+	ans=$dfltans
+    fi
+    case $ans in
+	Y*|y*)
+	    change=false
+	    break
+	    ;;
+	N*|n*)
+	    change=true
+	    break
+	    ;;
+	"?")
+	    msgid=restricthelp
+	    . $MSG_FILE
+	    continue
+	    ;;
+	*)
+	    msgid=ynonly
+	    . $MSG_FILE
+	    continue
+	    ;;
+    esac
+done
+
+
+# Now have answer.
+
+if $change
+then
+    exit_stat=$EXIT_SIGNAL_DO_CHANGE
+    sed -e '/^[ 	]*[^p][^r].*[^=]/s/^/protocol=cli;annex=/' $old > $new
+    if [ -f $new ]
+    then
+	$debug && echo "${dbg_hdr}Created $new"
+    else
+	$debug && echo "${dbg_hdr}ERROR: Did not create $new"
+	exit_stat=$EXIT_SIGNAL_BAD_CHANGE
+    fi
+fi
+
+$debug && echo "${dbg_hdr}Exiting script that edits copy of acp_restrict"
+exit $exit_stat
+
