@@ -1,0 +1,671 @@
+Annex Manager Release Notes
+---------------------------
+---------------------------
+
+Annex Manager is an SNMP-based management application that 
+uses the X/Motif graphical environment.  Annex Manager is 
+specifically designed to manage Xylogics Annex Remote Access 
+Servers, and is not intended as a general purpose network manager.  
+While Annex Manager can detect SNMP devices that are not Annexes, 
+you cannot use it to configure any non-Annex network device.
+
+Annex Manager R2.1 runs on a workstation platform running BSD 
+Unix (Sun Sparc, HP, RS/6000, SCO).  The user interface is built to the 
+X/Motif standard.
+
+Annex Manager is designed to run stand-alone.  It contains all 
+necessary SNMP protocol routines and X/Motif binary libraries.  The 
+installation process copies the appropriate binary executable and all  
+associated help and data files from the distribution media onto the 
+workstation's disk store.
+
+Annex Manager can be loosely coupled with several standard 
+network management products such as SunNet Manager, 
+HP/Openview, or Netview for AIX.  Annex Manager does not use 
+the API interfaces provided by those products.
+
+
+
+Why Use Annex Manager?
+----------------------
+----------------------
+
+
+Annex Manager allows a system administrator to monitor and 
+configure Annexes in a network.  Annex Manager is a host based, 
+window oriented, configuration and management application.  The 
+displays and user interface conform to the X/Motif standard.  Annex 
+Manager works best with a color monitor directly attached to a 
+workstation or a color X-windows terminal connected to a Unix host 
+over the network.  In addition, it supports a grey-scale X-window 
+terminal attached to a workstation.
+
+Annex Manager's configuration tool is easy to learn and use.  It 
+supports the functionality of the older host-based na configuration 
+tool in an easier to use format.
+
+Annex Manager is specifically designed to configure and manage 
+Annex products.  Its features depend on the proprietary MIB defined 
+for the Annex and on the various standard MIBs supported by the 
+Annex.  As such, Annex Manager cannot manage other SNMP-
+manageable nodes in the network.  Annex Manager is not intended 
+to be a generic SNMP management tool.
+
+Annex Manager provides features that have not been available with 
+the na utility.  Users can:
+
+-	Configure Annexes with Setup or Customize mode: 
+
+-	Setup mode allows users to configure one or more 
+	Annexes by setting the most commonly used 
+	parameters.
+
+-	Customize mode lets users set individual Annex 
+	parameters and provides access to all main menu 
+	commands.  
+
+-	Save current configuration parameter settings in Script files 
+	and restore the parameters from those files.
+
+-	Edit script files with a common editor on the workstation.
+
+-	Compare the configuration parameters of two ports on the 
+	same Annex or on different Annexes.
+
+-	Copy the current configuration parameter settings from one 
+	port to another or one Annex to another.
+
+-	Retrieve basic status and statistics information from the 
+	Annex.
+
+-	Define parameter groups to simplify configuration 
+	operations.
+
+-	Define site specific defaults.
+
+-	Discover Annexes in the network.
+
+-	Save Annex address lists after discovery and add names to 
+	the lists manually.
+
+-	Display default values for each configuration parameter on 
+	demand.
+
+-	Display on-line documentation for all Annex configuration 
+	parameters, all Annex Manager windows and all widgets on 
+	the screens.
+
+-	Boot and reset an Annex.
+
+-	Broadcast messages to users on Annex ports.
+
+-	Automatically reset ports or Annex subsystems after 
+	changing configuration parameters.
+
+
+
+Annex Manager supports:
+----------------------
+
+-	Multiple Annex hardware platforms, including the Annex3, 
+	MicroAnnex XL, the Remote Annex RA2000 and RA4000 
+	products, Cabletron CSMIM and MODMIM, 
+	Synoptics 5390, etc.
+
+-	 Supports Annex software release R10.1 and subsequent 
+	releases.
+
+System Requirements
+-------------------
+-------------------
+
+Release 2.1 of Annex Manager runs on several popular Unix systems.  
+The following sections list the hardware and software requirements 
+for installing and running Annex Manager.  
+
+For all systems, a minimum of 10MB of free disk space must be 
+available prior to installation.  A minimum of 32 MB of RAM is 
+recommended, although specific memory requirements will vary, 
+depending on the type of workstation and the other tasks that may 
+be concurrent with Annex Manager.  In all cases, a color monitor or 
+X-terminal is recommended, although Annex Manager is usable with 
+a monochrome X-terminal.
+
+Sun Requirements
+----------------
+
+Annex Manager runs under both SunOS 4.1.3c and Solaris 2.4 on 
+SPARC systems.  For SunOS versions earlier than 4.1.3c, the following 
+patches are required:
+
+-	Patch number 100444-48 OpenWindows 3.0: OpenWindows 
+	V3.0 Server Patch 3000-86.
+
+-	Patch number 100492-01_09 OpenWindows 3.0: jumbo patch 
+	for olwm 3.0.
+
+
+
+HP Requirements
+---------------
+Annex Manager runs under HP-UX 9.0.5 on HP 9000 Series 700 
+Workstations.
+
+IBM Requirements
+----------------
+
+Annex Manager runs on an IBM RS/6000 workstations under AIX 4.1.
+
+SCO Requirements
+----------------
+
+Annex Manager runs under SCO/Unix Release 3.2 and the X 
+windowing system.  You should have a 486 CPU with 16 mb RAM, 
+20 mb of available disk space, and a CDROM drive or a 3.5" floppy 
+drive to install the software.
+
+Remote Display Requirements
+---------------------------
+
+If you use Annex Manager on an X-terminal, we recommend that you 
+have more than 2mb of memory to avoid problems when you have 
+several windows open at the same time.
+
+
+
+New Features and Commands
+-------------------------
+-------------------------
+
+Annex Manager Release 2.1 includes changes in the discovery 
+process: 
+
+-	A new feature automatically lists Annexes that are available 
+	on your local network when you first start Annex Manager.
+
+-	A new 'Discover Annexes/Network' command uses a specific 
+	internet address and subnet mask to find available Annexes 
+	on any network.
+
+    The new discovery feature and command find Annexes 
+    running Annex software Release 11.1 and subsequent releases.  
+    To find Annexes running software releases prior to 11.1, use 
+    the existing 'Discover Annexes/Search Device' command.
+
+Automatic Discovery Process
+---------------------------
+
+When you start Annex Manager, a new discovery process finds all 
+available Annexes on your local network and places them in the main 
+window's Annex List box.  
+
+    To disable this process, type '-nod' argument when you load 
+    Annex Manager (e.g., type 'gui_am -nod').
+
+Annex Manager displays a new window over the main window to 
+inform you that the automatic discovery process is taking place.
+
+This message window indicates that you have 
+not entered a specific Internet Address or Subnet Mask.  In addition, it 
+includes the default broadcast address for your local network, and a 
+default timeout value.
+
+    You can use the  -dn (Discover Network), -ds (Discover Subnet 
+    mask) and -dt (Discover Timeout) command arguments when 
+    you load Annex Manager to override default settings.  For 
+    example, you can type gui_am -dn 132.245.88.0 -ds 255.255.255.0 
+    -dt 5 to discover Annexes for the 132.245.88.0 internet address 
+    and 255.255.255.0 subnet mask with a response time of 5 
+    seconds.  You cannot use -dn and -ds separately.  Annex 
+    Manager does not require that you enter a new timeout value.
+
+When Annex Manager completes the discovery process, a window 
+informs you about the number of Annexes that will be loaded in the 
+Annex List.
+
+The main window's Annex List box includes all available Annexes 
+on your local network.
+
+You can use any Annex Manager command for which you have 
+privileges to configure the Annexes on this list.  In addition, you can 
+change the list using "Add" or "Remove" and save the list using the 
+'Save Annex List' command.
+
+
+Discover Annexes/Network Command
+--------------------------------
+
+The new 'Discover Annexes/Network' command finds available Annexes 
+on a any network and adds them to the main window's Annex List 
+box.
+
+Displaying the Window
+
+To display the 'Discover Annexes/Network' window, move the pointer to 
+the Configure menu and choose 'Discover Annexes' and 'Network'.
+
+Understanding the Window
+
+'Discover Annexes/Network' uses three fields to find Annexes on a 
+network:
+
+-	'Internet Address' accepts an IP address for the network on 
+	which Annex Manager will find available Annexes.
+
+-	'Subnet Mask' defines the network portion of the IP address.
+
+-	'Timeout' defines the length of time in seconds that Annex 
+	Manager waits for a response.
+
+This window includes three push buttons:
+
+-	"OK" activates the discovery process.
+
+-	"Cancel" removes this window from your display.
+
+-	"Help" displays a separate window that explains the 
+	'Discover Annexes/Network' command and its fields.
+
+Using Discover Annexes/Network
+
+To find available Annexes on a network:
+
+1	Select 'Discover Annexes' from the Configure menu and then choose 
+	'Network'.
+
+	The command's window appears.
+
+2	Enter an 'Internet Address' and a 'Subnet Mask' for the network you 
+	want to search.
+
+	You must complete both the 'Internet Address'  and the 'Subnet 
+	Mask' fields.
+
+3	Enter a number of seconds in the 'Timeout' field.
+
+	This field automatically displays 10 seconds.  It uses a 10 
+	second default if you leave the field blank.
+
+4	Press "OK".
+
+	Annex Manager displays the window informing you that the 
+	discovery process is taking place.
+
+	This window lists the 'Internet Address', 'Subnet Mask' and 
+	'Timeout' value you entered, as well as the broadcast address.
+
+	When Annex Manager completes this process it displays a 
+	window informing you about the number of Annexes  that 
+	have been found.
+
+	Annex Manager adds the Annexes it finds to the main 
+	window's Annex List box.  If this process found Annexes 
+	that exist in the main window's list, a warning window lists 
+	duplicate Annexes and does not add them to the list.  You 
+	can use the 'Save Annex List' command to retain this list.
+
+
+Modified Commands
+-----------------
+-----------------
+
+This section describes changes in existing commands.  Release 2.1 
+provides a new menu name for the 'Discover Annexes' command and 
+adds categories in the 'Annex Async Port Status' command.
+
+Discover Annexes Command
+------------------------
+
+In Annex Manager Release 2.1, the 'Discover Annexes' command has a 
+new menu name.  To use this command you must choose 'Discover 
+Annexes' and 'Search Device' from the Configure menu.  The original 
+command and its windows have not changed.
+
+    'Discover Annexes/Search Device' finds Annexes running all 
+    Annex software releases.  The new discovery feature and 
+    command find Annexes running Annex software Release 11.1 
+    and subsequent releases only.
+
+Reset Command
+-------------
+
+The 'Reset' command now includes the 'Individual Internal Modems' option 
+in its 'Reset' Options box.
+
+When you select the 'Individual Internal Modems' option, the field below 
+the 'Reset Options' box automatically displays 'Internal Modems'.  You must 
+enter the modem numbers you want to reset here.  If you enter more 
+than one number, separate numbers with commas or indicate a range 
+of numbers using dashes.  
+
+Annex Async Port Status Command
+-------------------------------
+
+The 'Annex Async Port Status' command has three new categories in its 
+'Port Information' box.
+
+The Annex Async Port Status window includes the following new categories:
+
+-	'Current User' identifies the user logged in to the ports you 
+	selected.
+
+-	'Login Time' displays the day and time that the port was 
+	opened according to the Annex clock. 
+
+-	'Port Proto' defines the protocol that is active on a port.  This 
+	field can display the following codes. 
+
+	-	'Cli' indicates that this is a CLI  port opened by a device 
+		connected to the port or by a connection from a host 
+		as a virtual CLI.
+
+	-	'psv'r indicates that this is a slave port.
+
+	-	'vcli' indicates that this is a virtual port.
+
+	-	'dp' defines a dedicated port.
+
+	-	'lpd' indicates that the port is using the Annex line printer 
+		daemon.
+
+	-	'ppp' indicates that the PPP protocol is active.
+
+	-	'slip' indicates that the SLIP protocol is active.
+
+	-	'arap' indicates that the ARAP protocol is active.
+
+	-	'ftp' indicates that the port is an FTP interface.
+
+	-	'ndp' indicates that the port is a Novell dedicated port.
+
+	-	'ipx' indicates that the port is a dedicated IPX port used 
+		only for dial-in access.
+
+	-	'dyndial' defines a dynamic dial port.
+
+
+New Parameters
+--------------
+--------------
+
+This section lists new parameters for Release 2.1.
+
+-	'multisession' allows terminals (i.e., VT420 and VT 330) 
+	supporting DEC's Terminal Device/Session Management 
+	Protocol (TD/SMP) to display two active windows 
+	simultaneously. Entering 'enabled' here makes this feature 
+	available to all ports on which the VCI command interface 
+	is configured. 
+
+		Type | Annex
+		Values | enabled or disabled
+		Default | disabled
+		Lists | Annex Only, VCI_Interface
+
+-	'multisession_port' allows you to select ports that will display 
+	two active windows.  You can use this parameter only for 
+	ports on which the VCI command interface is configured.
+
+		Type | Async
+		Values | enabled or disabled
+		Default | disabled
+		Lists | VCI_Interface
+
+    To use the multisession feature, you must:
+
+    -	Have a valid LAT key.
+
+    -	Enter enabled for the multisession parameter.
+
+    -	Enter enabled for the multisession_port parameter.  
+
+    -	Reset an Annex if you change values for the 
+	multisession parameters.
+
+
+Working with SunNet Manager
+---------------------------
+---------------------------
+
+Although Annex Manager is a standalone application, it can be 
+loosely linked to SunNet Manager so that a network administrator 
+can click on an icon representing an Annex in the network map and 
+select Annex Manager from a list of tools for that node.  
+
+    The steps described here  are specific to SunNet Manager 
+    Release 2.2 and may vary if you are using a different version 
+    of SunNet Manager.
+
+Linking Annex Manager with SunNet Manager
+-----------------------------------------
+
+You can link Annex Manager and SunNet Manager from the Console 
+commands/tools option menu or from Annex icons.  In both cases, 
+you must link Annex Manager in the '/usr/snm/struct' directory's 
+'xylogics.schema' file.
+
+Adding Annex Manager to the Console Commands/Tools Option 
+Menu
+
+To add Annex Manager to the Console Commands/Tools option 
+menu: 
+
+1	Add the following information in the 'xylogics.schema' file's 
+	'instance elementCommand' section.
+
+	instance elementCommand   (
+	(SNM_Console "Annex-Manager..." "$GUI_AM_DIR/bin/gui_am")
+	)
+
+Please refer to Chapter 8 in the "SunNet Manager User's Guide" for 
+information about adding Annex Manager to the Tools option menu 
+while SunNet Manager is running.
+ 
+
+Adding Annex Manager to the Annex Icons
+
+To add Annex Manager to the Annex Icons:
+
+1	Add the following information in the 'xylogics.schema' file's 
+	'instance elementCommand' section.
+
+	instance elementCommand (
+        	(component.annexII     "Annex-Manager..."      
+
+	"$GUI_AM_DIR/bin/gui_am")
+		 (component.microannex  "Annex-Manager..."      
+
+	"$GUI_AM_DIR/bin/gui_am")
+		 (component.annex3      "Annex-Manager..."      
+
+	"$GUI_AM_DIR/bin/gui_am")
+	) 
+
+2	Place mouse cursor on the Annex icon and click the MENU button to 
+	display the popup menu.  
+
+3	On the popup menu, select Annex Manager under the Tools option.
+
+Please refer to the "SunNet Manager User's Guide" for more information. 
+
+
+Using SunNet Manager Discovery to Find Annexes
+----------------------------------------------
+
+The Discovery tool uses the object identifier (OID) or system 
+description retrieved from a device through SNMP to specify which 
+type of element it will create.   You must add components of each 
+Annex model to the '/var/adm/snm' directory's 'discover.conf' file for 
+Discovery to create Annex elements.  For more information, please 
+refer to Chapter 5 in the "SunNet Manager Reference Manual".
+
+Currently, all Annex models return the same OID for the 'sysOid' object.  
+SunNet Manager Discovery cannot distinguish among Annex 
+hardware models.  
+
+To use the Discovery tool:
+
+1	 add the following lines to the #MAPPINGS section:
+
+	Annex3			component.annex3
+
+	Micro Annex		component.microannex
+
+	Annex-II		component.annexII
+
+
+
+Troubleshooting
+---------------
+---------------
+
+This section lists provides answers to questions frequently asked by   
+in Annex Manager users.
+
+SNMP Communication
+
+In order for Annex Manager to communicate with an Annex, the 
+Annex's SNMP agent must be up and the specified community string 
+must match one of the Annex's community strings.  To perform 
+operations which will change parameters (e.g., the 'Set' command), the 
+'allow_snmp_sets' parameter on the Annex must be set to 'Y (Yes)'.  
+You can set this parameter only by using the non-SNMP 'na' and 'admin' 
+tools.
+
+OpenLook/OpenWindow Issues
+
+When you run Annex Manager in an OpenLook/OpenWindows 
+environment, make sure that the latest xnews server patch is installed.  
+If the application appears to hang after simple actions like a menu 
+selection, it is likely that the xnews server and OpenLook window 
+manager are causing the problem.
+
+OpenLook Window Manager 'Close' Menu Item
+
+Do not use the OpenLook Window Manager 'Close' menu option from 
+the menu bar.  Use the Annex Manager  "Close" buttons instead.  If 
+you use the OpenLook Window Manager menu option, Annex 
+Manager will terminate unexpectedly.  This termination is not always 
+immediate.
+
+Ethernet Interface Numbering
+
+Annex Manager numbers the ethernet interfaces starting with 1.  The 
+na and admin tools number the ethernet interfaces starting with 0 
+(zero).
+
+BadWindow Error on Startup
+
+Some X window terminals (possibly depending on the type of Xserver 
+or on other applications which have been run recently), will display 
+a 'BadWindow' error when you start Annex Manager.  Currently, the 
+only known way to clear this problem is to reset the X window server.  
+Annex Manager will then come up correctly.  
+
+Initialization Window
+
+Some window managers require that a window be placed once it 
+appears as an outline.  If you use such a window manager, and the 
+Annex Manager main window is not placed within a few seconds, 
+the initialization window may appear as a small sliver.  You can 
+expand this window.  It will disappear automatically when Annex 
+Manager completes its start up.
+
+Cut & Paste 
+
+Some operating systems seem to have a problem cutting and pasting 
+text from one portion of a window to another.  This issue does not 
+seem to be exclusive to Annex Manager.  
+
+Help on File Selection Windows
+
+When you use [F1] or "Help" to display help on a file selection 
+window, the you cannot acknowledge the help window until you 
+complete the file selection window action.
+
+Set Command Issues
+
+You may experience  intermittent problems with setting a large 
+number of parameters on multiple Annexes.  Using the "SNMP 
+Information" command to increase the timeout value may reduce the 
+frequency of the problem.
+
+Modifying or Deleting Parameter Groups
+
+Any user with write access to Annex Manager data files (i.e., who has 
+the ability to create, modify, or delete parameter groups) can modify 
+any parameter group even if the user did not create the file.
+
+Resetting Modems
+
+If you encounter problems resetting modems using the 'Reset' 
+commands or the Modem windows in the Setup mode, increasing the 
+SNMP timeout values may alleviate this problem.
+
+Boot Status
+
+Annex Manager does not automatically update the current status of 
+each Annex (e.g., NOT REACHABLE) when you attempt a boot operation. 
+You must select 'Verify Annex State' from the Status menu to determine 
+the current status.
+
+MOP Issues
+
+If the Annex has booted from a MOP host, the Annex Information 
+window shows the boot host address as 0.0.0.0.
+
+Annex Agent Problems
+
+There are some problems with various Annex software releases that 
+may affect Annex Manager operation.  Not all of these problems exist 
+for every Annex release.  You may encounter the following problems 
+in any Annex software releases:
+
+-	Some Annexes may not respond to an initial Annex Manager 
+	SNMP request (apparently after a certain amount of time has 
+	passed since a previous SNMP request).  This will cause the 
+	Annex to be added to the Annex list as NOT REACHABLE.  To 
+	re-establish contact, select the Annex and select 'Verify Annex 
+	State' from the Status menu.
+
+-	Some Annexes may display a zero value in the Annex Info 
+	window for the hardware type.  Annex Manager displays 
+	this condition with Unknown HW Type.
+
+-	The Annex Info window may display an erroneous hardware 
+	revision.
+
+-	Only Annex hardware with internal modems supports the 
+	'max_modem_calls' and 'port_modem_config' parameters.
+
+-	The boot message may not appear when you choose a Boot 
+	Option other than 'Delayed'.
+
+-	The shutdown boot message header may refer to na when 
+	users are notified about the shutdown.
+
+-	Sending broadcast messages to port 1 does not always work.
+
+-	You may not be able to  reset individual ports using the 'Reset' 
+	command or the 'Confirm Auto Reset' menu option.
+
+-	On some Annexes, you may not be able to set attn_string 
+	to " " once it has been changed from its original " " value.
+
+-	In addition to the parameters listed in the "Annex Manager 
+	User Guide", you may not be able to include the following 
+	parameters in a script, or use the Copy command: 
+	ipx_dump_password, mop_login_password, rip_routers, node_id, 
+	at_nodeid, session_limit_port, input_flow_control, 
+	output_flow_control.  
+
+	'Set' may not work properly if you include these parameters 
+	among others.  If you select any of these parameters, and 
+	then select other parameters, Annex Manager will not 
+	change values for any parameters that follow a parameter 
+	listed above.  For example, if you select 'ipx_dump_password' 
+	and then select 'ipx_file_server', Set will not change the value 
+	for 'ipx_file_server'.  For port parameters, only the first port 
+	number will be changed.
+Help
+Close

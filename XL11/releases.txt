@@ -1,0 +1,36 @@
+# This file contains release information.  There are three sections:
+#    1) User readable product version information
+#    2) Information on how the release was built
+#    3) Variable assignments used by the installation process
+# All lines should start with a "#" except for the lines with variable
+# assignment statements.
+#
+#
+# PRODUCT INFORMATION:
+# 
+# Product: Annex Software          Release: R11.1
+# Product: Annex Manager           Release: R2.1
+#
+#
+# BUILD INFORMATION:
+#
+# Date: Thu Mar 7 12:33:46 EST 1996
+# View: /view/R11.1
+# Kit:  R11.1
+#
+#
+# VARIABLE ASSIGNMENT STATEMENTS (USED BY INSTALLATION SCRIPTS):
+
+Box="Annex"
+box="annex"
+vers="R11.1"
+
+HST_TOOLS="Annex Software"
+HST_SPACES="       "
+HST_REL="R11.1"
+HST_DIR_LEAD="ra_"
+
+GUI_TOOLS="Annex Manager"
+GUI_SPACES="        "
+GUI_REL="R2.1"
+GUI_DIR_LEAD="gui_am_"

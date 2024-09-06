@@ -1,0 +1,482 @@
+Remote Annex Release Notes for Release 11.1
+-------------------------------------------
+
+These release notes apply to the Remote Annex operational code, 
+R11.1, the Annex Host Tools R11.1, and the Annex Manager V2.1. The 
+Annex Quick Install and/or the Annex Software Installation Notes 
+describe the installation process. 
+
+Included in these Release Notes is: 
+
+-	New Features
+
+-	Special Considerations 
+
+-	Supported Platforms 
+
+-	Compatibility 
+
+-	Known Problems/ Limitations 
+
+-	Problems corrected since R10.1A 
+
+We recommend you take the time to familiarize yourself with the 
+contents of this document. The time spent may be very beneficial in 
+ensuring a smooth transition to this new release.
+
+New Features
+------------
+------------
+
+User Profile-based Security; Expanded Security Capabilities 
+-----------------------------------------------------------
+
+Existing host-based security policies may now be applied based on 
+the user profile, which is any combination of: 
+
+-	username (supplied by the user as part of the authentication 
+	sequence) 
+
+-	group(s) in which the user is a member (as given in 
+	/etc/group or a similar file) 
+
+-	day of week 
+
+-	time of day 
+
+-	Annex 
+
+-	port 
+
+-	protocol (cli, ppp, slip)
+
+The security capabilities of the system which can be specified now 
+consist of: 
+
+-	authentication regime (native UNIX, Annex's ACP regime, 
+	SecurID, SafeWord, Kerberos, or none) 
+
+-	file to be used by the specified authentication regime (for 
+	Annex's ACP and Kerberos) 
+
+-	deny access 
+
+-	access to specific hosts via CLI telnet, CLI rlogin, or IP can 
+	be granted or denied 
+
+-	host access can be specified down to the port level 
+
+-	forced/automatic command execution 
+
+-	masking of particular commands 
+
+-	filters (for IP and AppleTalk) 
+
+-	routes (for IP) 
+
+-	dialback/chargeback 
+
+-	Appletalk connect time, password, and zone 
+
+-	CHAP password 
+
+
+
+Used in combination, these new features provide the network and 
+security administrator added flexibility in setting up a Remote Access 
+service. For example, certain ports may be made available to only 
+certain groups of users. Some users may be required to use a powerful 
+authentication mechanism such as SecureID, and granted access to 
+particular hosts, while other users continue to use the standard UNIX 
+/etc/passwd, but are restricted in their access. Access may be denied 
+on particular days of the week at a particular time of day. IP filters 
+may be applied to particular users (groups of users, Annexes, etc.); 
+they may be specified explicitly or the appropriate filter will be 
+generated and downloaded to the Annex for the duration of the 
+connection if host access criteria is specified. 
+
+All these capabilities are available without changing any source code 
+or recompiling the distributed binary files. Host restrictions are 
+specified in the acp_restrict file. The security regime is specified in a 
+new acp_regime file that is created at installation when you upgrade 
+a release. Group memberships are taken from the /etc/group system 
+file or an equivalent acp_group file. All other security enhancements 
+are specified in the acp_userinfo file.
+
+Improved Communications with the Security Host 
+----------------------------------------------
+
+The communication between the Annex and the security host (erpcd) 
+has been improved so it is more robust in the face of poor connections 
+and quicker to respond to server failure. Audit logging messages are 
+retained in the Annex until confirmation has been received that the 
+server has recorded the data. In the case of a security server failure, 
+the Annex will detect the failure more rapidly, and fail over to the 
+backup server if it is available. After fail-over, the messages which 
+have not yet been written are communicated to the backup server, 
+ensuring no data loss. 
+
+The protocol used for the communication is TCP-based.
+
+lpr Support 
+-----------
+
+The Annex may now accept connections from PCs and UNIX hosts 
+which support the standard lpr/lpd printing protocol - a standard 
+system utility for printing which is normally distributed with systems 
+which support TCP/IP. This removes the need to use a proprietary 
+mechanism such as aprint or rtelnet for printing via the Annex.
+
+Annex Interface for VMS Environments Support for 
+the multisession Feature
+------------------------------------------------
+
+The multisession feature, which is used by VT330 and VT420 
+terminals, is now available to users who have purchased the LAT 
+software key. This allows the terminal to have multiple simultaneous 
+connections over one communication line to the Annex. This allows 
+the user to take advantage of the split-screen feature provided on 
+those terminals.
+
+Annex Manager Discover 
+----------------------
+
+A new discovery mechanism has been added to Annex Manager V2.1 
+which automatically locates the Annexes on the LAN (see the Annex 
+Manager Release Notes, which are under separate cover).
+
+
+Special Considerations
+----------------------
+----------------------
+
+Default Flow Control Change 
+---------------------------
+
+The default input flow control value is now start/stop. If you have 
+installed Annexes which are using the default value from previous 
+releases (bell) and you want to continue to use this value, you should 
+explicitly set the value for the applicable ports. Annexes which are 
+using a value other than the default will be unaffected.
+
+
+Using the New Security Features 
+-------------------------------
+
+When using the new security features such as groups, it is important 
+to carefully specify and test the security profile specifications. The 
+Annex attempts to ensure that correct syntax is used, and takes a 
+conservative approach of denying user access if any problem is 
+detected. However, some of the system information, such as the group 
+membership, is the responsibility of the administrator. Given the 
+critical nature of this information, it is important for the administrator 
+to ensure the desired result is obtained.
+
+Changes to the acp_policy.c File
+--------------------------------
+
+The new features introduced with R11.1 of the Annex software have 
+resulted in substantial changes to the code for ERPCD, including the 
+acp_policy.c file. Due to the nature and scope of these changes, it is 
+suggested that customers who have modified the acp_policy.c file for 
+their own authentication regimes review the new file thoroughly 
+before integrating their changes, as it is unlikely that a simple diff 
+between R10.1 and R11.1 versions of the files will result in any useful 
+information. While the API between R10.1 and R11.1 remains 
+essentially unchanged with respect to the catalog of functions and 
+system callbacks available to programmers who have modified 
+acp_policy.c in the past, the arguments supplied to some functions 
+have changed, and most functions now much include a to parameter 
+to direct replies to the Annex from erpcd. For a complete description 
+of the new function prototypes, see the file src/erpcd/policy.doc.
+
+
+
+New ERPCD Process Handling 
+--------------------------
+
+Due to changes in R11.1, it is normal for more than one ERPCD process 
+to exist at steady-state.  In previous releases, only one ERPCD process 
+existed at steady state. 
+
+If you use the kill command to kill an ERPCD process, all of the other 
+ERPCD processes will be killed as well.  However, this may fail on 
+some platforms, resulting in only the specified ERPCD process being 
+killed.  If this occurs, you should specify all of the ERPCD processes 
+as arguments to the kill command. 
+
+ When you want ERPCD to re-read the acp_userinfo database, send 
+a SIGUSR1 signal to all ERPCD processes using the kill command:  
+
+kill -USR1 <pid1> <pid2> ... <pidn> 
+
+where pid 1-n are the process IDs of all ERPCD processes.  In fact, any 
+time you want to send a signal to ERPCD, it is safer to send that signal 
+to all ERPCD processes listed in the process table.
+
+ACP Server Fail-over Issues
+---------------------------
+
+ If the primary server fails, and then comes back up at a later time, 
+the Remote Annex may take as much as five minutes to automatically 
+detect that the primary server is back on-line. Therefore, it is 
+suggested that the administrator reset security on all Remote Annexes 
+after the primary server is brought back on line. Resetting security 
+will immediately switch the Remote Annex back to the primary server 
+if it is available.
+
+
+
+Supported Platforms
+-------------------
+-------------------
+
+The distribution media contains binary files for most of the supported 
+platforms. When the script detects that there are binary files for the 
+host operating system, it gives you the option of installing the binary 
+files or loading the source code and compiling the software at a later 
+time. If there are no binary files available, the script loads the source 
+code and uses an available compiler on the host system to build the 
+image. If the script does not identify a compiler on your system, it 
+ends the installation session. 
+
+Table 1 lists the operating system versions supported by Annex and 
+whether binary files are provided on the distribution media.
+
+Table 1. Annex Supported Platforms 
+
+Operating System Version	| Files Available 
+---------------------------------------------------------------
+
+Sun Microsystems SunOS, 4.1.3	| Binary Files and Source Code 
+
+Solaris,2.4			| Binary Files and Source Code 
+
+Hewlett-Packard HP-UX 9.0	| Binary Files and Source Code 
+
+IBM RS/6000 AIX, 4.1.3		| Binary Files and Source Code 
+
+SCO, 3.2			| Binary Files and Source Code 
+
+BSDI, 2.0.1			| Binary Files and Source Code 
+
+Digital Equipment Corp., 	| Binary Files and Source Code 
+Alpha OSF, 3.2
+
+UNIXWARE, 2.0			| Binary Files and Source Code 
+
+Free BSD, 2.0.5			| Source Code Only 
+
+SGI IRIX, 5.3			| Source Code Only 
+
+Ultrix, 4.3			| Source Code Only
+
+
+
+Compatibility
+--------------
+--------------
+
+The Annex server (host) software and the Annex Manager version 
+which are included in this release are compatible with Remote Annex 
+Release 10.1 and with the Communications Server Release 10.0. The 
+software release number for the Annex is displayed in the first line of 
+the CLI stats command output. The Annex Manager version is 
+displayed in the About Annex Manager section of the Help menu.
+
+R11.1 may use R10 configuration files without modification. Since the 
+host access restrictions (acp_restrict file) now applies to IP packets, 
+the user will be asked at installation time if the file should be modified 
+to retain the Release 10 behavior, that is, if the host access should 
+continue to apply only to CLI telnet and rlogin connections.
+
+After installing R11.1 on the host, all units which use that host for 
+services will be using the R11.1 host services, regardless of the release 
+installed on the Annex. 
+
+When running in a mixed-release environment, the R10 Annexes will 
+have restrictions: 
+
+-	Some of the features added with R11.1 as part of the security 
+	profile on the host are not available to the R10 Annexes. 
+	When these features are used with an R10 Annex, the user 
+	connection will be broken since the lack of these features 
+	would be considered a security breach:   
+
+	-	forced/automatic command execution   
+
+	-	routes
+
+	-	filters - either explicit specification, or as part of the host 
+		access specification 
+
+-	R11.1 Annex Manager Discovery mechanism will not 
+	discover the R10 Annexes 
+
+-	Improved host communications added to R11.1 will not be 
+	in effect 
+
+-	IPX dialback/ callback does not work 
+
+
+Known Problems/Limitations
+--------------------------
+--------------------------
+-	Group functionality is not supported on BSDI, FreeBSD or Ultrix
+	systems.
+
+-	ARAP does not log the login name of a user.
+
+-	A port on an Annex Interface for VMS Environments (VMS 
+	port) running multisessions should be disabled before it is 
+	remotely reset from another port.
+
+-	The rlogin command should not be used while a VMS port 
+	is in multisessions.
+
+-	 The AIX platform requires ERPCD to be killed and restarted 
+	to update the acp_userinfo database. The documented 
+	method of using SIGUSER1 will not work on this platform.
+
+-	The BSDI platform requires the administrator to manually 
+	start ERPCD after the installation script is completed.
+
+-	The Remote Annex Administrator's Guide for UNIX for this 
+	release describes a -s argument for the CLI host command. 
+	This argument is not yet implemented. 
+
+-	Prior to configuring any ports on an Annex Interface for 
+	VMS environments for use with the multisessions feature, 
+	the server must be enabled for multisessions using the define 
+	server multisessions enabled command and the server must 
+	be rebooted. If the VT330/VT420 terminal does not enter 
+	multisession mode even though the multisession 
+	characteristic has been enabled for the port, use the show 
+	server command to check that the server has the multisession 
+	characteristic enabled. 
+
+-	The instructions for loading the install script from CD-ROM on HP-UX
+
+	1	Log on as root to a host system with a CD-ROM 
+		drive. If the installation host does not have a CD-ROM 
+		drive, log in to an NFS accessible host. 
+	
+	2	If necessary, create a mount point for the CD-ROM.
+	
+			mkdir /cdrom 
+	
+	3	Place the distribution CD on the CD-ROM drive. 
+	
+	4	Mount the CD-ROM. 
+	
+			mount -r -t cdfs /dev/dsk/c201d2s0 /cdrom 
+	
+	5	Switch to the installation directory.   
+	
+			cd /usr/annex 
+	
+	6	Extract the setup directory from the distribution media.
+	
+			tar -xf '/cdrom/SOFTWARE.TAR:1' setup
+	
+		The quoting is important in the above tar   
+		command line.
+	
+	7	Call the install script from the setup directory.   
+	
+			setup/install 
+	
+	8	When you continue the software installation, the script prompts 
+		you to indicate the source of the tar file.    
+	
+			What type of install will be performed?      
+	
+			1.Floppy Disks
+			2.Tape 
+			3.Tarfile previously copied to hard disk 
+			4.Reinstall from previously extracted software 
+				on hard drive 
+			5.Quit 
+		
+			Enter the install source type [1]: 3 
+	
+	
+	
+	9	Enter the complete path of the tar file to the next prompt. 
+	
+			What is the fully specified path and name of the
+			tar file      
+				Name: /cdrom/SOFTWARE.TAR;1 
+	
+	10	Complete the installation as documented. 
+
+
+Problems Corrected Since R10.1A 
+-------------------------------
+-------------------------------
+
+spr.5353 	Sequence numbers in the acp_logfile are not skipped 
+		when slip_ppp_security is set and cli_security is not set. 
+
+spr.5459 	Annex not crash on an auto-detect port and a PPP client 
+		with ppp_security_proto = N and ppp_slip_sec = Y.
+
+spr.5450 	Modem line noise won't effect macros and drop users to 
+		the CLI command. 
+
+spr.5428 	Annex will fail in less than 6 minutes in attempting to find 
+		a security host by broadcasting. 
+
+spr.5429 	Annex will not crash trying to reset an active PPP      
+		interface. 
+
+spr.5447 	A memory leak with caller accounting has been fixed. 
+
+spr.5655 	An illegal configuration option in PPP will not cause the 
+		Annex to crash. 
+
+spr.5455 	Annex will not crash on a quick disconnect from ppp. 
+
+spr.5180 	Timing problem with Windows 95 PPP Client,      
+		auto_detect mode and pap has been fixed. 
+
+spr.5413 	LAT connects to a vcli session will now hang up      
+		correctly.		 
+
+spr.4226 	PAP security will drop to the local security if the 
+		pref_secure1 server is set to zeros, and there is no 
+		secondary or broadcast security host. 
+
+spr.5410 	HIC services now show up in queue -v and not in      
+		services. 
+
+spr.5380 	Annex will delete proxy-arp interfaces when they go 
+		down and not expire them. 
+
+spr.5362 	Modem configuration code will not insert characters into 
+		the data stream at an inopportune time during start-up of 
+		a line, previously causing the Annex to dump. 
+
+spr.5449 	Modified SLC driver so that the hardware drops RTS      
+		drops less frequently at 115.2Kbps. (The SLC hardware 
+		drops RTS automatically when its FIFO gets full; the 
+		interrupt trigger point was moved back at 115.2Kbps so 
+		this event should be rarer.) 
+
+spr.5423 	Line-kill timer now waits for 45 seconds of interrupt time 
+		before killing lines. 
+
+spr.5424 	Line would sometimes be killed multiple times when      
+		CPU load very high for a long period of time. We now 
+		check the shutdown flag first, so this count should be 
+		accurate.
+
+spr.5098 	Non-queued access requests to busy Annex ports from 
+		obsolete LAT 5.1 hosts will no longer hang for three 
+		minutes, but will be rejected immediately. 
+
+spr.5440 	The Annex will properly handle the situation when two 
+		ARA lines are coming in at the same time and ARA tries 
+		to assign them both the same address. Since only one line 
+		can succeed, the other one will back out and remove the 
+		incomplete ifnet from the queue.
